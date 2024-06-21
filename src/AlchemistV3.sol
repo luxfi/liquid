@@ -438,19 +438,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable, Multicall, Mutex {
     }
 
     /// @inheritdoc IAlchemistV3AdminActions
-    function sweepRewardTokens(address rewardToken, address yieldToken) external override lock {
-        _onlyKeeper();
-
-        if (_supportedYieldTokens.contains(rewardToken) || _supportedUnderlyingTokens.contains(rewardToken)) {
-            revert UnsupportedToken(rewardToken);
-        }
-
-        msg.sender.delegatecall(abi.encodeWithSignature("claim(address)", yieldToken));
-
-        TokenUtils.safeTransfer(rewardToken, msg.sender, TokenUtils.safeBalanceOf(rewardToken, address(this)));
-    }
-
-    /// @inheritdoc IAlchemistV3AdminActions
     function setTransferAdapterAddress(address transferAdapterAddress) external override lock {
         _onlyAdmin();
         transferAdapter = transferAdapterAddress;
@@ -1346,7 +1333,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable, Multicall, Mutex {
     ///
     /// @return The total value.
     function totalValue(address owner) public view returns (uint256) {
-        uint256 totalValue = 0;
+        uint256 total = 0;
 
         Sets.AddressSet storage depositedTokens = _accounts[owner].depositedTokens;
         for (uint256 i = 0; i < depositedTokens.values.length; ++i) {
@@ -1355,10 +1342,10 @@ contract AlchemistV3 is IAlchemistV3, Initializable, Multicall, Mutex {
             uint256 shares = _accounts[owner].balances[yieldToken];
             uint256 amountUnderlyingTokens = convertSharesToUnderlyingTokens(yieldToken, shares);
 
-            totalValue += normalizeUnderlyingTokensToDebt(underlyingToken, amountUnderlyingTokens);
+            total += normalizeUnderlyingTokensToDebt(underlyingToken, amountUnderlyingTokens);
         }
 
-        return totalValue;
+        return total;
     }
 
     /// @dev Issues shares of `yieldToken` for `amount` of its underlying token to `recipient`.

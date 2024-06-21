@@ -453,7 +453,7 @@ contract TransmuterBuffer is ITransmuterBuffer, AccessControl, Initializable {
         uint8 decimals = TokenUtils.expectDecimals(token);
         uint256 pricePerShare = IAlchemistV3(alchemist).getUnderlyingTokensPerShare(token);
         uint256 wantShares = amountUnderlying * 10 ** decimals / pricePerShare;
-        (uint256 availableShares, uint256 lastAccruedWeight) = IAlchemistV3(alchemist).positions(address(this), token);
+        (uint256 availableShares,) = IAlchemistV3(alchemist).positions(address(this), token);
         if (wantShares > availableShares) {
             wantShares = availableShares;
         }

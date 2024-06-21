@@ -24,7 +24,7 @@ abstract contract Mutex {
     /// @dev Gets if the mutex is locked.
     ///
     /// @return if the mutex is locked.
-    function _isLocked() internal returns (bool) {
+    function _isLocked() internal view returns (bool) {
         return _lockState == 1;
     }
 
