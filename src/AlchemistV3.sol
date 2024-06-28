@@ -2,9 +2,7 @@
 pragma solidity ^0.8.13;
 
 import {Initializable} from "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
-
 import {Unauthorized, IllegalState, IllegalArgument} from "./base/Errors.sol";
-
 import "./base/Multicall.sol";
 import "./base/Mutex.sol";
 import "./interfaces/IAlchemistV3.sol";
@@ -15,6 +13,7 @@ import "./libraries/SafeCast.sol";
 import "./libraries/Sets.sol";
 import "./libraries/TokenUtils.sol";
 import "./libraries/Limiters.sol";
+import "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 /// @title  AlchemistV3
 /// @author Alchemix Finance
@@ -27,6 +26,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable, Multicall, Mutex {
         // A signed value which represents the current amount of debt or credit that the account has accrued.
         // Positive values indicate debt, negative values indicate credit.
         int256 debt;
+        // The timestamp of first time user has borrowed alAsset. Resets when debt goes to 0
+        uint256 initialLoanTimeStamp;
         // The share balances for each yield token.
         mapping(address => uint256) balances;
         // The last values recorded for accrued weights for each yield token.
@@ -108,6 +109,38 @@ contract AlchemistV3 is IAlchemistV3, Initializable, Multicall, Mutex {
     address public override transferAdapter;
 
     constructor() initializer {}
+
+    /// @inheritdoc IAlchemistV3State
+    function getCDP(address owner) external view returns (uint256 depositedCollateral, int256 debt) {
+        Account storage account = _accounts[owner];
+
+        Sets.AddressSet storage depositedTokens = account.depositedTokens;
+
+        uint256 secondsSinceLoan = elapsedSecondsSinceLoan(owner);
+
+        address yieldToken = depositedTokens.values[0];
+
+        uint256 yieldRequest = getYieldRequestForAlchemist(yieldToken);
+
+        /// @dev mocked number of total borrowers. Not sure if this matters
+        uint256 totalBorrowersForThisAlchemist = 1;
+
+        uint256 yeildRequestedFromUser = (yieldRequest / totalBorrowersForThisAlchemist) * secondsSinceLoan;
+
+        depositedCollateral = totalValue(owner);
+
+        debt = account.debt;
+
+        if (SafeCast.toInt256(yeildRequestedFromUser) > debt) {
+            /// @dev debt cleared
+            debt -= debt;
+        } else {
+            /// @dev crude representation of debt being reduced by redemption request
+            /// this may ultimately come from the collateral
+            debt -= SafeCast.toInt256(yeildRequestedFromUser);
+        }
+        return (depositedCollateral, debt);
+    }
 
     /// @inheritdoc IAlchemistV3State
     function getYieldTokensPerShare(address yieldToken) external view override returns (uint256) {
@@ -1094,6 +1127,12 @@ contract AlchemistV3 is IAlchemistV3, Initializable, Multicall, Mutex {
         // Update the owner's account, increase their debt by the amount of tokens to mint, and then finally validate
         // their account to assure that the collateralization invariant is still held.
         _poke(owner);
+
+        // Update timestamp of initial loan for a user
+        if (_accounts[owner].initialLoanTimeStamp == 0) {
+            _accounts[owner].initialLoanTimeStamp = block.timestamp;
+        }
+
         _updateDebt(owner, SafeCast.toInt256(amount));
         _validate(owner);
 
@@ -1263,6 +1302,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable, Multicall, Mutex {
     function _updateDebt(address owner, int256 amount) internal {
         Account storage account = _accounts[owner];
         account.debt += amount;
+        if (account.debt == 0) {
+            _accounts[owner].initialLoanTimeStamp = 0;
+        }
     }
 
     /// @dev Set the mint allowance for `spender` to `amount` for the account owned by `owner`.
@@ -1325,6 +1367,25 @@ contract AlchemistV3 is IAlchemistV3, Initializable, Multicall, Mutex {
         if (collateralization < minimumCollateralization) {
             revert Undercollateralized();
         }
+    }
+
+    /// @inheritdoc IAlchemistV3State
+    function elapsedSecondsSinceLoan(address owner) public view returns (uint256) {
+        return (block.timestamp - _accounts[owner].initialLoanTimeStamp);
+    }
+
+    /// @inheritdoc IAlchemistV3State
+    function getYieldRequestForAlchemist(address yieldToken) public view returns (uint256) {
+        /// @dev mocked rate at 1 bps or .001 % per second
+        uint256 redemptionRate = 1;
+
+        uint256 collateralForThisAlchemist = IERC20(yieldToken).balanceOf(address(this));
+
+        /// @dev mocked arbitrary cap on what the Transmuter can pull from
+        uint256 maxRedeemableCollateral = collateralForThisAlchemist / 100;
+
+        /// @dev yield requested from Transmuter for this Alchemist is at .001% of the capped collateral
+        return (redemptionRate * maxRedeemableCollateral) / BPS;
     }
 
     /// @dev Gets the total value of the deposit collateral measured in debt tokens of the account owned by `owner`.

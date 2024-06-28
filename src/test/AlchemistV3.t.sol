@@ -3,6 +3,7 @@ pragma solidity ^0.8.13;
 
 import {DSTestPlus} from "./utils/DSTestPlus.sol";
 import {IAlchemistV3AdminActions} from "../interfaces/alchemist/IAlchemistV3AdminActions.sol";
+import "../../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../libraries/SafeERC20.sol";
 import {console} from "../../lib/forge-std/src/console.sol";
 import {AlchemistV3} from "../AlchemistV3.sol";
@@ -15,6 +16,7 @@ import {TestYieldToken} from "./mocks/TestYieldToken.sol";
 import {TestYieldTokenAdapter} from "./mocks/TestYieldTokenAdapter.sol";
 import "../../../lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {CheatCodes} from "./utils/Cheatcodes.sol";
+import "../libraries/SafeCast.sol";
 
 contract AlchemistV3Test is DSTestPlus {
     // ----- [SETUP] Variables for setting up a minimal CDP -----
@@ -62,10 +64,10 @@ contract AlchemistV3Test is DSTestPlus {
     // ----- Variables for deposits & withdrawals -----
 
     // account funds to make deposits/test with
-    uint256 accountFunds = 1_000_000e18;
+    uint256 accountFunds = 10_000_000e18;
 
     // amount of yield/underlying token to deposit
-    uint256 depositAmount = 10_000e18;
+    uint256 depositAmount = 100_000e18;
 
     // minimum amount of yield/underlying token to deposit
     uint256 minimumDeposit = 1000e18;
@@ -192,6 +194,58 @@ contract AlchemistV3Test is DSTestPlus {
         uint256 shares = alchemist.convertYieldTokensToShares(address(fakeYieldToken), depositAmount);
         alchemist.withdraw(address(fakeYieldToken), shares / 2, address(0xbeef));
         assertApproxEq(alchemist.totalValue(address(0xbeef)), depositAmount / 2, minimumDepositOrWithdrawalLoss);
+        hevm.stopPrank();
+    }
+
+    function testCDPWithZeroDebt() external {
+        hevm.prank(address(0xdead));
+        whitelist.add(address(0xbeef));
+        hevm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), accountFunds);
+        alchemist.deposit(address(fakeYieldToken), depositAmount, address(0xbeef));
+        (uint256 deposit, int256 debt) = alchemist.getCDP(address(0xbeef));
+        assertApproxEq(deposit, depositAmount, minimumDepositOrWithdrawalLoss);
+        assertApproxEq(SafeCast.toUint256(debt), 0, minimumDepositOrWithdrawalLoss);
+        hevm.stopPrank();
+    }
+
+    function testCDPWithPositiveDebt() external {
+        /// @dev minting a half of the collateral
+        uint256 mintAmount = depositAmount / 2;
+
+        /// @dev expected debt after 1 day / 86400s for a speicifc user with 50,000 debt
+        /// at a mocked redemption rate on a capped amount of total collateral in an Alchemist
+        uint256 debAfterOneDay = 41_352e18;
+
+        hevm.prank(address(0xdead));
+
+        vm.warp(1_719_590_015);
+
+        whitelist.add(address(0xbeef));
+
+        hevm.startPrank(address(0xbeef));
+
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), accountFunds);
+
+        alchemist.deposit(address(fakeYieldToken), depositAmount, address(0xbeef));
+
+        alchemist.mint(mintAmount, address(0xbeef));
+
+        (uint256 deposit, int256 debt) = alchemist.getCDP(address(0xbeef));
+
+        assertApproxEq(deposit, depositAmount, minimumDepositOrWithdrawalLoss);
+
+        assertApproxEq(SafeCast.toUint256(debt), mintAmount, minimumDepositOrWithdrawalLoss);
+
+        // warp by 1 day / 86400s
+        vm.warp(1_719_590_095 + 86_400);
+
+        (deposit, debt) = alchemist.getCDP(address(0xbeef));
+
+        assertApproxEq(deposit, depositAmount, minimumDepositOrWithdrawalLoss);
+
+        assertApproxEq(SafeCast.toUint256(debt), debAfterOneDay, minimumDepositOrWithdrawalLoss);
+
         hevm.stopPrank();
     }
 }
