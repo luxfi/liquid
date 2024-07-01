@@ -228,11 +228,18 @@ interface IAlchemistV3State {
     /// @return params elapsed time in seconds
     function elapsedSecondsSinceLoan(address owner) external view returns (uint256);
 
-    /// @notice Gets amount needed by Transmuter for redemptions. Should make use of the getRedmptionRate() on the Transmuter.
+    /// @notice Gets total amount needed by Transmuter for redemptions. Should make use of the getRedmptionRate() on the Transmuter.
     ///
     /// @param yieldToken The yield token address for the specified Alchemist
     /// @return params yield amount neeeded
-    function getYieldRequestForAlchemist(address yieldToken) external view returns (uint256);
+    function getRedemptionRequestForAlchemist(address yieldToken) external view returns (uint256);
+
+    /// @notice Gets share of redemption amout for user.
+    ///
+    /// @param yieldToken The yield token address for the specified Alchemist
+    /// @param owner The address of the account owner.
+    /// @return params redemption amount neeeded
+    function getRedemptionAmountRequestForUser(address yieldToken, address owner) external view returns (uint256);
 
     /// @notice Gets deposit and debt of the account owned by `owner`.
     ///
