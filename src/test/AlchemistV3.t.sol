@@ -215,7 +215,7 @@ contract AlchemistV3Test is DSTestPlus {
 
         /// @dev expected debt after 1 day / 86400s for a speicifc user with 50,000 debt
         /// at a mocked redemption rate on a capped amount of total collateral in an Alchemist
-        uint256 debAfterOneDay = 41_352e18;
+        uint256 debAfterOneDay = 4_999_995e16;
 
         hevm.prank(address(0xdead));
 
