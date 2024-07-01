@@ -1376,7 +1376,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable, Multicall, Mutex {
 
     /// @inheritdoc IAlchemistV3State
     function getYieldRequestForAlchemist(address yieldToken) public view returns (uint256) {
-        /// @dev mocked rate at 1 bps or .001 % per second
+        /// @dev mocked rate at 1 bps or .01 % per second
         uint256 redemptionRate = 1;
 
         uint256 collateralForThisAlchemist = IERC20(yieldToken).balanceOf(address(this));
@@ -1384,7 +1384,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable, Multicall, Mutex {
         /// @dev mocked arbitrary cap on what the Transmuter can pull from
         uint256 maxRedeemableCollateral = collateralForThisAlchemist / 100;
 
-        /// @dev yield requested from Transmuter for this Alchemist is at .001% of the capped collateral
+        /// @dev yield requested from Transmuter for this Alchemist is at .01% of the capped collateral
         return (redemptionRate * maxRedeemableCollateral) / BPS;
     }
 
