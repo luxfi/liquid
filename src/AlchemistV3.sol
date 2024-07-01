@@ -122,9 +122,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable, Multicall, Mutex {
 
         uint256 redemptionRequestForUser = getRedemptionAmountRequestForUser(yieldToken, owner);
 
-        /// @dev mocked number of total borrowers. Not sure if this matters
-        uint256 totalBorrowersForThisAlchemist = 1;
-
         depositedCollateral = totalValue(owner);
 
         debt = account.debt;
@@ -1396,8 +1393,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable, Multicall, Mutex {
         /// @dev mocked arbitrary cap on what the Transmuter can pull from
         uint256 maxRedeemableCollateral = collateralForThisAlchemist / LTV;
 
-        /// @dev yield requested from Transmuter for this Alchemist is at .01% per second which is high
-        /// so articialliay increasing this denom to drecrease the amount requested
+        /// @dev amount requested from Transmuter for this Alchemist is at .01% per second which is high
+        /// so artificially increasing this denominator to decrease the amount requested
         return (redemptionRate * maxRedeemableCollateral) / (BPS * 100);
     }
 
