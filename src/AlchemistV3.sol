@@ -116,8 +116,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable, Multicall, Mutex {
 
         Sets.AddressSet storage depositedTokens = account.depositedTokens;
 
-        uint256 secondsSinceLoan = elapsedSecondsSinceLoan(owner);
-
         address yieldToken = depositedTokens.values[0];
 
         uint256 redemptionRequestForUser = getRedemptionAmountRequestForUser(yieldToken, owner);
@@ -1373,41 +1371,49 @@ contract AlchemistV3 is IAlchemistV3, Initializable, Multicall, Mutex {
         }
     }
 
-    /// @inheritdoc IAlchemistV3State
+    /// @notice Checks elapsed time since the account owned by `owner` has created a loan / debts been reset to zero
+    ///
+    /// @param owner The address of the account owner.
+    /// @return params elapsed time in seconds
     function elapsedSecondsSinceLoan(address owner) public view returns (uint256) {
         return (block.timestamp - _accounts[owner].initialLoanTimeStamp);
     }
 
-    /// @inheritdoc IAlchemistV3State
+    /// @notice Gets total amount needed by Transmuter for redemptions. Should make use of the getRedmptionRate() on the Transmuter.
+    ///
+    /// @param yieldToken The yield token address for the specified Alchemist
+    /// @return params yield amount neeeded
     function getRedemptionRequestForAlchemist(address yieldToken) public view returns (uint256) {
         /// @dev mocked rate at 1 bps or .01 % per second
-        /// This should be lower, like .0001% per second
+        /// This should be lower, like (1/30) / 86400s % per second or about 3858e9 per second
         uint256 redemptionRate = 1;
 
         // total deposit from all users and (any potential yield)
         uint256 collateralForThisAlchemist = IERC20(yieldToken).balanceOf(address(this));
 
-        // mocked LTV i.e. atleast twice as much collateral as borrowed
-        uint256 LTV = 2;
-
         /// @dev mocked arbitrary cap on what the Transmuter can pull from
-        uint256 maxRedeemableCollateral = collateralForThisAlchemist / LTV;
+        uint256 maxRedeemableCollateral = collateralForThisAlchemist / 2;
 
         /// @dev amount requested from Transmuter for this Alchemist is at .01% per second which is high
         /// so artificially increasing this denominator to decrease the amount requested
-        return (redemptionRate * maxRedeemableCollateral) / (BPS * 100);
+        return (redemptionRate * maxRedeemableCollateral * BPS) / 3858e9;
     }
 
-    /// @inheritdoc IAlchemistV3State
+    /// @notice Gets share of redemption amout for user.
+    ///
+    /// @param yieldToken The yield token address for the specified Alchemist
+    /// @param owner The address of the account owner.
+    /// @return params redemption amount neeeded
     function getRedemptionAmountRequestForUser(address yieldToken, address owner) public view returns (uint256) {
         /// @dev mocked total debt of alAsset. Not sure how best to fetch this value
         uint256 totalDebt = IERC20(debtToken).totalSupply();
         if (totalDebt == 0) {
             return 0;
         }
-        int256 shareOfDebt = _accounts[owner].debt / SafeCast.toInt256(totalDebt);
+        uint256 shareOfDebt = (SafeCast.toUint256(_accounts[owner].debt) * BPS) / totalDebt;
         uint256 globalRdemptionAmount = getRedemptionRequestForAlchemist(yieldToken);
-        return SafeCast.toUint256(shareOfDebt) * globalRdemptionAmount;
+        uint256 secondsSinceLoan = elapsedSecondsSinceLoan(owner);
+        return (shareOfDebt * globalRdemptionAmount * secondsSinceLoan) / BPS;
     }
 
     /// @dev Gets the total value of the deposit collateral measured in debt tokens of the account owned by `owner`.
