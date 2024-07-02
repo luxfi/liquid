@@ -222,25 +222,6 @@ interface IAlchemistV3State {
     /// @return maximum      The maximum possible amount of tokens that can be repaid at a time.
     function getRepayLimitInfo(address underlyingToken) external view returns (uint256 currentLimit, uint256 rate, uint256 maximum);
 
-    /// @notice Checks elapsed time since the account owned by `owner` has created a loan / debts been reset to zero
-    ///
-    /// @param owner The address of the account owner.
-    /// @return params elapsed time in seconds
-    function elapsedSecondsSinceLoan(address owner) external view returns (uint256);
-
-    /// @notice Gets total amount needed by Transmuter for redemptions. Should make use of the getRedmptionRate() on the Transmuter.
-    ///
-    /// @param yieldToken The yield token address for the specified Alchemist
-    /// @return params yield amount neeeded
-    function getRedemptionRequestForAlchemist(address yieldToken) external view returns (uint256);
-
-    /// @notice Gets share of redemption amout for user.
-    ///
-    /// @param yieldToken The yield token address for the specified Alchemist
-    /// @param owner The address of the account owner.
-    /// @return params redemption amount neeeded
-    function getRedemptionAmountRequestForUser(address yieldToken, address owner) external view returns (uint256);
-
     /// @notice Gets deposit and debt of the account owned by `owner`.
     ///
     /// @param owner The address of the account owner.
