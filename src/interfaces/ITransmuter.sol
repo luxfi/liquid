@@ -2,6 +2,31 @@
 pragma solidity ^0.8.13;
 
 interface ITransmuter {
+    struct AlchemistEntry {
+        // TODO: Add other necessary alchemist data here
+        uint256 index;
+        bool isActive;
+    }
+
+    // TODO: Potentially replace this with NFT respresented position
+    struct StakingPosition {
+        // Alchemist from which collateral will be drawn from. 
+        // TODO: figure out how to handle this for multi collateral positions
+        // Scoopy suggested allowing users to claim an even mix of assets from all registered alchemists n times faster than usual
+        // For now will handle as single collateral asset.
+        address alchemist;
+
+        // Address of the collateral address that the user requested. 
+        // TODO: Once this code is combined with the AlchemistV3 code we can just pull this data from there instead of storing it here.
+        address collateralAsset;
+
+        // Amount staked.
+        uint256 amount;
+
+        // Time when the transmutation will be complete/claimable.
+        uint256 positionMaturationDate;
+    }
+
     // TODO: Fill this in with functions events and full comments:) 
 
     /// @notice Emitted when the admin address is updated.
@@ -14,10 +39,12 @@ interface ITransmuter {
     /// @param creator          The address that created the position.
     /// @param alchemist        The address of the alchemist which tokens will be claimed from.
     /// @param amountStaked     The amount of tokens staked.
+    /// @param nftId            The id of the newly minted NFT.
     event PositionCreated(
         address indexed creator,
         address indexed alchemist,
-        uint256 amountStaked
+        uint256 amountStaked,
+        uint256 nftId
     );
 
     /// @dev Emitted when a position is claimed.

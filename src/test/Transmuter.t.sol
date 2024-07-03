@@ -1,0 +1,143 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity 0.8.26;
+
+import {Test} from "../../../lib/forge-std/src/Test.sol";
+import {StdCheats} from "../../../lib/forge-std/src/StdCheats.sol";
+
+import {AlEth} from "../external/AlETH.sol";
+import {Transmuter, InitializationParams} from "../Transmuter.sol";
+
+contract TransmuterTest is Test {
+    AlEth public alETH;
+    AlEth public collateralToken;
+    Transmuter public transmuter;
+
+    function setUp() public {
+        alETH = new AlEth();
+        collateralToken = new AlEth();
+        transmuter = new Transmuter(InitializationParams(address(alETH), 365 days));
+
+        transmuter.addAlchemist(address(0xbeef));
+
+        deal(address(collateralToken), address(0xbeef), type(uint256).max);
+
+        vm.prank(address(0xbeef));
+        collateralToken.approve(address(transmuter), type(uint256).max);
+    }
+
+    function testAddAlchemist() public {
+        transmuter.addAlchemist(address(0xdead));
+
+        (uint256 index, bool active) = transmuter.alchemistEntries(address(0xdead));
+
+        assertEq(index, 1);
+        assertEq(active, true);
+
+        assertEq(transmuter.alchemists(1), address(0xdead));
+    }
+
+    function testAddAlchemistAlreadyAdded() public {
+        vm.expectRevert("Alchemist has already been added!");
+        transmuter.addAlchemist(address(0xbeef));
+    }
+
+    function testRemoveAlchemist() public {
+        transmuter.removeAlchemist(address(0xbeef));
+
+        (uint256 index, bool active) = transmuter.alchemistEntries(address(0xbeef));
+
+        assertEq(index, 0);
+        assertEq(active, false);
+
+        vm.expectRevert();
+        transmuter.alchemists(0);
+    }
+
+    function testRemoveAlchemistNotRegistered() public {
+        vm.expectRevert("Alchemist is not registered!");
+        transmuter.removeAlchemist(address(0xbee));
+    }
+
+    function testSetTransmutationTime() public {
+        transmuter.setTransmutationTime(20 days);
+
+        assertEq(transmuter.timeToTransmute(), 20 days);
+    }
+
+    function testSweepTokens() public {
+        deal(address(alETH), address(transmuter), 100e18);
+
+        transmuter.sweepTokens();
+
+        assertEq(alETH.balanceOf(address(this)), 100e18);
+    }
+
+    // TODO: Update once create redemption is modified
+    function testCreateRedemption() public {
+        transmuter.createRedemption(address(0xbeef), address(0xadbc), 100e18);
+
+        uint256[] memory ids = new uint256[](1);
+        ids[0] = 0;
+
+        Transmuter.StakingPosition[] memory positions = transmuter.getPositions(address(this), ids);
+
+        assertEq(positions[0].amount, 100e18);
+    }
+
+    // TODO: Update once create redemption is modified
+    function testFuzzCreateRedemption(uint256 amount) public {
+        vm.assume(amount > 0);
+
+        transmuter.createRedemption(address(0xbeef), address(0xadbc), amount);
+
+        uint256[] memory ids = new uint256[](1);
+        ids[0] = 0;
+
+        Transmuter.StakingPosition[] memory positions = transmuter.getPositions(address(this), ids);
+
+        assertEq(positions[0].amount, amount);
+    }
+
+    function testCreateRedemptionNoTokens() public {
+        vm.expectRevert("Value must be greater than 0!");
+        transmuter.createRedemption(address(0xbeef), address(0xadbc), 0);
+
+    }
+
+    function testCreateRedemptioNotRegistered() public {
+        vm.expectRevert("Alchemist is not registered!");
+        transmuter.createRedemption(address(0xbeeb), address(0xadbc), 100e18);
+    }
+
+    function testClaimRedemption() public {
+        transmuter.createRedemption(address(0xbeef), address(collateralToken), 100e18);
+
+        vm.warp(block.timestamp + 365 days);
+        transmuter.claimRedemption(0);
+
+        assertEq(collateralToken.balanceOf(address(this)), 100e18);
+    }
+
+    function testFuzzClaimRedemption(uint256 amount) public {
+        vm.assume(amount > 0);
+
+        transmuter.createRedemption(address(0xbeef), address(collateralToken), amount);
+
+        vm.warp(block.timestamp + 365 days);
+        transmuter.claimRedemption(0);
+
+        assertEq(collateralToken.balanceOf(address(this)), amount);
+    }
+
+    function testClaimRedemptionPremature() public {
+        transmuter.createRedemption(address(0xbeef), address(collateralToken), 100e18);
+
+        vm.expectRevert("Position has not reached maturity!");
+        transmuter.claimRedemption(0);
+    }
+
+    function testClaimRedemptionNoPosition() public {
+        vm.expectRevert("No position found!");
+        transmuter.claimRedemption(0);
+    }
+}
