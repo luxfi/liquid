@@ -14,25 +14,6 @@ struct InitializationParams {
 ///
 /// @notice A contract which facilitates the exchange of alAssets to yield bearing assets.
 contract Transmuter is ITransmuter {
-    // TODO: Potentially replace this with NFT respresented position
-    struct StakingPosition {
-        // Alchemist from which collateral will be drawn from. 
-        // TODO: figure out how to handle this for multi collateral positions
-        // Scoopy suggested allowing users to claim an even mix of assets from all registered alchemists n times faster than usual
-        // For now will handle as single collateral asset.
-        address alchemist;
-
-        // Address of the collateral address that the user requested. 
-        // TODO: Once this code is combined with the AlchemistV3 code we can just pull this data from there instead of storing it here.
-        address collateralAsset;
-
-        // Amount staked.
-        uint256 amount;
-
-        // Time when the transmutation will be complete/claimable.
-        uint256 positionMaturationDate;
-    }
-
     // Alchemix synthetic asset to be transmuted.
     address public syntheticToken;
 
@@ -49,11 +30,11 @@ contract Transmuter is ITransmuter {
     // The current redemption rate
     uint256 public redemptionRate;
 
-    /// @dev Array of all registered alchemists. 
+    /// @dev Array of all registered alchemists.
     address[] public alchemists;
 
     /// @dev Map of addresses to index in `alchemists` array
-    mapping(address => uint256) public alchemistIndex;
+    mapping(address => AlchemistEntry) public alchemistEntries;
 
     /// @dev Map of addresses to a map of NFT tokenId to associated position.
     mapping(address => mapping(uint256 => StakingPosition)) private positions;
@@ -70,16 +51,17 @@ contract Transmuter is ITransmuter {
 
     // Adds an Alchemist to the transmuter
     function addAlchemist(address alchemist) external {
-        require(alchemistIndex[alchemist] == 0, "Alchemist has already been added!");
+        require(alchemistEntries[alchemist].isActive == false, "Alchemist has already been added!");
         alchemists.push(alchemist);
-        alchemistIndex[alchemist] = alchemists.length - 1;
+        alchemistEntries[alchemist] = AlchemistEntry(alchemists.length-1, true);
     }
 
     // Removes an Alchemist from the transmuter
     function removeAlchemist(address alchemist) external {
-        alchemists[alchemistIndex[alchemist]] = alchemists[alchemists.length-1];
+        require(alchemistEntries[alchemist].isActive == true, "Alchemist is not registered!");
+        alchemists[alchemistEntries[alchemist].index] = alchemists[alchemists.length-1];
         alchemists.pop();
-        alchemistIndex[alchemist] = 0;
+        delete alchemistEntries[alchemist];
     }
 
     // Sets the transmutation time, denoted in days.
@@ -94,29 +76,33 @@ contract Transmuter is ITransmuter {
 
     /* ---------------EXTERNAL FUNCTIONS--------------- */
 
-    // TODO: Remove this once NFTs are implemented. Should be handled in UI
+    // IDs can be seen from UI, which will input them into this function to get data
+    // Potentially move this to the NFT entirely, but likely need some on chain data
     function getPositions(address account, uint256[] calldata ids) external view returns(StakingPosition[] memory) {
         StakingPosition[] memory userPositions = new StakingPosition[](ids.length);
 
-        for (uint256 i = 0; i < ids.length - 1; i++) {
+        for (uint256 i = 0; i < ids.length; i++) {
             userPositions[i] = positions[account][ids[i]];
         }
 
         return userPositions;
     }
 
+    // TODO: If we decide to let users take split of collateral from all alchemists then this needs to be updated
+    // If not then we should be pull collateral address from alchemist once it is merged in
     function createRedemption(address alchemist, address collateral, uint256 depositAmount) external {
         require(depositAmount > 0, "Value must be greater than 0!");
+        require(alchemistEntries[alchemist].isActive == true, "Alchemist is not registered!");
 
         // TODO: Create NFT
 
         positions[msg.sender][idCounter] = StakingPosition(alchemist, collateral, depositAmount, block.timestamp + timeToTransmute);
         
-        idCounter++;
-
         _updateRedemptionRate();
 
-        emit PositionCreated(msg.sender, alchemist, depositAmount);
+        emit PositionCreated(msg.sender, alchemist, depositAmount, idCounter);
+                
+        idCounter++;
     }
 
     function claimRedemption(uint256 id) external {
