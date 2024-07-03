@@ -80,6 +80,9 @@ contract AlchemistV3Test is Test {
     // minimum amount of yield/underlying token to deposit
     uint256 minimumDepositOrWithdrawalLoss = 1e18;
 
+    // random EOA for testing
+    address externalUser = address(0x69E8cE9bFc01AA33cD2d02Ed91c72224481Fa420);
+
     function setUp() external {
         // test maniplulation for convenience
         address caller = address(0xdead);
@@ -328,41 +331,41 @@ contract AlchemistV3Test is Test {
 
         /// @dev expected debt after 1 month for a specific user with 80,000 debt
         /// at a mocked redemption rate on a capped amount of total collateral in an Alchemist
-        uint256 debAfterOneMonth = 79_253_550_834_629_341_915_618;
+        uint256 debAfterOneMonth = 79_924_608_634_297_563_812_243;
 
         /// @dev expected deposit after 1 month for a specific user with 100,000 deposit
         /// at a mocked redemption rate on a capped amount of total collateral in an Alchemist
-        uint256 depositAfterOneMonth = 99_253_550_834_629_341_915_618;
+        uint256 depositAfterOneMonth = 99_924_608_634_297_563_812_243;
 
         /// @dev faking total collateral
         uint256 initialAlchemistCollateral = 900_000e18;
 
-        /// @dev collateral after 1 month at 12% APY i.e. 1% increase per month starting @ 900_000e18
-        uint256 alchemistCollateral1Month = 909_000e18;
+        /// @dev collateral after 1 month at 12% APY i.e. 1% increase per month starting from initial 900_000e18 + 100_000e18 deposited
+        uint256 alchemistCollateralAfter1Month = 101_000e18;
 
         uint256 initialBorrowedAmount = 280_000e18;
 
-        deal(address(fakeYieldToken), address(0xD4D86f77aC52E0e8a26E474503C51930F022649f), accountFunds);
-
-        vm.startPrank(address(0xdead));
+        deal(address(fakeYieldToken), externalUser, accountFunds);
 
         vm.warp(1_719_590_015);
 
+        vm.startPrank(address(0xdead));
+
         whitelist.add(address(0xbeef));
 
-        whitelist.add(address(0xD4D86f77aC52E0e8a26E474503C51930F022649f));
+        whitelist.add(externalUser);
 
         vm.stopPrank();
 
         /// simulating mint from a user
 
-        vm.startPrank(address(0xD4D86f77aC52E0e8a26E474503C51930F022649f));
+        vm.startPrank(externalUser);
 
         SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), accountFunds);
 
-        alchemist.deposit(address(fakeYieldToken), initialAlchemistCollateral, address(0xD4D86f77aC52E0e8a26E474503C51930F022649f));
+        alchemist.deposit(address(fakeYieldToken), initialAlchemistCollateral, externalUser);
 
-        alchemist.mint(initialBorrowedAmount, address(0xD4D86f77aC52E0e8a26E474503C51930F022649f));
+        alchemist.mint(initialBorrowedAmount, externalUser);
 
         vm.stopPrank();
 
@@ -382,11 +385,11 @@ contract AlchemistV3Test is Test {
         vm.warp(1_719_590_095 + (30 * 86_400));
 
         // Fake yeild accrual after 1 month @ 12% APY
-        deal(address(fakeYieldToken), address(this), 9000e18);
+        deal(address(fakeYieldToken), address(alchemist), alchemistCollateralAfter1Month);
 
         (uint256 deposit, int256 debt) = alchemist.getCDP(address(0xbeef));
 
-        // i.e. 100,000 collateral - ((.001307 alAsset per second * 86400 seconds * 30 days ) * 0.22 share of debt)
+        // i.e. 100,000 collateral + yield - ((.001307 alAsset per second * 86400 seconds * 30 days ) * 0.22 share of debt)
         vm.assertApproxEqAbs(deposit, depositAfterOneMonth, minimumDepositOrWithdrawalLoss);
 
         // i.e. 80,000 debt - ((.001307 alAsset per second * 86400 seconds * 30 days ) * 0.22 share of debt)
