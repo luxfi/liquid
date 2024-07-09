@@ -1,15 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity ^0.8.11;
+pragma solidity ^0.8.23;
 
 import "../../../lib/openzeppelin-contracts/contracts/utils/Context.sol";
-import "../../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import "../../../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/IERC20Upgradeable.sol";
-import {ReentrancyGuard} from "../../../lib/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
+import {ReentrancyGuard} from "../../../lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 import {ITransmuterBuffer} from "../../interfaces/transmuter/ITransmuterBuffer.sol";
 
 contract TransmuterMock is Context, ReentrancyGuard {
-    using SafeERC20 for IERC20Upgradeable;
-
     address public constant ZERO_ADDRESS = address(0);
     uint256 public TRANSMUTATION_PERIOD;
 
