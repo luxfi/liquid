@@ -1,4 +1,4 @@
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.23;
 
 /// @notice An error used to indicate that an action could not be completed because either the `msg.sender` or
 ///         `msg.origin` is not authorized.

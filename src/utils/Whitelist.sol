@@ -15,7 +15,7 @@ contract Whitelist is IWhitelist, Ownable {
     /// @inheritdoc IWhitelist
     bool public override disabled;
 
-    constructor() Ownable() {}
+    constructor() Ownable(msg.sender) {}
 
     /// @inheritdoc IWhitelist
     function getAddresses() external view returns (address[] memory) {
