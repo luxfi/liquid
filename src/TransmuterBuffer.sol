@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.23;
 
 import {AccessControl} from "../lib/openzeppelin-contracts/contracts/access/AccessControl.sol";
 import {Initializable} from "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
-import "../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 
 import "./base/Errors.sol";
 
@@ -83,7 +82,7 @@ contract TransmuterBuffer is ITransmuterBuffer, AccessControl, Initializable {
     /// @param _admin     The governing address of the buffer.
     /// @param _debtToken The debt token minted by the Alchemist and accepted by the Transmuter.
     function initialize(address _admin, address _debtToken) external initializer {
-        _setupRole(ADMIN, _admin);
+        _grantRole(ADMIN, _admin);
         _setRoleAdmin(ADMIN, ADMIN);
         _setRoleAdmin(KEEPER, ADMIN);
         debtToken = _debtToken;

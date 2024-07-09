@@ -1,4 +1,4 @@
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.23;
 
 import {IllegalArgument} from "../base/Errors.sol";
 

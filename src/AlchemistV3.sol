@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Unlicense
-pragma solidity ^0.8.13;
+pragma solidity 0.8.26;
 
 import {Initializable} from "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 import {Unauthorized, IllegalState, IllegalArgument} from "./base/Errors.sol";
@@ -1434,7 +1434,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable, Multicall, Mutex {
     ///
     /// @return The expected total value.
     function expectedTotalValue(address yieldToken, address owner) public view returns (uint256) {
-        address underlyingToken = _yieldTokens[yieldToken].underlyingToken;
         uint256 depositedAmount = totalValue(owner);
         uint256 shares = convertYieldTokensToShares(yieldToken, depositedAmount);
         uint256 amountUnderlyingTokens = convertSharesToUnderlyingTokens(yieldToken, shares);

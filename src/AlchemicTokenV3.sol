@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.23;
 
 import {AccessControl} from "../lib/openzeppelin-contracts/contracts/access/AccessControl.sol";
 import {ERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {Ownable} from "../lib/openzeppelin-contracts/contracts/access/Ownable.sol";
-import {ReentrancyGuard} from "../lib/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
+import {ReentrancyGuard} from "../lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 
 import {IllegalArgument, IllegalState, Unauthorized} from "./base/Errors.sol";
 
@@ -57,8 +57,8 @@ contract AlchemicTokenV3 is AccessControl, ReentrancyGuard, ERC20, IERC3156Flash
     event SetMaxFlashLoan(uint256 maxFlashLoan);
 
     constructor(string memory _name, string memory _symbol, uint256 _flashFee) ERC20(_name, _symbol) {
-        _setupRole(ADMIN_ROLE, msg.sender);
-        _setupRole(SENTINEL_ROLE, msg.sender);
+        _grantRole(ADMIN_ROLE, msg.sender);
+        _grantRole(SENTINEL_ROLE, msg.sender);
         _setRoleAdmin(SENTINEL_ROLE, ADMIN_ROLE);
         _setRoleAdmin(ADMIN_ROLE, ADMIN_ROLE);
         flashMintFee = _flashFee;
@@ -133,7 +133,7 @@ contract AlchemicTokenV3 is AccessControl, ReentrancyGuard, ERC20, IERC3156Flash
     ///
     /// @param sentinel The address to set as a sentinel.
     function setSentinel(address sentinel) external onlyAdmin {
-        _setupRole(SENTINEL_ROLE, sentinel);
+        _grantRole(SENTINEL_ROLE, sentinel);
     }
 
     /// @notice Pauses `minter` from minting tokens.
