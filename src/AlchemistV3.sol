@@ -120,7 +120,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable, Multicall, Mutex {
 
         uint256 redemptionRequestForUser = getRedemptionAmountRequestForUser(yieldToken, owner);
 
-        depositedCollateral = totalValue(owner);
+        depositedCollateral = expectedTotalValue(yieldToken, owner);
 
         debt = account.debt;
 
@@ -1384,19 +1384,11 @@ contract AlchemistV3 is IAlchemistV3, Initializable, Multicall, Mutex {
     /// @param yieldToken The yield token address for the specified Alchemist
     /// @return params yield amount neeeded
     function getRedemptionRequestForAlchemist(address yieldToken) public view returns (uint256) {
-        /// @dev mocked rate at 1 bps or .01 % per second
-        /// This should be lower, like (1/30) / 86400s % per second or about 3858e9 per second
-        uint256 redemptionRate = 1;
+        // To simplify, mocking 10,000 yield tokens a month for now i.e. .003858 tokens a second (10,000 / 30 days / 86400 seconds)
 
-        // total deposit from all users and (any potential yield)
-        uint256 collateralForThisAlchemist = IERC20(yieldToken).balanceOf(address(this));
-
-        /// @dev mocked arbitrary cap on what the Transmuter can pull from
-        uint256 maxRedeemableCollateral = collateralForThisAlchemist / 2;
-
-        /// @dev amount requested from Transmuter for this Alchemist is at .01% per second which is high
-        /// so artificially increasing this denominator to decrease the amount requested
-        return (redemptionRate * maxRedeemableCollateral * BPS) / 3858e9;
+        // TODO should get the redemption rate from the Transmuter (getRedemptionRate()). This could be in basis points per period
+        // (preferably basis points per seconds)
+        return 3858e12;
     }
 
     /// @notice Gets share of redemption amout for user.
@@ -1430,11 +1422,23 @@ contract AlchemistV3 is IAlchemistV3, Initializable, Multicall, Mutex {
             address underlyingToken = _yieldTokens[yieldToken].underlyingToken;
             uint256 shares = _accounts[owner].balances[yieldToken];
             uint256 amountUnderlyingTokens = convertSharesToUnderlyingTokens(yieldToken, shares);
-
             total += normalizeUnderlyingTokensToDebt(underlyingToken, amountUnderlyingTokens);
         }
-
         return total;
+    }
+
+    /// @dev Gets the expected value of the deposit collateral + yield for `owner`.
+    ///
+    /// @param yieldToken The address of the yieldToken.
+    /// @param owner The address of the account owner.
+    ///
+    /// @return The expected total value.
+    function expectedTotalValue(address yieldToken, address owner) public view returns (uint256) {
+        address underlyingToken = _yieldTokens[yieldToken].underlyingToken;
+        uint256 depositedAmount = totalValue(owner);
+        uint256 shares = convertYieldTokensToShares(yieldToken, depositedAmount);
+        uint256 amountUnderlyingTokens = convertSharesToUnderlyingTokens(yieldToken, shares);
+        return amountUnderlyingTokens;
     }
 
     /// @dev Issues shares of `yieldToken` for `amount` of its underlying token to `recipient`.
