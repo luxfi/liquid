@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import {Initializable} from "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
-import {ReentrancyGuardUpgradeable} from "../lib/openzeppelin-contracts-upgradeable/contracts/security/ReentrancyGuardUpgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "../lib/openzeppelin-contracts-upgradeable/contracts/utils/ReentrancyGuardUpgradeable.sol";
 import {AccessControlUpgradeable} from "../lib/openzeppelin-contracts-upgradeable/contracts/access/AccessControlUpgradeable.sol";
 
 import "./base/Errors.sol";
@@ -142,7 +142,7 @@ contract TransmuterV3 is ITransmuterV2, Initializable, ReentrancyGuardUpgradeabl
     constructor() initializer {}
 
     function initialize(address _syntheticToken, address _underlyingToken, address _buffer, address _whitelist) external initializer {
-        _setupRole(ADMIN, msg.sender);
+        _grantRole(ADMIN, msg.sender);
         _setRoleAdmin(ADMIN, ADMIN);
         _setRoleAdmin(SENTINEL, ADMIN);
 

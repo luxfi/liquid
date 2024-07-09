@@ -1,4 +1,4 @@
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.23;
 
 import {IYieldToken} from "../interfaces/IYieldToken.sol";
 
