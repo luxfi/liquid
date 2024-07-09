@@ -88,10 +88,6 @@ contract AlchemistV3Test is Test {
     // another random EOA for testing
     address anotherExternalUser = address(0x420Ab24368E5bA8b727E9B8aB967073Ff9316969);
 
-    // Real Tokens
-    IERC20 constant dai = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
-    IERC20 constant yvDai = IERC20(0xdA816459F1AB5631232FE5e97a05BBBb94970c95);
-
     function setUp() external {
         // test maniplulation for convenience
         address caller = address(0xdead);
