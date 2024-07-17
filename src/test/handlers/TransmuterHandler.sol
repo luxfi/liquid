@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.26;
+pragma solidity ^0.8.26;
 
 import {CommonBase} from "forge-std/Base.sol";
 import {StdCheats} from "forge-std/StdCheats.sol";
@@ -10,7 +10,6 @@ import "../../Transmuter.sol";
 contract TransmuterHandler is CommonBase, StdCheats, StdUtils{
     Transmuter private _transmuter;
 
-    // TODO: Add alchemist
     constructor(Transmuter transmuter) {
         _transmuter = transmuter;
     }
