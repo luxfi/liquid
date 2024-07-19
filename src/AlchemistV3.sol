@@ -5,9 +5,7 @@ import "./interfaces/IAlchemistV3.sol";
 import "./libraries/TokenUtils.sol";
 import "./libraries/Limiters.sol";
 import "./libraries/SafeCast.sol";
-
 import {Initializable} from "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
-
 import {Unauthorized, IllegalArgument} from "./base/Errors.sol";
 
 /// @title  AlchemistV3
@@ -34,7 +32,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     uint256 public constant BPS = 10_000;
 
-    uint256 public minimumCollateralization;
+    uint256 public maxLTV;
 
     uint256 public protocolFee;
 
@@ -113,7 +111,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         yieldToken = params.yieldToken;
         admin = params.admin;
         transmuter = params.transmuter;
-        minimumCollateralization = params.minimumCollateralization;
+        maxLTV = params.maxLTV;
         protocolFee = params.protocolFee;
         protocolFeeReceiver = params.protocolFeeReceiver;
         whitelist = params.whitelist;
@@ -164,12 +162,10 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     }
 
     /// @inheritdoc IAlchemistV3
-    function mint(uint256 amount, address recipient) external override {
+    function mint(uint256 amount) external override {
         _checkArgument(amount > 0);
-        _checkArgument(recipient != address(0));
-
-        // Mint tokens from the message sender's account to the recipient.
-        _mint(msg.sender, amount, recipient);
+        // Mint tokens to msg.sender
+        _mint(amount, msg.sender);
     }
 
     /// @inheritdoc IAlchemistV3
@@ -192,7 +188,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     /// @inheritdoc IAlchemistV3
     function repay(address user, uint256 amount) external override {
-        // TODO a user’s debt by burning alAssets
+        // TODO repay a user’s debt by burning alAssets
     }
 
     /// @inheritdoc IAlchemistV3
@@ -206,6 +202,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @inheritdoc IAlchemistV3
     function setMaxLoanToValue(uint256 maxltv) external override {
         /// TODO set ltv. (a private variable or struct variable ?)
+        _checkArgument(maxltv > 0 && maxltv < 1e18);
+        maxLTV = maxltv;
     }
 
     function _checkArgument(bool expression) internal pure {
@@ -214,19 +212,14 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         }
     }
 
-    function _mint(address owner, uint256 amount, address recipient) internal {
+    function _mint(uint256 amount, address recipient) internal {
         // Check that the system will allow for the specified amount to be minted.
-
         // TODO To review and add mint limit checks
         // i.e. _checkMintingLimit(uint256 amount)
+        _updateDebt(recipient, SafeCast.toInt256(amount));
 
-        _updateDebt(owner, SafeCast.toInt256(amount));
-
-        // Valid the owner's account to assure that the collateralization invariant is still held.
-        _validate(owner);
-
-        // Decrease the global amount of mintable debt tokens.
-        _mintingLimiter.decrease(amount);
+        // Validate the owner's account to assure that the collateralization invariant is still held.
+        _validate(recipient);
 
         // Mint the debt tokens to the recipient.
         TokenUtils.safeMint(debtToken, recipient, amount);
@@ -242,10 +235,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         if (debt <= 0) {
             return;
         }
-
-        uint256 collateralization = totalValue(owner) * FIXED_POINT_SCALAR / uint256(debt);
-
-        if (collateralization < minimumCollateralization) {
+        uint256 collateralization = (totalValue(owner) * maxLTV) / FIXED_POINT_SCALAR;
+        uint256 normalizedDebt = uint256(debt);
+        if (collateralization < normalizedDebt) {
             revert Undercollateralized();
         }
     }

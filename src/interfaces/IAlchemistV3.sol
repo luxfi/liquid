@@ -17,8 +17,8 @@ interface IAlchemistV3 is IAlchemistV3Errors {
         address yieldToken;
         // The initial transmuter or transmuter buffer.
         address transmuter;
-        // The minimum collateralization ratio that an account must maintain.
-        uint256 minimumCollateralization;
+        // The max ltv
+        uint256 maxLTV;
         // The percentage fee taken from each harvest measured in units of basis points.
         uint256 protocolFee;
         // The address that receives protocol fees.
@@ -48,8 +48,7 @@ interface IAlchemistV3 is IAlchemistV3Errors {
 
     /// @notice Mint `amount` debt tokens.
     /// @param amount    The amount of tokens to mint.
-    /// @param recipient The address of the recipient.
-    function mint(uint256 amount, address recipient) external;
+    function mint(uint256 amount) external;
 
     /// @notice Burn `amount` debt tokens to credit the account owned by `recipient`.
     ///
