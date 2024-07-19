@@ -236,8 +236,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
             return;
         }
         uint256 collateralization = (totalValue(owner) * maxLTV) / FIXED_POINT_SCALAR;
-        uint256 normalizedDebt = uint256(debt);
-        if (collateralization < normalizedDebt) {
+        if (collateralization < uint256(debt)) {
             revert Undercollateralized();
         }
     }
