@@ -130,7 +130,7 @@ contract AlchemistV3Test is Test, IAlchemistV3Errors {
             yieldToken: address(fakeYieldToken),
             debtToken: address(alToken),
             transmuter: address(transmuterBuffer),
-            maxLTV: LTV,
+            maximumLTV: LTV,
             protocolFee: 1000,
             protocolFeeReceiver: address(10),
             mintingLimitMinimum: 1,
@@ -190,7 +190,7 @@ contract AlchemistV3Test is Test, IAlchemistV3Errors {
         ltv = bound(ltv, 0 + 1e14, LTV - 1e16);
         vm.startPrank(address(0xbeef));
         alchemist.setMaxLoanToValue(ltv);
-        vm.assertApproxEqAbs(alchemist.maxLTV(), ltv, minimumDepositOrWithdrawalLoss);
+        vm.assertApproxEqAbs(alchemist.maximumLTV(), ltv, minimumDepositOrWithdrawalLoss);
         vm.stopPrank();
     }
 
