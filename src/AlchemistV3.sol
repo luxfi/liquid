@@ -32,7 +32,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     uint256 public constant BPS = 10_000;
 
-    uint256 public maxLTV;
+    uint256 public maximumLTV;
 
     uint256 public protocolFee;
 
@@ -111,7 +111,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         yieldToken = params.yieldToken;
         admin = params.admin;
         transmuter = params.transmuter;
-        maxLTV = params.maxLTV;
+        maximumLTV = params.maximumLTV;
         protocolFee = params.protocolFee;
         protocolFeeReceiver = params.protocolFeeReceiver;
         whitelist = params.whitelist;
@@ -119,16 +119,16 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     }
 
     /// @inheritdoc IAlchemistV3
-    function deposit(address user, uint256 collateralamount) external override returns (uint256) {
+    function deposit(address user, uint256 collateralAmount) external override returns (uint256) {
         _checkArgument(user != address(0));
 
         // Deposit the yield tokens to the recipient.
-        _deposit(collateralamount, user);
+        _deposit(collateralAmount, user);
 
         // Transfer tokens from the message sender now that the internal storage updates have been committed.
-        TokenUtils.safeTransferFrom(yieldToken, msg.sender, address(this), collateralamount);
+        TokenUtils.safeTransferFrom(yieldToken, msg.sender, address(this), collateralAmount);
 
-        return collateralamount;
+        return collateralAmount;
     }
 
     /// @inheritdoc IAlchemistV3
@@ -182,11 +182,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     }
 
     /// @inheritdoc IAlchemistV3
-    function burn(uint256 amount, address recipient) external override returns (uint256) {
-        // TODO Re-implement when necessary
-    }
-
-    /// @inheritdoc IAlchemistV3
     function repay(address user, uint256 amount) external override {
         // TODO repay a user’s debt by burning alAssets
     }
@@ -200,10 +195,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     }
 
     /// @inheritdoc IAlchemistV3
-    function setMaxLoanToValue(uint256 maxltv) external override {
-        /// TODO set ltv. (a private variable or struct variable ?)
-        _checkArgument(maxltv > 0 && maxltv < 1e18);
-        maxLTV = maxltv;
+    function setMaxLoanToValue(uint256 maxLTV) external override {
+        _checkArgument(maxLTV > 0 && maxLTV < 1e18);
+        maximumLTV = maxLTV;
     }
 
     function _checkArgument(bool expression) internal pure {
@@ -235,7 +229,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         if (debt <= 0) {
             return;
         }
-        uint256 collateralization = (totalValue(owner) * maxLTV) / FIXED_POINT_SCALAR;
+        uint256 collateralization = (totalValue(owner) * maximumLTV) / FIXED_POINT_SCALAR;
         if (collateralization < uint256(debt)) {
             revert Undercollateralized();
         }
