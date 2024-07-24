@@ -24,4 +24,6 @@ contract AlchemistHandler is CommonBase, StdCheats, StdUtils{
     function burn() public {}
 
     function repay() public {}
+
+    function liquidate() public {}
 }

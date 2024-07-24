@@ -38,15 +38,16 @@ contract InvariantTests is Test {
             FuzzSelector({addr: address(transmuterHandler), selectors: selectors})
         );
 
-        selectors = new bytes4[](5);
-        selectors[0] = TransmuterHandler.claimRedemption.selector;
-        selectors[1] = TransmuterHandler.claimRedemption.selector;
-        selectors[2] = TransmuterHandler.claimRedemption.selector;
-        selectors[3] = TransmuterHandler.claimRedemption.selector;
-        selectors[4] = TransmuterHandler.claimRedemption.selector;
+        selectors = new bytes4[](6);
+        selectors[0] = AlchemistHandler.deposit.selector;
+        selectors[1] = AlchemistHandler.withdraw.selector;
+        selectors[2] = AlchemistHandler.mint.selector;
+        selectors[3] = AlchemistHandler.burn.selector;
+        selectors[4] = AlchemistHandler.liquidate.selector;
+        selectors[5] = AlchemistHandler.repay.selector;
         
         targetSelector(
-            FuzzSelector({addr: address(alchemist), selectors: selectors})
+            FuzzSelector({addr: address(alchemistHandler), selectors: selectors})
         );
     }
 

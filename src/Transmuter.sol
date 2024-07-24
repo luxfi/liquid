@@ -2,8 +2,9 @@
 pragma solidity ^0.8.26;
 
 import "./libraries/TokenUtils.sol";
-
 import "./interfaces/ITransmuter.sol";
+
+import {ERC1155} from "../lib/openzeppelin-contracts/contracts/token/ERC1155/ERC1155.sol";
 
 struct InitializationParams {
     address syntheticToken;
@@ -13,9 +14,12 @@ struct InitializationParams {
 /// @title AlchemixV3 Transmuter
 ///
 /// @notice A contract which facilitates the exchange of alAssets to yield bearing assets.
-contract Transmuter is ITransmuter {
+contract Transmuter is ITransmuter, ERC1155 {
     // Alchemix synthetic asset to be transmuted.
     address public syntheticToken;
+
+    // Nft contract for transmuter positions.
+    address public transmuterNFT;
 
     // Time to transmute a position, denominated in days.
     uint256 public timeToTransmute;
@@ -23,9 +27,8 @@ contract Transmuter is ITransmuter {
     // Total alAssets locked in the system.
     uint256 public totalLocked;
 
-    // TODO: Remove this once NFTs are implemented. 
-    // Value to mock incrementing NFT token ids.
-    uint256 public idCounter;
+    // Nonce to increment nft IDs.
+    uint256 public nonce;
 
     // The current redemption rate
     uint256 public redemptionRate;
@@ -40,7 +43,7 @@ contract Transmuter is ITransmuter {
     mapping(address => mapping(uint256 => StakingPosition)) private positions;
 
     // TODO: Replace with upgradeable initializer
-    constructor(InitializationParams memory params) {
+    constructor(InitializationParams memory params) ERC1155("https://alchemix.fi/transmuter/{id}.json") {
         syntheticToken = params.syntheticToken;
         timeToTransmute = params.timeToTransmute;
     }
@@ -51,6 +54,7 @@ contract Transmuter is ITransmuter {
 
     // Adds an Alchemist to the transmuter
     function addAlchemist(address alchemist) external {
+        // TODO: replace recquire with custom error
         require(alchemistEntries[alchemist].isActive == false, "Alchemist has already been added!");
         alchemists.push(alchemist);
         alchemistEntries[alchemist] = AlchemistEntry(alchemists.length-1, true);
@@ -89,20 +93,27 @@ contract Transmuter is ITransmuter {
     }
 
     // TODO: If we decide to let users take split of collateral from all alchemists then this needs to be updated
+    // TODO: Specifying the alchemist isn't plausible so need to change this
     // If not then we should be pull collateral address from alchemist once it is merged in
     function createRedemption(address alchemist, address collateral, uint256 depositAmount) external {
         require(depositAmount > 0, "Value must be greater than 0!");
         require(alchemistEntries[alchemist].isActive == true, "Alchemist is not registered!");
 
-        // TODO: Create NFT
+        TokenUtils.safeTransferFrom(
+            syntheticToken,
+            msg.sender,
+            address(this),
+            depositAmount
+        );
 
-        positions[msg.sender][idCounter] = StakingPosition(alchemist, collateral, depositAmount, block.timestamp + timeToTransmute);
+        // TODO: Add `data` param if we decide we need this
+        _mint(msg.sender, ++nonce, depositAmount, "");
+
+        positions[msg.sender][nonce] = StakingPosition(alchemist, collateral, depositAmount, block.timestamp + timeToTransmute);
         
         _updateRedemptionRate();
 
-        emit PositionCreated(msg.sender, alchemist, depositAmount, idCounter);
-                
-        idCounter++;
+        emit PositionCreated(msg.sender, alchemist, depositAmount, nonce);
     }
 
     function claimRedemption(uint256 id) external {
@@ -121,7 +132,7 @@ contract Transmuter is ITransmuter {
 
         delete positions[msg.sender][id];
 
-        // TODO: burn NFT
+        _burn(msg.sender, id, position.amount);
 
         _updateRedemptionRate();
 
