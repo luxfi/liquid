@@ -16,6 +16,8 @@ import {TestERC20} from "./mocks/TestERC20.sol";
 import {TestYieldToken} from "./mocks/TestYieldToken.sol";
 import {IAlchemistV3} from "../interfaces/IAlchemistV3.sol";
 import {ITestYieldToken} from "../interfaces/test/ITestYieldToken.sol";
+import {InsufficientAllowance} from "../base/Errors.sol";
+
 import "../interfaces/IAlchemistV3Errors.sol";
 
 contract AlchemistV3Test is Test, IAlchemistV3Errors {
@@ -118,8 +120,7 @@ contract AlchemistV3Test is Test, IAlchemistV3Errors {
         transmuterBuffer = TransmuterBuffer(address(proxyTransmuterBuffer));
 
         // TransmuterV3 proxy
-        bytes memory transParams =
-            abi.encodeWithSelector(TransmuterV3.initialize.selector, address(alToken), fakeUnderlyingToken, address(transmuterBuffer), whitelist);
+        bytes memory transParams = abi.encodeWithSelector(TransmuterV3.initialize.selector, address(alToken), fakeUnderlyingToken, address(transmuterBuffer));
 
         proxyTransmuter = new TransparentUpgradeableProxy(address(transmuterLogic), proxyOwner, transParams);
         transmuter = TransmuterV3(address(proxyTransmuter));
@@ -135,8 +136,7 @@ contract AlchemistV3Test is Test, IAlchemistV3Errors {
             protocolFeeReceiver: address(10),
             mintingLimitMinimum: 1,
             mintingLimitMaximum: uint256(type(uint160).max),
-            mintingLimitBlocks: 300,
-            whitelist: address(whitelist)
+            mintingLimitBlocks: 300
         });
 
         bytes memory alchemParams = abi.encodeWithSelector(AlchemistV3.initialize.selector, params);
@@ -245,6 +245,44 @@ contract AlchemistV3Test is Test, IAlchemistV3Errors {
         alchemist.deposit(address(0xbeef), amount);
         vm.expectRevert(Undercollateralized.selector);
         alchemist.mint((amount * FIXED_POINT_SCALAR) / ltv);
+        vm.stopPrank();
+    }
+
+    function testMintFrom_Variable_Amount_Revert_No_Allowance(uint256 amount) external {
+        amount = bound(amount, 1e18, accountFunds);
+        uint256 ltv = 2e17;
+
+        vm.startPrank(externalUser);
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
+        /// Make deposit for external user
+        alchemist.deposit(externalUser, amount);
+        vm.stopPrank();
+
+        vm.startPrank(address(0xbeef));
+        /// 0xbeef mints tokens from `externalUser` account, to be recieved by `externalUser`.
+        /// 0xbeef however, has not been approved for any mint amount for `externalUsers` account.
+        vm.expectRevert(InsufficientAllowance.selector);
+        alchemist.mintFrom(externalUser, ((amount * ltv) / FIXED_POINT_SCALAR), externalUser);
+        vm.stopPrank();
+    }
+
+    function testMintFrom_Variable_Amount(uint256 amount) external {
+        amount = bound(amount, 1e18, accountFunds);
+        uint256 ltv = 2e17;
+
+        vm.startPrank(externalUser);
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
+        /// Make deposit for external user
+        alchemist.deposit(externalUser, amount);
+
+        /// 0xbeef has been approved up to a mint amount for minting from `externalUser` account.
+        alchemist.approveMint(address(0xbeef), amount + 100e18);
+        vm.stopPrank();
+
+        vm.startPrank(address(0xbeef));
+        alchemist.mintFrom(externalUser, ((amount * ltv) / FIXED_POINT_SCALAR), externalUser);
+
+        vm.assertApproxEqAbs(IERC20(alToken).balanceOf(externalUser), (amount * ltv) / FIXED_POINT_SCALAR, minimumDepositOrWithdrawalLoss);
         vm.stopPrank();
     }
 }

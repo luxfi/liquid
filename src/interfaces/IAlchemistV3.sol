@@ -29,9 +29,12 @@ interface IAlchemistV3 is IAlchemistV3Errors {
         uint256 mintingLimitMaximum;
         // The number of blocks that it takes for the minting limit to be refreshed.
         uint256 mintingLimitBlocks;
-        // The address of the whitelist.
-        address whitelist;
     }
+
+    /// @notice Approve `spender` to mint `amount` debt tokens.
+    /// @param spender The address that will be approved to mint.
+    /// @param amount  The amount of tokens that `spender` will be allowed to mint.
+    function approveMint(address spender, uint256 amount) external;
 
     /// @notice Deposits yield tokens to `user` with amount `collateralAmount`.
     /// @param user The address of the user to credit with deposit.
@@ -48,10 +51,16 @@ interface IAlchemistV3 is IAlchemistV3Errors {
     /// @return amountWithdrawn The number of yield tokens that were withdrawn to the account owner.
     function withdraw(uint256 amount) external returns (uint256 amountWithdrawn);
 
-    /// @notice Mint the `amount` of alAsset to account owner.
+    /// @notice Mint the `amount` of alAsset to account owner (msg.sender).
     /// @notice Only callable by account owner.
     /// @param amount The amount of alAsset to mint.
     function mint(uint256 amount) external;
+
+    /// @notice Mint `amount` of debt tokens from the account owned by `owner` to `recipient`.
+    /// @param owner     The address of the owner of the account to mint from.
+    /// @param amount    The amount of tokens to mint.
+    /// @param recipient The address of the recipient.
+    function mintFrom(address owner, uint256 amount, address recipient) external;
 
     /// @notice Sets the `maxLTV` (maximum Loan to Value) at which a loan can be taken.
     /// @notice Maximum LTV is a number between 0 and 1 exclusive.
