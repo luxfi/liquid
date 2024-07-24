@@ -31,16 +31,13 @@ contract TransmuterV3 is Initializable, AccessControlUpgradeable {
     /// @dev the source of the exchanged collateral
     address public buffer;
 
-    /// @dev The address of the external whitelist contract.
-    address public whitelist;
-
     /// @dev The amount of decimal places needed to normalize collateral to debtToken
     uint256 public conversionFactor;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
-    function initialize(address _syntheticToken, address _underlyingToken, address _buffer, address _whitelist) external initializer {
+    function initialize(address _syntheticToken, address _underlyingToken, address _buffer) external initializer {
         _grantRole(ADMIN, msg.sender);
         _setRoleAdmin(ADMIN, ADMIN);
         _setRoleAdmin(SENTINEL, ADMIN);
@@ -51,7 +48,5 @@ contract TransmuterV3 is Initializable, AccessControlUpgradeable {
         uint8 underlyingTokenDecimals = TokenUtils.expectDecimals(underlyingToken);
         conversionFactor = 10 ** (debtTokenDecimals - underlyingTokenDecimals);
         buffer = _buffer;
-        // Push a blank tick to function as a sentinel value in the active ticks queue.
-        whitelist = _whitelist;
     }
 }
