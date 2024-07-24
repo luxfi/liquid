@@ -5,10 +5,8 @@ import "./interfaces/IAlchemistV3.sol";
 import "./libraries/TokenUtils.sol";
 import "./libraries/Limiters.sol";
 import "./libraries/SafeCast.sol";
-
 import {Initializable} from "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
-
-import {Unauthorized, IllegalArgument} from "./base/Errors.sol";
+import {Unauthorized, IllegalArgument, InsufficientAllowance} from "./base/Errors.sol";
 
 /// @title  AlchemistV3
 /// @author Alchemix Finance
@@ -16,16 +14,15 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     using Limiters for Limiters.LinearGrowthLimiter;
 
     /// @notice A user account.
+    /// @notice This account struct is included in the main contract, AlchemistV3.sol, to aid readability.
     struct Account {
         // A signed value which represents the current amount of debt or credit that the account has accrued.
         // Positive values indicate debt, negative values indicate credit.
         int256 debt;
-        // account owner balanceof yeild token managed by this alchemist
+        // The account owners yield token balance.
         uint256 balance;
         // The allowances for mints.
         mapping(address => uint256) mintAllowances;
-        // The allowances for withdrawals.
-        mapping(address => mapping(address => uint256)) withdrawAllowances;
     }
 
     string public constant version = "3.0.0";
@@ -34,13 +31,11 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     uint256 public constant BPS = 10_000;
 
-    uint256 public minimumCollateralization;
+    uint256 public maximumLTV;
 
     uint256 public protocolFee;
 
     address public protocolFeeReceiver;
-
-    address public whitelist;
 
     address public debtToken;
 
@@ -113,24 +108,23 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         yieldToken = params.yieldToken;
         admin = params.admin;
         transmuter = params.transmuter;
-        minimumCollateralization = params.minimumCollateralization;
+        maximumLTV = params.maximumLTV;
         protocolFee = params.protocolFee;
         protocolFeeReceiver = params.protocolFeeReceiver;
-        whitelist = params.whitelist;
         _mintingLimiter = Limiters.createLinearGrowthLimiter(params.mintingLimitMaximum, params.mintingLimitBlocks, params.mintingLimitMinimum);
     }
 
     /// @inheritdoc IAlchemistV3
-    function deposit(address user, uint256 collateralamount) external override returns (uint256) {
+    function deposit(address user, uint256 collateralAmount) external override returns (uint256) {
         _checkArgument(user != address(0));
 
-        // Deposit the yield tokens to the recipient.
-        _deposit(collateralamount, user);
+        // Deposit the yield tokens to the user.
+        _deposit(collateralAmount, user);
 
         // Transfer tokens from the message sender now that the internal storage updates have been committed.
-        TokenUtils.safeTransferFrom(yieldToken, msg.sender, address(this), collateralamount);
+        TokenUtils.safeTransferFrom(yieldToken, msg.sender, address(this), collateralAmount);
 
-        return collateralamount;
+        return collateralAmount;
     }
 
     /// @inheritdoc IAlchemistV3
@@ -146,27 +140,21 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         return amount;
     }
 
-    function _withdraw(address owner, uint256 amount) internal returns (uint256) {
-        _checkArgument(_accounts[owner].balance >= amount);
-
-        _accounts[owner].balance -= amount;
-
-        // Valid the owner's account to assure that the collateralization invariant is still held.
-        _validate(owner);
-
-        return amount;
-    }
-
-    function _deposit(uint256 amount, address recipient) internal returns (uint256) {
+    /// @inheritdoc IAlchemistV3
+    function mint(uint256 amount) external override {
         _checkArgument(amount > 0);
-        _accounts[recipient].balance += amount;
-        return amount;
+        // Mint tokens from the message sender's account to the recipient.
+        _mint(msg.sender, amount, msg.sender);
     }
 
     /// @inheritdoc IAlchemistV3
-    function mint(uint256 amount, address recipient) external override {
+    function mintFrom(address owner, uint256 amount, address recipient) external override {
         _checkArgument(amount > 0);
         _checkArgument(recipient != address(0));
+
+        // Preemptively try and decrease the minting allowance. This will save gas when the allowance is not sufficient
+        // for the mint.
+        _decreaseMintAllowance(owner, msg.sender, amount);
 
         // Mint tokens from the message sender's account to the recipient.
         _mint(msg.sender, amount, recipient);
@@ -174,8 +162,10 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     /// @inheritdoc IAlchemistV3
     function maxMint() external override returns (uint256 amount) {
-        /// TODO Mints absolute maximum for the position, returns amount minted
-        amount = 0;
+        uint256 collateralization = (totalValue(msg.sender) * maximumLTV) / FIXED_POINT_SCALAR;
+        amount = collateralization - uint256(_accounts[msg.sender].debt);
+        _checkArgument(amount > 0);
+        _mint(msg.sender, amount, msg.sender);
         return amount;
     }
 
@@ -186,13 +176,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     }
 
     /// @inheritdoc IAlchemistV3
-    function burn(uint256 amount, address recipient) external override returns (uint256) {
-        // TODO Re-implement when necessary
-    }
-
-    /// @inheritdoc IAlchemistV3
     function repay(address user, uint256 amount) external override {
-        // TODO a user’s debt by burning alAssets
+        // TODO repay a user’s debt by burning alAssets
     }
 
     /// @inheritdoc IAlchemistV3
@@ -204,49 +189,110 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     }
 
     /// @inheritdoc IAlchemistV3
-    function setMaxLoanToValue(uint256 maxltv) external override {
-        /// TODO set ltv. (a private variable or struct variable ?)
+    function approveMint(address spender, uint256 amount) external override {
+        _approveMint(msg.sender, spender, amount);
     }
 
+    /// @inheritdoc IAlchemistV3
+    function setMaxLoanToValue(uint256 maxLTV) external override {
+        _checkArgument(maxLTV > 0 && maxLTV < 1e18);
+        maximumLTV = maxLTV;
+    }
+
+    /// @dev Withdraw the `amount` of yield tokens from the account owned by `owner`.
+    /// @param owner   The address of the account owner to withdraw from.
+    /// @param amount  The amount of yeild tokens to withdraw.
+    ///
+    /// @return The amount of yield tokens withdrawn.
+    function _withdraw(address owner, uint256 amount) internal returns (uint256) {
+        _checkArgument(_accounts[owner].balance >= amount);
+
+        _accounts[owner].balance -= amount;
+
+        // Valid the owner's account to assure that the collateralization invariant is still held.
+        _validate(owner);
+
+        return amount;
+    }
+
+    /// @dev Deposit the `amount` of yield tokens from msg.sender to the account owned by `recipient`.
+    /// @param amount  The amount of yeild tokens to withdraw.
+    /// @param recipient  The address of the account to be credited with the yeild token deposit.
+    ///
+    /// @return The amount of yield tokens deposited.
+    function _deposit(uint256 amount, address recipient) internal returns (uint256) {
+        _checkArgument(amount > 0);
+        _accounts[recipient].balance += amount;
+        return amount;
+    }
+
+    /// @dev Checks an expression and reverts with an {IllegalArgument} error if the expression is {false}.
+    ///
+    /// @param expression The expression to check.
     function _checkArgument(bool expression) internal pure {
         if (!expression) {
             revert IllegalArgument();
         }
     }
 
+    /// @dev Mints debt tokens to `recipient` using the account owned by `owner`.
+    /// @param owner     The owner of the account to mint from.
+    /// @param amount    The amount to mint.
+    /// @param recipient The recipient of the minted debt tokens.
     function _mint(address owner, uint256 amount, address recipient) internal {
         // Check that the system will allow for the specified amount to be minted.
-
         // TODO To review and add mint limit checks
         // i.e. _checkMintingLimit(uint256 amount)
+        _updateDebt(recipient, SafeCast.toInt256(amount));
 
-        _updateDebt(owner, SafeCast.toInt256(amount));
-
-        // Valid the owner's account to assure that the collateralization invariant is still held.
+        // Validate the owner's account to assure that the collateralization invariant is still held.
         _validate(owner);
-
-        // Decrease the global amount of mintable debt tokens.
-        _mintingLimiter.decrease(amount);
 
         // Mint the debt tokens to the recipient.
         TokenUtils.safeMint(debtToken, recipient, amount);
     }
 
+    /// @dev Increases the debt by `amount` for the account owned by `owner`.
+    /// @param owner   The address of the account owner.
+    /// @param amount  The amount to increase the debt by.
     function _updateDebt(address owner, int256 amount) internal {
         Account storage account = _accounts[owner];
         account.debt += amount;
     }
 
+    /// @dev Checks that the account owned by `owner` is properly collateralized.
+    /// @dev If the account is undercollateralized then this will revert with an {Undercollateralized} error.
+    /// @param owner The address of the account owner.
     function _validate(address owner) internal view {
         int256 debt = _accounts[owner].debt;
         if (debt <= 0) {
             return;
         }
-
-        uint256 collateralization = totalValue(owner) * FIXED_POINT_SCALAR / uint256(debt);
-
-        if (collateralization < minimumCollateralization) {
+        uint256 collateralization = (totalValue(owner) * maximumLTV) / FIXED_POINT_SCALAR;
+        if (collateralization < uint256(debt)) {
             revert Undercollateralized();
         }
+    }
+
+    /// @dev Set the mint allowance for `spender` to `amount` for the account owned by `owner`.
+    /// @param owner   The address of the account owner.
+    /// @param spender The address of the spender.
+    /// @param amount  The amount of debt tokens to set the mint allowance to.
+    function _approveMint(address owner, address spender, uint256 amount) internal {
+        Account storage account = _accounts[owner];
+        account.mintAllowances[spender] = amount;
+    }
+
+    /// @dev Decrease the mint allowance for `spender` by `amount` for the account owned by `owner`.
+    /// @dev Reverts on underflow i.e. If the `spender' doesnt have an allowance >= `amount`.
+    /// @param owner   The address of the account owner.
+    /// @param spender The address of the spender.
+    /// @param amount  The amount of debt tokens to decrease the mint allowance by.
+    function _decreaseMintAllowance(address owner, address spender, uint256 amount) internal {
+        Account storage account = _accounts[owner];
+        if (account.mintAllowances[spender] < amount) {
+            revert InsufficientAllowance();
+        }
+        account.mintAllowances[spender] -= amount;
     }
 }
