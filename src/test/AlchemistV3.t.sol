@@ -16,8 +16,11 @@ import {TestERC20} from "./mocks/TestERC20.sol";
 import {TestYieldToken} from "./mocks/TestYieldToken.sol";
 import {IAlchemistV3} from "../interfaces/IAlchemistV3.sol";
 import {ITestYieldToken} from "../interfaces/test/ITestYieldToken.sol";
+import {InsufficientAllowance} from "../base/Errors.sol";
 
-contract AlchemistV3Test is Test {
+import "../interfaces/IAlchemistV3Errors.sol";
+
+contract AlchemistV3Test is Test, IAlchemistV3Errors {
     // ----- [SETUP] Variables for setting up a minimal CDP -----
 
     // Callable contract variables
@@ -60,7 +63,9 @@ contract AlchemistV3Test is Test {
     mapping(address => bool) users;
 
     // LTV
-    uint256 public LTV = 11e17; // 1.1, prev = 2 * 1e18
+    uint256 public LTV = 9 * 1e17; // .9
+
+    uint256 public constant FIXED_POINT_SCALAR = 1e18;
 
     // ----- Variables for deposits & withdrawals -----
 
@@ -115,8 +120,7 @@ contract AlchemistV3Test is Test {
         transmuterBuffer = TransmuterBuffer(address(proxyTransmuterBuffer));
 
         // TransmuterV3 proxy
-        bytes memory transParams =
-            abi.encodeWithSelector(TransmuterV3.initialize.selector, address(alToken), fakeUnderlyingToken, address(transmuterBuffer), whitelist);
+        bytes memory transParams = abi.encodeWithSelector(TransmuterV3.initialize.selector, address(alToken), fakeUnderlyingToken, address(transmuterBuffer));
 
         proxyTransmuter = new TransparentUpgradeableProxy(address(transmuterLogic), proxyOwner, transParams);
         transmuter = TransmuterV3(address(proxyTransmuter));
@@ -127,13 +131,12 @@ contract AlchemistV3Test is Test {
             yieldToken: address(fakeYieldToken),
             debtToken: address(alToken),
             transmuter: address(transmuterBuffer),
-            minimumCollateralization: LTV,
+            maximumLTV: LTV,
             protocolFee: 1000,
             protocolFeeReceiver: address(10),
             mintingLimitMinimum: 1,
             mintingLimitMaximum: uint256(type(uint160).max),
-            mintingLimitBlocks: 300,
-            whitelist: address(whitelist)
+            mintingLimitBlocks: 300
         });
 
         bytes memory alchemParams = abi.encodeWithSelector(AlchemistV3.initialize.selector, params);
@@ -180,6 +183,141 @@ contract AlchemistV3Test is Test {
         alchemist.deposit(address(0xbeef), amount);
         alchemist.withdraw(amount / 2);
         vm.assertApproxEqAbs(alchemist.totalValue(address(0xbeef)), amount / 2, minimumDepositOrWithdrawalLoss);
+        vm.stopPrank();
+    }
+
+    function testSetMaxLTV_Variable_LTV(uint256 ltv) external {
+        ltv = bound(ltv, 0 + 1e14, LTV - 1e16);
+        vm.startPrank(address(0xbeef));
+        alchemist.setMaxLoanToValue(ltv);
+        vm.assertApproxEqAbs(alchemist.maximumLTV(), ltv, minimumDepositOrWithdrawalLoss);
+        vm.stopPrank();
+    }
+
+    function testSetMaxLTV_Invalid_LTV_Zero() external {
+        uint256 ltv = 0;
+        vm.startPrank(address(0xbeef));
+        vm.expectRevert(IllegalArgument.selector);
+        alchemist.setMaxLoanToValue(ltv);
+        vm.stopPrank();
+    }
+
+    function testSetMaxLTV_Invalid_LTV_Above_Max_Bound(uint256 ltv) external {
+        // ~ all possible LTVS above max bound
+        vm.assume(ltv > 1e18);
+        vm.startPrank(address(0xbeef));
+        vm.expectRevert(IllegalArgument.selector);
+        alchemist.setMaxLoanToValue(ltv);
+        vm.stopPrank();
+    }
+
+    function testMint_Variable_Amount(uint256 amount) external {
+        amount = bound(amount, 1e18, accountFunds);
+        uint256 ltv = 2e17;
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
+        alchemist.deposit(address(0xbeef), amount);
+        alchemist.mint((amount * ltv) / FIXED_POINT_SCALAR);
+        vm.assertApproxEqAbs(IERC20(alToken).balanceOf(address(0xbeef)), (amount * ltv) / FIXED_POINT_SCALAR, minimumDepositOrWithdrawalLoss);
+        vm.stopPrank();
+    }
+
+    function testMint_Variable_LTV(uint256 ltv) external {
+        uint256 amount = depositAmount;
+
+        // ~ all possible LTVS up to max LTV
+        ltv = bound(ltv, 0 + 1e14, LTV - 1e16);
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
+        alchemist.deposit(address(0xbeef), amount);
+        alchemist.mint((amount * ltv) / FIXED_POINT_SCALAR);
+        vm.assertApproxEqAbs(IERC20(alToken).balanceOf(address(0xbeef)), (amount * ltv) / FIXED_POINT_SCALAR, minimumDepositOrWithdrawalLoss);
+        vm.stopPrank();
+    }
+
+    function testMint_Revert_Exceeds_LTV(uint256 amount, uint256 ltv) external {
+        amount = bound(amount, 1e18, accountFunds);
+
+        // ~ all possible LTVS above max LTV
+        ltv = bound(ltv, LTV + 1e14, 1e18);
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
+        alchemist.deposit(address(0xbeef), amount);
+        vm.expectRevert(Undercollateralized.selector);
+        alchemist.mint((amount * FIXED_POINT_SCALAR) / ltv);
+        vm.stopPrank();
+    }
+
+    function testMintFrom_Variable_Amount_Revert_No_Allowance(uint256 amount) external {
+        amount = bound(amount, 1e18, accountFunds);
+        uint256 ltv = 2e17;
+
+        vm.startPrank(externalUser);
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
+        /// Make deposit for external user
+        alchemist.deposit(externalUser, amount);
+        vm.stopPrank();
+
+        vm.startPrank(address(0xbeef));
+        /// 0xbeef mints tokens from `externalUser` account, to be recieved by `externalUser`.
+        /// 0xbeef however, has not been approved for any mint amount for `externalUsers` account.
+        vm.expectRevert(InsufficientAllowance.selector);
+        alchemist.mintFrom(externalUser, ((amount * ltv) / FIXED_POINT_SCALAR), externalUser);
+        vm.stopPrank();
+    }
+
+    function testMintFrom_Variable_Amount(uint256 amount) external {
+        amount = bound(amount, 1e18, accountFunds);
+        uint256 ltv = 2e17;
+
+        vm.startPrank(externalUser);
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
+        /// Make deposit for external user
+        alchemist.deposit(externalUser, amount);
+
+        /// 0xbeef has been approved up to a mint amount for minting from `externalUser` account.
+        alchemist.approveMint(address(0xbeef), amount + 100e18);
+        vm.stopPrank();
+
+        vm.startPrank(address(0xbeef));
+        alchemist.mintFrom(externalUser, ((amount * ltv) / FIXED_POINT_SCALAR), externalUser);
+
+        vm.assertApproxEqAbs(IERC20(alToken).balanceOf(externalUser), (amount * ltv) / FIXED_POINT_SCALAR, minimumDepositOrWithdrawalLoss);
+        vm.stopPrank();
+    }
+
+    function testMaxMint_Variable_Amount(uint256 amount) external {
+        amount = bound(amount, 1e18, accountFunds);
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
+        alchemist.deposit(address(0xbeef), amount);
+        alchemist.maxMint();
+        vm.assertApproxEqAbs(IERC20(alToken).balanceOf(address(0xbeef)), (amount * LTV) / FIXED_POINT_SCALAR, minimumDepositOrWithdrawalLoss);
+        vm.stopPrank();
+    }
+
+    function testMaxMint_Variable_Amount_Multiple_Mints(uint256 amount) external {
+        amount = bound(amount, 1e18, accountFunds);
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
+        alchemist.deposit(address(0xbeef), amount);
+        alchemist.mint((amount * 25e16) / FIXED_POINT_SCALAR);
+        alchemist.mint((amount * 25e16) / FIXED_POINT_SCALAR);
+
+        // amount/2 has now been minted. The max amount minted should be : ((total deposit * LTV) - amount/2)
+        uint256 maxMinted = alchemist.maxMint();
+        vm.assertApproxEqAbs(maxMinted, ((amount * LTV) / FIXED_POINT_SCALAR) - (amount / 2), minimumDepositOrWithdrawalLoss);
+
+        // This should result in a final alAsset balance of : deposit amount * LTV
+        vm.assertApproxEqAbs(IERC20(alToken).balanceOf(address(0xbeef)), (amount * LTV) / FIXED_POINT_SCALAR, minimumDepositOrWithdrawalLoss);
+        vm.stopPrank();
+    }
+
+    function testMaxMint_Variable_Amount_Revert_Zero_Deposit(uint256 amount) external {
+        amount = bound(amount, 1e18, accountFunds);
+        vm.startPrank(address(0xbeef));
+        vm.expectRevert(IllegalArgument.selector);
+        alchemist.maxMint();
         vm.stopPrank();
     }
 }
