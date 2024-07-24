@@ -162,8 +162,10 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     /// @inheritdoc IAlchemistV3
     function maxMint() external override returns (uint256 amount) {
-        /// TODO Mints absolute maximum for the position, returns amount minted
-        amount = 0;
+        uint256 collateralization = (totalValue(msg.sender) * maximumLTV) / FIXED_POINT_SCALAR;
+        amount = collateralization - uint256(_accounts[msg.sender].debt);
+        _checkArgument(amount > 0);
+        _mint(msg.sender, amount, msg.sender);
         return amount;
     }
 

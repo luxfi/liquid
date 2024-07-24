@@ -285,4 +285,39 @@ contract AlchemistV3Test is Test, IAlchemistV3Errors {
         vm.assertApproxEqAbs(IERC20(alToken).balanceOf(externalUser), (amount * ltv) / FIXED_POINT_SCALAR, minimumDepositOrWithdrawalLoss);
         vm.stopPrank();
     }
+
+    function testMaxMint_Variable_Amount(uint256 amount) external {
+        amount = bound(amount, 1e18, accountFunds);
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
+        alchemist.deposit(address(0xbeef), amount);
+        alchemist.maxMint();
+        vm.assertApproxEqAbs(IERC20(alToken).balanceOf(address(0xbeef)), (amount * LTV) / FIXED_POINT_SCALAR, minimumDepositOrWithdrawalLoss);
+        vm.stopPrank();
+    }
+
+    function testMaxMint_Variable_Amount_Multiple_Mints(uint256 amount) external {
+        amount = bound(amount, 1e18, accountFunds);
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
+        alchemist.deposit(address(0xbeef), amount);
+        alchemist.mint((amount * 25e16) / FIXED_POINT_SCALAR);
+        alchemist.mint((amount * 25e16) / FIXED_POINT_SCALAR);
+
+        // amount/2 has now been minted. The max amount minted should be : ((total deposit * LTV) - amount/2)
+        uint256 maxMinted = alchemist.maxMint();
+        vm.assertApproxEqAbs(maxMinted, ((amount * LTV) / FIXED_POINT_SCALAR) - (amount / 2), minimumDepositOrWithdrawalLoss);
+
+        // This should result in a final alAsset balance of : deposit amount * LTV
+        vm.assertApproxEqAbs(IERC20(alToken).balanceOf(address(0xbeef)), (amount * LTV) / FIXED_POINT_SCALAR, minimumDepositOrWithdrawalLoss);
+        vm.stopPrank();
+    }
+
+    function testMaxMint_Variable_Amount_Revert_Zero_Deposit(uint256 amount) external {
+        amount = bound(amount, 1e18, accountFunds);
+        vm.startPrank(address(0xbeef));
+        vm.expectRevert(IllegalArgument.selector);
+        alchemist.maxMint();
+        vm.stopPrank();
+    }
 }
