@@ -86,7 +86,6 @@ interface IAlchemistV3 is IAlchemistV3Errors {
     /// @notice Checks if the debt for account `owner` is greater than the underlying value of their collateral + 5%.
     /// @notice If so, the users debt is zero’d out and collateral with underlying value equivalent to the debt is sent to the transmuter.
     /// @notice The remainder is sent to the liquidator.
-    ///
     /// @param owner The address of the account owner.
     ///
     /// @return assets Yield tokens sent to the transmuter.
