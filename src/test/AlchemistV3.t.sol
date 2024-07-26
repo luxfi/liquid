@@ -335,7 +335,11 @@ contract AlchemistV3Test is Test, IAlchemistV3Errors {
         alchemist.repay(address(0xbeef), amount / 2);
         uint256 supplyAfterBurn = IERC20(alToken).totalSupply();
         (uint256 depositedCollateral, int256 debt) = alchemist.getCDP(address(0xbeef));
+
+        // User debt updates to correct value
         vm.assertApproxEqAbs(uint256(debt), ((amount * LTV) / FIXED_POINT_SCALAR) - (amount / 2), minimumDepositOrWithdrawalLoss);
+
+        // The alAsset total supply has updated to the correct amount after burning
         vm.assertApproxEqAbs(supplyAfterBurn, expectedSupplyAfterBurn, minimumDepositOrWithdrawalLoss);
         vm.stopPrank();
     }
@@ -349,7 +353,12 @@ contract AlchemistV3Test is Test, IAlchemistV3Errors {
         alchemist.maxMint();
         alchemist.repayWithUnderlying(address(0xbeef), amount / 2);
         (uint256 depositedCollateral, int256 debt) = alchemist.getCDP(address(0xbeef));
+
+        // User debt updates to correct value
         vm.assertApproxEqAbs(uint256(debt), ((amount * LTV) / FIXED_POINT_SCALAR) - (amount / 2), minimumDepositOrWithdrawalLoss);
+
+        // Transmuter has recieved the correct amount of underlying tokens
+        vm.assertApproxEqAbs(IERC20(fakeUnderlyingToken).balanceOf(address(transmuterBuffer)), amount / 2, minimumDepositOrWithdrawalLoss);
         vm.stopPrank();
     }
 }
