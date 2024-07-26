@@ -13,6 +13,8 @@ interface IAlchemistV3 is IAlchemistV3Errors {
         address admin;
         // The ERC20 token used to represent debt. i.e. the alAsset.
         address debtToken;
+        // The ERC20 token used to represent the underlying token of the yield token.
+        address underlyingToken;
         // The address of the yield token being deposited.
         address yieldToken;
         // The initial transmuter or transmuter buffer.
@@ -67,12 +69,19 @@ interface IAlchemistV3 is IAlchemistV3Errors {
     /// @param maxLTV Maximum LTV.
     function setMaxLoanToValue(uint256 maxLTV) external;
 
-    /// @notice Reduces the debt of `user` by burning an `amount` of alAssets.
+    /// @notice Reduces the debt of `user` by burning an `amount` of alAssets and Burns that `amount` of alAssets.
     /// @notice Callable by anyone.
     /// @notice Capped at existing debt of user.
     /// @param user Address of the user having debt repaid.
     /// @param amount Amount of alAsset tokens to repay.
     function repay(address user, uint256 amount) external;
+
+    /// @notice Reduces the debt of `user` by burning an `amount` of alAssets and transfers that `amount` of underlying tokens to the transmuter.
+    /// @notice Callable by anyone.
+    /// @notice Capped at existing debt of user.
+    /// @param user Address of the user having debt repaid.
+    /// @param amount Amount of alAsset tokens to repay.
+    function repayWithUnderlying(address user, uint256 amount) external;
 
     /// @notice Checks if the debt for account `owner` is greater than the underlying value of their collateral + 5%.
     /// @notice If so, the users debt is zero’d out and collateral with underlying value equivalent to the debt is sent to the transmuter.

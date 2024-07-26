@@ -39,6 +39,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     address public debtToken;
 
+    address public underlyingToken;
+
     address public yieldToken;
 
     address public admin;
@@ -105,6 +107,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     function initialize(InitializationParams memory params) external initializer {
         _checkArgument(params.protocolFee <= BPS);
         debtToken = params.debtToken;
+        underlyingToken = params.underlyingToken;
         yieldToken = params.yieldToken;
         admin = params.admin;
         transmuter = params.transmuter;
@@ -177,7 +180,14 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     /// @inheritdoc IAlchemistV3
     function repay(address user, uint256 amount) external override {
-        // TODO repay a user’s debt by burning alAssets
+        uint256 actualAmount = _repay(user, amount);
+        TokenUtils.safeBurnFrom(debtToken, msg.sender, actualAmount);
+    }
+
+    /// @inheritdoc IAlchemistV3
+    function repayWithUnderlying(address user, uint256 amount) external override {
+        uint256 actualAmount = _repay(user, amount);
+        TokenUtils.safeTransferFrom(underlyingToken, msg.sender, transmuter, actualAmount);
     }
 
     /// @inheritdoc IAlchemistV3
@@ -226,15 +236,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         return amount;
     }
 
-    /// @dev Checks an expression and reverts with an {IllegalArgument} error if the expression is {false}.
-    ///
-    /// @param expression The expression to check.
-    function _checkArgument(bool expression) internal pure {
-        if (!expression) {
-            revert IllegalArgument();
-        }
-    }
-
     /// @dev Mints debt tokens to `recipient` using the account owned by `owner`.
     /// @param owner     The owner of the account to mint from.
     /// @param amount    The amount to mint.
@@ -260,18 +261,20 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         account.debt += amount;
     }
 
-    /// @dev Checks that the account owned by `owner` is properly collateralized.
-    /// @dev If the account is undercollateralized then this will revert with an {Undercollateralized} error.
-    /// @param owner The address of the account owner.
-    function _validate(address owner) internal view {
-        int256 debt = _accounts[owner].debt;
-        if (debt <= 0) {
-            return;
-        }
-        uint256 collateralization = (totalValue(owner) * maximumLTV) / FIXED_POINT_SCALAR;
-        if (collateralization < uint256(debt)) {
-            revert Undercollateralized();
-        }
+    /// @notice Reduces the debt of `user` by the `amount` of alAssets.
+    /// @notice If the `amount` speicified is > debt, amount will default to the max possible amount.
+    /// @notice Callable by anyone.
+    /// @notice Capped at existing debt of user.
+    /// @param user Address of the user having debt repaid.
+    /// @param amount Amount of alAsset tokens to repay.
+    ///
+    /// @return The actual amount of debt repaid
+    function _repay(address user, uint256 amount) internal returns (uint256) {
+        int256 debt = _accounts[user].debt;
+        _checkArgument(debt > 0);
+        uint256 actualAmount = amount > SafeCast.toUint256(debt) ? SafeCast.toUint256(debt) : amount;
+        _updateDebt(user, -SafeCast.toInt256(actualAmount));
+        return actualAmount;
     }
 
     /// @dev Set the mint allowance for `spender` to `amount` for the account owned by `owner`.
@@ -294,5 +297,28 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
             revert InsufficientAllowance();
         }
         account.mintAllowances[spender] -= amount;
+    }
+
+    /// @dev Checks an expression and reverts with an {IllegalArgument} error if the expression is {false}.
+    ///
+    /// @param expression The expression to check.
+    function _checkArgument(bool expression) internal pure {
+        if (!expression) {
+            revert IllegalArgument();
+        }
+    }
+
+    /// @dev Checks that the account owned by `owner` is properly collateralized.
+    /// @dev If the account is undercollateralized then this will revert with an {Undercollateralized} error.
+    /// @param owner The address of the account owner.
+    function _validate(address owner) internal view {
+        int256 debt = _accounts[owner].debt;
+        if (debt <= 0) {
+            return;
+        }
+        uint256 collateralization = (totalValue(owner) * maximumLTV) / FIXED_POINT_SCALAR;
+        if (collateralization < uint256(debt)) {
+            revert Undercollateralized();
+        }
     }
 }

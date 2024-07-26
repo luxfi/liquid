@@ -130,6 +130,7 @@ contract AlchemistV3Test is Test, IAlchemistV3Errors {
             admin: alOwner,
             yieldToken: address(fakeYieldToken),
             debtToken: address(alToken),
+            underlyingToken: address(fakeUnderlyingToken),
             transmuter: address(transmuterBuffer),
             maximumLTV: LTV,
             protocolFee: 1000,
@@ -156,6 +157,7 @@ contract AlchemistV3Test is Test, IAlchemistV3Errors {
         deal(address(fakeYieldToken), address(0xbeef), accountFunds);
         deal(address(fakeYieldToken), externalUser, accountFunds);
         deal(address(fakeUnderlyingToken), anotherExternalUser, accountFunds);
+        deal(address(fakeUnderlyingToken), address(0xbeef), accountFunds);
 
         vm.startPrank(anotherExternalUser);
 
@@ -318,6 +320,36 @@ contract AlchemistV3Test is Test, IAlchemistV3Errors {
         vm.startPrank(address(0xbeef));
         vm.expectRevert(IllegalArgument.selector);
         alchemist.maxMint();
+        vm.stopPrank();
+    }
+
+    function testRepay_Variable_Amount(uint256 amount) external {
+        amount = bound(amount, 1e18, accountFunds);
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
+        SafeERC20.safeApprove(address(alToken), address(alchemist), amount + 100e18);
+        alchemist.deposit(address(0xbeef), amount);
+        alchemist.maxMint();
+        uint256 supplyBeforeBurn = IERC20(alToken).totalSupply();
+        uint256 expectedSupplyAfterBurn = supplyBeforeBurn - amount / 2;
+        alchemist.repay(address(0xbeef), amount / 2);
+        uint256 supplyAfterBurn = IERC20(alToken).totalSupply();
+        (uint256 depositedCollateral, int256 debt) = alchemist.getCDP(address(0xbeef));
+        vm.assertApproxEqAbs(uint256(debt), ((amount * LTV) / FIXED_POINT_SCALAR) - (amount / 2), minimumDepositOrWithdrawalLoss);
+        vm.assertApproxEqAbs(supplyAfterBurn, expectedSupplyAfterBurn, minimumDepositOrWithdrawalLoss);
+        vm.stopPrank();
+    }
+
+    function testRepayUnderlying_Variable_Amount(uint256 amount) external {
+        amount = bound(amount, 1e18, accountFunds);
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
+        SafeERC20.safeApprove(address(fakeUnderlyingToken), address(alchemist), amount + 100e18);
+        alchemist.deposit(address(0xbeef), amount);
+        alchemist.maxMint();
+        alchemist.repayWithUnderlying(address(0xbeef), amount / 2);
+        (uint256 depositedCollateral, int256 debt) = alchemist.getCDP(address(0xbeef));
+        vm.assertApproxEqAbs(uint256(debt), ((amount * LTV) / FIXED_POINT_SCALAR) - (amount / 2), minimumDepositOrWithdrawalLoss);
         vm.stopPrank();
     }
 }
