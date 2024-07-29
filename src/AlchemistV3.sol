@@ -272,7 +272,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     function _repay(address user, uint256 amount) internal returns (uint256) {
         int256 debt = _accounts[user].debt;
         _checkArgument(debt > 0);
-        uint256 actualAmount = amount > SafeCast.toUint256(debt) ? SafeCast.toUint256(debt) : amount;
+        uint256 actualAmount = amount > uint256(debt) ? uint256(debt) : amount;
         _updateDebt(user, -SafeCast.toInt256(actualAmount));
         return actualAmount;
     }
