@@ -11,3 +11,7 @@ error IllegalState();
 /// @notice An error used to indicate that an action could not be completed because of an illegal argument was passed
 ///         to the function.
 error IllegalArgument();
+
+/// @notice An error used to indicate that an action could not be completed because the required amount of allowance has not
+///         been approved.
+error InsufficientAllowance();
