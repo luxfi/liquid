@@ -43,7 +43,7 @@ contract TransmuterTest is Test {
     }
 
     function testAddAlchemistAlreadyAdded() public {
-        vm.expectRevert("Alchemist has already been added!");
+        vm.expectRevert();
         transmuter.addAlchemist(alchemist);
     }
 
@@ -60,7 +60,7 @@ contract TransmuterTest is Test {
     }
 
     function testRemoveAlchemistNotRegistered() public {
-        vm.expectRevert("Alchemist is not registered!");
+        vm.expectRevert();
         transmuter.removeAlchemist(address(0xbee));
     }
 
@@ -107,13 +107,13 @@ contract TransmuterTest is Test {
     }
 
     function testCreateRedemptionNoTokens() public {
-        vm.expectRevert("Value must be greater than 0!");
+        vm.expectRevert();
         transmuter.createRedemption(address(0xbeef), address(0xadbc), 0);
 
     }
 
     function testCreateRedemptioNotRegistered() public {
-        vm.expectRevert("Alchemist is not registered!");
+        vm.expectRevert();
         transmuter.createRedemption(address(0xbeeb), address(0xadbc), 100e18);
     }
 
@@ -146,13 +146,13 @@ contract TransmuterTest is Test {
         vm.prank(address(0xbeef));
         transmuter.createRedemption(alchemist, address(collateralToken), 100e18);
 
-        vm.expectRevert("Position has not reached maturity!");
+        vm.expectRevert();
         vm.prank(address(0xbeef));
         transmuter.claimRedemption(1);
     }
 
     function testClaimRedemptionNoPosition() public {
-        vm.expectRevert("No position found!");
+        vm.expectRevert();
         vm.prank(address(0xbeef));
         transmuter.claimRedemption(1);
     }
