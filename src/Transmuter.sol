@@ -184,7 +184,6 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
                 We can't redeem more than 100% of debt so we will have to scale this differently than one year
                 I guess I'm not entirely sure what redemption times we are going to allow
                 The smaller the timeframe of a transmuter position the smaller the scaling time needs to be
-                EDIT: This is likely fine since we scale the cumulative debts before making this calculation
 
                 1 month would work for the above example
 
@@ -276,7 +275,6 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
 
         // TODO we need to keep track of which tokens in here are pending a sweep and are not actually part of an active position
         redemptionRate = (alchemistDebt * 1e18 / IERC20(syntheticToken).balanceOf(address(this))) * 365 days / timeToTransmute;
-        // This will give us a value scaled up by 1e18 which will allow us have transmutation times greater than one year
         // We will need to take this scaling into account down the pipeline
 
         emit RedemptionRateUpdated(block.timestamp, redemptionRate);
