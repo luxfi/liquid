@@ -2,9 +2,11 @@
 pragma solidity 0.8.26;
 
 import "./interfaces/IAlchemistV3.sol";
+import "./interfaces/IYearnVaultV2.sol";
 import "./libraries/TokenUtils.sol";
 import "./libraries/Limiters.sol";
 import "./libraries/SafeCast.sol";
+import "./interfaces/ITokenAdapter.sol";
 import {Initializable} from "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 import {Unauthorized, IllegalArgument, InsufficientAllowance} from "./base/Errors.sol";
 
@@ -58,7 +60,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     function getCDP(address owner) external view returns (uint256 depositedCollateral, int256 debt) {
         Account storage account = _accounts[owner];
 
-        depositedCollateral = totalValue(owner);
+        depositedCollateral = _accounts[owner].balance;
 
         debt = account.debt;
 
@@ -101,7 +103,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     function totalValue(address owner) public view returns (uint256) {
         // TODO This function could be replaced by another to reflect the underlying value based on yield generated
-        return _accounts[owner].balance;
+        return convertYieldTokensToUnderlying(_accounts[owner].balance);
     }
 
     function initialize(InitializationParams memory params) external initializer {
@@ -190,12 +192,48 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         TokenUtils.safeTransferFrom(underlyingToken, msg.sender, transmuter, actualAmount);
     }
 
+    /// @dev Gets the amount of an underlying token that `amount` of `yieldToken` is exchangeable for.
+    ///
+    /// @param amount The amount of yield tokens.
+    ///
+    /// @return The amount of underlying tokens.
+    function convertYieldTokensToUnderlying(uint256 amount) public view returns (uint256) {
+        uint8 decimals = TokenUtils.expectDecimals(yieldToken);
+        // console.log('yield token priced in underlying ----> : ', IYearnVaultV2(yieldToken).pricePerShare());
+
+        return (amount * IYearnVaultV2(yieldToken).pricePerShare()) / 10 ** 18;
+        // return amount;
+    }
+
     /// @inheritdoc IAlchemistV3
     function liquidate(address owner) external override returns (uint256 assets, uint256 fee) {
         // TODO checks if a users debt is greater than the underlying value of their collateral + 5%.
         // If so, the users debt is zero’d out and collateral with underlying value equivalent to the debt is sent to the transmuter.
         // The remainder is sent to the liquidator.
-        return (assets, fee);
+
+        if (_accounts[owner].debt <= 0) {
+            revert LiquidationError();
+        }
+
+        if (_isUnderCollateralized(owner)) {
+            assets = uint256(_accounts[owner].debt);
+
+            uint256 totalUnderyling = convertYieldTokensToUnderlying(assets);
+
+            // Liquidator fee i.e. yield token price of underlying * debt amount - debt amount
+            fee = totalUnderyling - assets;
+
+            // zero out the liquidated users debt
+            _accounts[owner].debt = 0;
+
+            TokenUtils.safeBurnFrom(yieldToken, address(this), assets);
+            if (fee > 0) {
+                TokenUtils.safeBurnFrom(yieldToken, address(this), fee);
+            }
+            return (assets, fee);
+        } else {
+            revert LiquidationError();
+        }
     }
 
     /// @inheritdoc IAlchemistV3
@@ -320,5 +358,20 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         if (collateralization < uint256(debt)) {
             revert Undercollateralized();
         }
+    }
+
+    /// @dev Checks that the account owned by `owner` is properly collateralized.
+    /// @dev If the account is undercollateralized then this will revert with an {Undercollateralized} error.
+    /// @param owner The address of the account owner.
+    function _isUnderCollateralized(address owner) internal view returns (bool) {
+        int256 debt = _accounts[owner].debt;
+        if (debt <= 0) {
+            return false;
+        }
+        uint256 collateralization = (totalValue(owner) * maximumLTV) / FIXED_POINT_SCALAR;
+        if (collateralization < uint256(debt)) {
+            return true;
+        }
+        return false;
     }
 }
