@@ -199,36 +199,41 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @return The amount of underlying tokens.
     function convertYieldTokensToUnderlying(uint256 amount) public view returns (uint256) {
         uint8 decimals = TokenUtils.expectDecimals(yieldToken);
-        // console.log('yield token priced in underlying ----> : ', IYearnVaultV2(yieldToken).pricePerShare());
-
         return (amount * IYearnVaultV2(yieldToken).pricePerShare()) / 10 ** 18;
-        // return amount;
     }
 
     /// @inheritdoc IAlchemistV3
     function liquidate(address owner) external override returns (uint256 assets, uint256 fee) {
-        // TODO checks if a users debt is greater than the underlying value of their collateral + 5%.
+        // TODO checks if a users debt is greater than the underlying value of their collateral.
         // If so, the users debt is zero’d out and collateral with underlying value equivalent to the debt is sent to the transmuter.
         // The remainder is sent to the liquidator.
 
-        if (_accounts[owner].debt <= 0) {
+        int256 debt = _accounts[owner].debt;
+
+        if (debt <= 0) {
             revert LiquidationError();
         }
 
         if (_isUnderCollateralized(owner)) {
-            assets = uint256(_accounts[owner].debt);
-
+            assets = _accounts[owner].balance;
             uint256 totalUnderyling = convertYieldTokensToUnderlying(assets);
 
-            // Liquidator fee i.e. yield token price of underlying * debt amount - debt amount
-            fee = totalUnderyling - assets;
+            // Liquidator fee i.e. yield token price of underlying - debt owed
+            if (totalUnderyling > uint256(debt)) {
+                fee = totalUnderyling - uint256(debt);
+            }
 
             // zero out the liquidated users debt
             _accounts[owner].debt = 0;
 
-            TokenUtils.safeBurnFrom(yieldToken, address(this), assets);
+            // zero out the liquidated users collateral
+            _accounts[owner].balance = 0;
+
+            // TODO should we send the collateral to transmuter ?
+            // TokenUtils.safeTransfer(yieldToken, address(transmuter), uint256(debt));
+
             if (fee > 0) {
-                TokenUtils.safeBurnFrom(yieldToken, address(this), fee);
+                TokenUtils.safeTransfer(yieldToken, msg.sender, fee);
             }
             return (assets, fee);
         } else {
@@ -350,12 +355,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @dev If the account is undercollateralized then this will revert with an {Undercollateralized} error.
     /// @param owner The address of the account owner.
     function _validate(address owner) internal view {
-        int256 debt = _accounts[owner].debt;
-        if (debt <= 0) {
-            return;
-        }
-        uint256 collateralization = (totalValue(owner) * maximumLTV) / FIXED_POINT_SCALAR;
-        if (collateralization < uint256(debt)) {
+        if (_isUnderCollateralized(owner)) {
             revert Undercollateralized();
         }
     }

@@ -17,6 +17,7 @@ import {TestYieldToken} from "./mocks/TestYieldToken.sol";
 import {IAlchemistV3} from "../interfaces/IAlchemistV3.sol";
 import {ITestYieldToken} from "../interfaces/test/ITestYieldToken.sol";
 import {InsufficientAllowance} from "../base/Errors.sol";
+import "../interfaces/IYearnVaultV2.sol";
 
 import "../interfaces/IAlchemistV3Errors.sol";
 
@@ -373,5 +374,48 @@ contract AlchemistV3Test is Test, IAlchemistV3Errors {
         // Transmuter has recieved the correct amount of underlying tokens
         vm.assertApproxEqAbs(IERC20(fakeUnderlyingToken).balanceOf(address(transmuterBuffer)), maxCollateralAmount / 2, minimumDepositOrWithdrawalLoss);
         vm.stopPrank();
+    }
+
+    function testLiquidate_Undercollateralized_Position() external {
+        // NOTE testing with --fork-block-number 20592882, totalSupply will change if this is not maintained
+
+        uint256 amount = accountFunds;
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
+        alchemist.deposit(address(0xbeef), amount);
+        alchemist.mint((amount * LTV) / FIXED_POINT_SCALAR);
+        vm.stopPrank();
+
+        // Now altering the yield tokens price (on the dai Yearn Vault) in underyling by artificially inflating the token supply from  1.54e25 to (1.54e25 + 1.54e26/7.3)
+        // see https://etherscan.io/address/0xdA816459F1AB5631232FE5e97a05BBBb94970c95#code
+        vm.store(address(fakeYieldToken), bytes32(uint256(5)), bytes32(uint256(((1.54e25 * FIXED_POINT_SCALAR) / 73e17) + 1.54e25)));
+        bytes32 modifiedStateVariable = vm.load(address(fakeYieldToken), bytes32(uint256(5)));
+        uint256 yieldTokenTotalSupply = IYearnVaultV2(address(fakeYieldToken)).totalSupply();
+
+        // make sure the right state variable has been modified
+        vm.assertApproxEqAbs(uint256(modifiedStateVariable), uint256(yieldTokenTotalSupply), minimumDepositOrWithdrawalLoss);
+
+        // let another user liquidate the previous user position
+        vm.startPrank(externalUser);
+        uint256 liquidatorPrevTokenBalance = IERC20(fakeYieldToken).balanceOf(address(externalUser));
+        (uint256 assets, uint256 fees) = alchemist.liquidate(address(0xbeef));
+        uint256 liquidatorPostTokenBalance = IERC20(fakeYieldToken).balanceOf(address(externalUser));
+        (uint256 depositedCollateral, int256 debt) = alchemist.getCDP(address(0xbeef));
+        vm.stopPrank();
+
+        // ensure debt is zero
+        vm.assertApproxEqAbs(debt, 0, minimumDepositOrWithdrawalLoss);
+
+        // ensure depositedCollateral is zero
+        vm.assertApproxEqAbs(depositedCollateral, 0, minimumDepositOrWithdrawalLoss);
+
+        // ensure assets liquidated is equal to the amount put in
+        vm.assertApproxEqAbs(assets, accountFunds, minimumDepositOrWithdrawalLoss);
+
+        // ensure liquidator fee is correct (total underlying - debt)
+        vm.assertApproxEqAbs(fees, 191_966_404_330_380_896_000_000_000, 1e18);
+
+        // liquidator gets correct amount of fee
+        vm.assertApproxEqAbs(liquidatorPostTokenBalance, liquidatorPrevTokenBalance + fees, 1e18);
     }
 }
