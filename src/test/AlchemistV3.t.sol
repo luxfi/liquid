@@ -418,4 +418,20 @@ contract AlchemistV3Test is Test, IAlchemistV3Errors {
         // liquidator gets correct amount of fee
         vm.assertApproxEqAbs(liquidatorPostTokenBalance, liquidatorPrevTokenBalance + fees, 1e18);
     }
+
+    function testLiquidate_Revert_If_Overcollateralized_Position() external {
+        uint256 amount = accountFunds;
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
+        alchemist.deposit(address(0xbeef), amount);
+        alchemist.mint((amount * LTV) / FIXED_POINT_SCALAR);
+        vm.stopPrank();
+
+        // let another user liquidate the previous user position
+        vm.startPrank(externalUser);
+        uint256 liquidatorPrevTokenBalance = IERC20(fakeYieldToken).balanceOf(address(externalUser));
+        vm.expectRevert(LiquidationError.selector);
+        (uint256 assets, uint256 fees) = alchemist.liquidate(address(0xbeef));
+        vm.stopPrank();
+    }
 }
