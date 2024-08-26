@@ -199,7 +199,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @return The amount of underlying tokens.
     function convertYieldTokensToUnderlying(uint256 amount) public view returns (uint256) {
         uint8 decimals = TokenUtils.expectDecimals(yieldToken);
-        return (amount * IYearnVaultV2(yieldToken).pricePerShare()) / 10 ** 18;
+        return (amount * IYearnVaultV2(yieldToken).pricePerShare()) / 10 ** decimals;
     }
 
     /// @inheritdoc IAlchemistV3
