@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Unlicense
+// SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
 import "./interfaces/IAlchemistV3.sol";
@@ -21,7 +21,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         // A signed value which represents the current amount of debt or credit that the account has accrued.
         // Positive values indicate debt, negative values indicate credit.
         int256 debt;
-        // The account owners yield token balance.
+        // The account owner's yield token balance.
         uint256 balance;
         // The allowances for mints.
         mapping(address => uint256) mintAllowances;
@@ -42,8 +42,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     address public debtToken;
 
     address public underlyingToken;
-
-    address public yieldToken;
+    
+    address[] public yieldTokens;
+    mapping(address => bool) public isYieldToken;
 
     address public admin;
 
@@ -57,14 +58,10 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     constructor() initializer {}
 
-    function getCDP(address owner) external view returns (uint256 depositedCollateral, int256 debt) {
+    function getCDP(address owner) external view returns (uint256, int256) {
         Account storage account = _accounts[owner];
 
-        depositedCollateral = _accounts[owner].balance;
-
-        debt = account.debt;
-
-        return (depositedCollateral, debt);
+        return (account.balance, account.debt);
     }
 
     function getYieldToken()
@@ -76,14 +73,14 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         return (yieldTokenAddress, underlyingTokenAddress, yieldTokenTicker, underlyingTokenTicker);
     }
 
-    function getLoanTerms() external view returns (uint8 LTV, uint8 underlyingTokenAddress, uint8 redemptionFee) {
+    function getLoanTerms() external view returns (uint256 LTV, uint256 underlyingTokenAddress, uint256 redemptionFee) {
         /// TODO Return actual LTV, Liquidation ratio, and redemption fee
         return (LTV, underlyingTokenAddress, redemptionFee);
     }
 
-    function getTotalDepositedValue() external view returns (uint256 deposits) {
-        /// TODO Return the total amount of yield tokens deposited in the alchemist
-        return deposits;
+    function getTotalDepositedSingle(address yieldToken) external view returns (uint256) {
+        //TODO: does there need to be any other accounting?
+        return ERC20(yieldToken).balanceOf(this.address);
     }
 
     function getTotalBorrowed() external view returns (uint256 deposits) {
@@ -91,9 +88,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         return deposits;
     }
 
-    function getMaxBorrowable() external view returns (uint256 mexDebt) {
+    function getMaxBorrowable(address user) external view returns (uint256 maxDebt) {
         /// TODO Return the maximum a user can borrow at any moment. Improves frontend UX becuase if user selects “MAX” deposit, then it will use the
-        return mexDebt;
+        return maxDebt;
     }
 
     function getTotalUnderlyingValue() external view returns (uint256 TVL) {
@@ -120,21 +117,22 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     }
 
     /// @inheritdoc IAlchemistV3
-    function deposit(address user, uint256 collateralAmount) external override returns (uint256) {
+    function deposit(address user, address yieldToken, uint256 amount) external override returns (uint256) {
         _checkArgument(user != address(0));
+        _checkArgument(isYieldToken(yieldToken));
 
-        // Deposit the yield tokens to the user.
-        _deposit(collateralAmount, user);
+        _deposit(user, yieldToken, amount);
 
-        // Transfer tokens from the message sender now that the internal storage updates have been committed.
-        TokenUtils.safeTransferFrom(yieldToken, msg.sender, address(this), collateralAmount);
+        // Transfer tokens from the msg.sender now that the internal storage updates have been committed.
+        TokenUtils.safeTransferFrom(yieldToken, msg.sender, address(this), amount);
 
         return collateralAmount;
     }
 
     /// @inheritdoc IAlchemistV3
-    function withdraw(uint256 amount) external override returns (uint256) {
+    function withdraw(address yieldToken, uint256 amount) external override returns (uint256) {
         _checkArgument(msg.sender != address(0));
+        _checkArgument(isYieldToken(yieldToken));
 
         // Withdraw the amount from the system.
         _withdraw(msg.sender, amount);
@@ -148,7 +146,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @inheritdoc IAlchemistV3
     function mint(uint256 amount) external override {
         _checkArgument(amount > 0);
-        // Mint tokens from the message sender's account to the recipient.
+        // Mint tokens to self
         _mint(msg.sender, amount, msg.sender);
     }
 
@@ -159,7 +157,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         // Preemptively try and decrease the minting allowance. This will save gas when the allowance is not sufficient
         // for the mint.
-        _decreaseMintAllowance(owner, msg.sender, amount);
+        _spendAllowance(owner, msg.sender, amount);
 
         // Mint tokens from the message sender's account to the recipient.
         _mint(msg.sender, amount, recipient);
@@ -193,11 +191,12 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     }
 
     /// @dev Gets the amount of an underlying token that `amount` of `yieldToken` is exchangeable for.
-    ///
+    /// @param yieldToken Which yield token to convert to underlying
     /// @param amount The amount of yield tokens.
     ///
-    /// @return The amount of underlying tokens.
-    function convertYieldTokensToUnderlying(uint256 amount) public view returns (uint256) {
+    /// @return uint256 amount of underlying tokens.
+    function convertYieldTokensToUnderlying(address yieldToken, uint256 amount) public view returns (uint256) {
+        _checkArgument(isYieldToken(yieldToken));
         uint8 decimals = TokenUtils.expectDecimals(yieldToken);
         return (amount * IYearnVaultV2(yieldToken).pricePerShare()) / 10 ** decimals;
     }
@@ -207,6 +206,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         // TODO checks if a users debt is greater than the underlying value of their collateral.
         // If so, the users debt is zero’d out and collateral with underlying value equivalent to the debt is sent to the transmuter.
         // The remainder is sent to the liquidator.
+        // In a multi-yield token model, this will also need to determine which assets to liquidate
 
         int256 debt = _accounts[owner].debt;
 
@@ -327,19 +327,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     function _approveMint(address owner, address spender, uint256 amount) internal {
         Account storage account = _accounts[owner];
         account.mintAllowances[spender] = amount;
-    }
-
-    /// @dev Decrease the mint allowance for `spender` by `amount` for the account owned by `owner`.
-    /// @dev Reverts on underflow i.e. If the `spender' doesnt have an allowance >= `amount`.
-    /// @param owner   The address of the account owner.
-    /// @param spender The address of the spender.
-    /// @param amount  The amount of debt tokens to decrease the mint allowance by.
-    function _decreaseMintAllowance(address owner, address spender, uint256 amount) internal {
-        Account storage account = _accounts[owner];
-        if (account.mintAllowances[spender] < amount) {
-            revert InsufficientAllowance();
-        }
-        account.mintAllowances[spender] -= amount;
     }
 
     /// @dev Checks an expression and reverts with an {IllegalArgument} error if the expression is {false}.
