@@ -18,12 +18,12 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @notice A user account.
     /// @notice This account struct is included in the main contract, AlchemistV3.sol, to aid readability.
     struct Account {
-        // A signed value which represents the current amount of debt or credit that the account has accrued.
-        // Positive values indicate debt, negative values indicate credit.
-        int256 debt;
-        // The account owner's yield token balance.
-        uint256 balance;
-        // The allowances for mints.
+        /// @notice user's debt, mapped by yield token (yield token addr => debt)
+        /// @notice Positive values indicate debt, negative values indicate credit.
+        mapping(address => int256) debt;
+        /// @notice yield token balance in each yield token
+        mapping(address => uint256) balance;
+        /// @notice allowances for minting alAssets
         mapping(address => uint256) mintAllowances;
     }
 
@@ -43,7 +43,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     address public underlyingToken;
     
-    address[] public yieldTokens;
+    /// @notice list of whitelisted yield tokens, capped to a max of 10
+    address[](10) public yieldTokens;
+    /// @notice helper for checking if token is whitelisted
     mapping(address => bool) public isYieldToken;
 
     address public admin;
@@ -64,28 +66,14 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         return (account.balance, account.debt);
     }
 
-    function getYieldToken()
-        external
-        view
-        returns (uint256 yieldTokenAddress, uint256 underlyingTokenAddress, uint256 yieldTokenTicker, uint256 underlyingTokenTicker)
-    {
-        /// TODO Return actual data about the yield token in one call to avoid dependency chains in the api
-        return (yieldTokenAddress, underlyingTokenAddress, yieldTokenTicker, underlyingTokenTicker);
-    }
-
     function getLoanTerms() external view returns (uint256 LTV, uint256 underlyingTokenAddress, uint256 redemptionFee) {
         /// TODO Return actual LTV, Liquidation ratio, and redemption fee
         return (LTV, underlyingTokenAddress, redemptionFee);
     }
 
-    function getTotalDepositedSingle(address yieldToken) external view returns (uint256) {
+    function getTotalDeposited(address yieldToken) external view returns (uint256) {
         //TODO: does there need to be any other accounting?
         return ERC20(yieldToken).balanceOf(this.address);
-    }
-
-    function getTotalBorrowed() external view returns (uint256 deposits) {
-        /// TODO Return the total amount of yield tokens deposited in the alchemist
-        return deposits;
     }
 
     function getMaxBorrowable(address user) external view returns (uint256 maxDebt) {
@@ -98,22 +86,47 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         return TVL;
     }
 
-    function totalValue(address owner) public view returns (uint256) {
+    function totalValue(address owner, address yieldToken) public view returns (uint256) {
         // TODO This function could be replaced by another to reflect the underlying value based on yield generated
-        return convertYieldTokensToUnderlying(_accounts[owner].balance);
+        return convertYieldTokensToUnderlying(_accounts[owner].balance[yieldToken]);
     }
 
     function initialize(InitializationParams memory params) external initializer {
         _checkArgument(params.protocolFee <= BPS);
         debtToken = params.debtToken;
         underlyingToken = params.underlyingToken;
-        yieldToken = params.yieldToken;
+        for (uint256 i = 0; i < parmas._yieldTokens.length; i++) {
+            yieldTokens.push(params._yieldTokens[i]);
+            isYieldToken[params._yieldTokens[i]] = true;
+        }
         admin = params.admin;
         transmuter = params.transmuter;
         maximumLTV = params.maximumLTV;
         protocolFee = params.protocolFee;
         protocolFeeReceiver = params.protocolFeeReceiver;
         _mintingLimiter = Limiters.createLinearGrowthLimiter(params.mintingLimitMaximum, params.mintingLimitBlocks, params.mintingLimitMinimum);
+    }
+
+    // note must remove token before adding new token in its slot
+    function whitelistYieldToken(address yieldToken, uint256 i) external onlyAdmin {
+        // check that token is not already whitelisted
+        _checkArgument(!isYieldToken(yieldToken));
+        // push regularly if no index is specified
+        if(i == 0) {
+            yieldTokens.push(yieldToken);
+            isYieldToken[yieldToken] = true;
+        else {
+            _checkArgument(yieldTokens[i] == address(0));
+            yieldTokens[i] = yieldToken;
+            isYieldToken[yieldToken] = true;
+        }
+    }
+
+    // note addr is safety measure to make sure correct token is deleted
+    function removeYieldToken(address yieldToken, uint256 i) external onlyAdmin {
+        _checkArgument(yieldTokens[i] == yieldToken);
+        yieldTokens[i] = address(0);
+        isYieldToken[yieldToken] = false;
     }
 
     /// @inheritdoc IAlchemistV3
