@@ -16,8 +16,8 @@ interface IAlchemistV3 is IAlchemistV3Errors {
         address debtToken;
         // The ERC20 token used to represent the underlying token of the yield token.
         address underlyingToken;
-        // The address of the yield token being deposited.
-        address yieldToken;
+        // The address(es) of the yield token(s) being deposited.
+        address[] _yieldTokens;
         // The initial transmuter or transmuter buffer.
         address transmuter;
         // The maximum LTV (Loan to Value) between 0 and 1 exclusive
