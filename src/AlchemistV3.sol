@@ -17,10 +17,10 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     /// @notice A user account.
     /// @notice This account struct is included in the main contract, AlchemistV3.sol, to aid readability.
+    ///TODO: consider removing struct and having three mappings
     struct Account {
-        /// @notice user's debt, mapped by yield token (yield token addr => debt)
-        /// @notice Positive values indicate debt, negative values indicate credit.
-        mapping(address => int256) debt;
+        /// @notice user's debt, positive values indicate debt, negative values indicate credit.
+        int256 debt;
         /// @notice yield token balance in each yield token
         mapping(address => uint256) balance;
         /// @notice allowances for minting alAssets
@@ -43,8 +43,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     address public underlyingToken;
     
-    /// @notice list of whitelisted yield tokens, capped to a max of 10
-    address[](10) public yieldTokens;
+    /// @notice list of whitelisted yield tokens
+    address[] public yieldTokens;
     /// @notice helper for checking if token is whitelisted
     mapping(address => bool) public isYieldToken;
 
@@ -61,18 +61,20 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     constructor() initializer {}
 
     function getCDP(address owner) external view returns (uint256, int256) {
+        //TODO: this will need to be updated if we switch off of the struct
         Account storage account = _accounts[owner];
 
         return (account.balance, account.debt);
     }
 
-    function getLoanTerms() external view returns (uint256 LTV, uint256 underlyingTokenAddress, uint256 redemptionFee) {
+    function getLoanTerms() external view returns (uint256 LTV, uint256 liquidationRatio, uint256 redemptionFee) {
         /// TODO Return actual LTV, Liquidation ratio, and redemption fee
-        return (LTV, underlyingTokenAddress, redemptionFee);
+        return (LTV, liquidationRatio, redemptionFee);
     }
 
     function getTotalDeposited(address yieldToken) external view returns (uint256) {
-        //TODO: does there need to be any other accounting?
+        _checkArgument(isYieldToken(yieldToken));
+        // TODO does there need to be any other accounting?
         return ERC20(yieldToken).balanceOf(this.address);
     }
 
@@ -83,6 +85,11 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     function getTotalUnderlyingValue() external view returns (uint256 TVL) {
         /// TODO Read the total value of the TVL in the alchemist, denominated in the underlying token.
+        for (uint256 i = 0; i < yieldTokens.length; i++) {
+            uint256 yieldTokenTVL = ERC20(yieldTokens[i]).balanceOf(this.address);
+            uint256 yieldTokenTVLInUnderlying = convertYieldTokensToUnderlying(yieldTokens[i], yieldTokenTVL);
+            TVL += yieldTokenTVLInUnderlying;
+        }
         return TVL;
     }
 
@@ -115,7 +122,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         if(i == 0) {
             yieldTokens.push(yieldToken);
             isYieldToken[yieldToken] = true;
-        else {
+        } else {
             _checkArgument(yieldTokens[i] == address(0));
             yieldTokens[i] = yieldToken;
             isYieldToken[yieldToken] = true;
@@ -133,24 +140,28 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     function deposit(address user, address yieldToken, uint256 amount) external override returns (uint256) {
         _checkArgument(user != address(0));
         _checkArgument(isYieldToken(yieldToken));
+        _checkArgument(amount > 0);
 
-        _deposit(user, yieldToken, amount);
+        _accounts[recipient].balance[yieldToken] += amount;
 
-        // Transfer tokens from the msg.sender now that the internal storage updates have been committed.
+        // Transfer tokens from msg.sender now that the internal storage updates have been committed.
         TokenUtils.safeTransferFrom(yieldToken, msg.sender, address(this), amount);
 
-        return collateralAmount;
+        return amount;
     }
 
     /// @inheritdoc IAlchemistV3
     function withdraw(address yieldToken, uint256 amount) external override returns (uint256) {
         _checkArgument(msg.sender != address(0));
         _checkArgument(isYieldToken(yieldToken));
+        _checkArgument(_accounts[owner].balance[yieldToken] >= amount);
 
-        // Withdraw the amount from the system.
-        _withdraw(msg.sender, amount);
+        _accounts[owner].balance[yieldToken] -= amount;
 
-        // Transfer the yield tokens to the recipient.
+        // Assure that the collateralization invariant is still held.
+        _validate(owner);
+
+        // Transfer the yield tokens to msg.sender
         TokenUtils.safeTransfer(yieldToken, msg.sender, amount);
 
         return amount;
@@ -174,15 +185,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         // Mint tokens from the message sender's account to the recipient.
         _mint(msg.sender, amount, recipient);
-    }
-
-    /// @inheritdoc IAlchemistV3
-    function maxMint() external override returns (uint256 amount) {
-        uint256 collateralization = (totalValue(msg.sender) * maximumLTV) / FIXED_POINT_SCALAR;
-        amount = collateralization - uint256(_accounts[msg.sender].debt);
-        _checkArgument(amount > 0);
-        _mint(msg.sender, amount, msg.sender);
-        return amount;
     }
 
     /// @inheritdoc IAlchemistV3
@@ -263,33 +265,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     function setMaxLoanToValue(uint256 maxLTV) external override {
         _checkArgument(maxLTV > 0 && maxLTV < 1e18);
         maximumLTV = maxLTV;
-    }
-
-    /// @dev Withdraw the `amount` of yield tokens from the account owned by `owner`.
-    /// @param owner   The address of the account owner to withdraw from.
-    /// @param amount  The amount of yeild tokens to withdraw.
-    ///
-    /// @return The amount of yield tokens withdrawn.
-    function _withdraw(address owner, uint256 amount) internal returns (uint256) {
-        _checkArgument(_accounts[owner].balance >= amount);
-
-        _accounts[owner].balance -= amount;
-
-        // Valid the owner's account to assure that the collateralization invariant is still held.
-        _validate(owner);
-
-        return amount;
-    }
-
-    /// @dev Deposit the `amount` of yield tokens from msg.sender to the account owned by `recipient`.
-    /// @param amount  The amount of yeild tokens to withdraw.
-    /// @param recipient  The address of the account to be credited with the yeild token deposit.
-    ///
-    /// @return The amount of yield tokens deposited.
-    function _deposit(uint256 amount, address recipient) internal returns (uint256) {
-        _checkArgument(amount > 0);
-        _accounts[recipient].balance += amount;
-        return amount;
     }
 
     /// @dev Mints debt tokens to `recipient` using the account owned by `owner`.
