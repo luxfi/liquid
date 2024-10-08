@@ -41,18 +41,20 @@ interface IAlchemistV3 is IAlchemistV3Errors {
 
     /// @notice Deposits yield tokens to `user` with amount `collateralAmount`.
     /// @param user The address of the user to credit with deposit.
+    /// @param yieldToken Address of the yield token to deposit
     /// @param collateralAmount  The amount of yield tokens to deposit.
     ///
     /// @return amountDeposited The number of yield tokens that were deposited to the account owner.
-    function deposit(address user, uint256 collateralAmount) external returns (uint256 amountDeposited);
+    function deposit(address user, address yieldToken, uint256 collateralAmount) external returns (uint256 amountDeposited);
 
     /// @notice Withdraws the desired `amount` of yield tokens.
     /// @notice Maximum amount equivalent to whatever puts the user at the maxLTV.
     /// @notice Only callable by account owner.
+    /// @param yieldToken Address of the yield token to withdraw
     /// @param amount The amount yield tokens to withdraw.
     ///
     /// @return amountWithdrawn The number of yield tokens that were withdrawn to the account owner.
-    function withdraw(uint256 amount) external returns (uint256 amountWithdrawn);
+    function withdraw(address yieldToken, uint256 amount) external returns (uint256 amountWithdrawn);
 
     /// @notice Mint the `amount` of alAsset to account owner (msg.sender).
     /// @notice Only callable by account owner.
@@ -92,11 +94,6 @@ interface IAlchemistV3 is IAlchemistV3Errors {
     /// @return assets Yield tokens sent to the transmuter.
     /// @return fee Yield tokens sent to the liquidator.
     function liquidate(address owner) external returns (uint256 assets, uint256 fee);
-
-    /// @notice QoL function to set the mint amount to be the absolute maximum for the position.
-    ///
-    /// @return amount Minted alAsset sent to account owner.
-    function maxMint() external returns (uint256 amount);
 
     /// @notice Globally redeems all users for their pending built up redemption amount.
     /// @notice Callable by anyone.
