@@ -99,9 +99,16 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         return TVL;
     }
 
-    function totalValue(address owner, address yieldToken) public view returns (uint256) {
+    function totalValue(address owner) public view returns (uint256) {
         // TODO This function could be replaced by another to reflect the underlying value based on yield generated
-        return convertYieldTokensToUnderlying(yieldToken, _accounts[owner].balance[yieldToken]);
+        uint256 totalUnderlying;
+        for (uint256 i = 0; i < yieldTokens.length; i++) {
+            address yieldToken = yieldTokens[i];
+            if(yieldToken == address(0)) continue;
+            uint256 bal = _accounts[owner].balance[yieldToken];
+            if(bal > 0) totalUnderlying += convertYieldTokensToUnderlying(yieldToken, bal);
+        }
+        return totalUnderlying;
     }
 
     function initialize(InitializationParams memory params) external initializer {
@@ -235,14 +242,13 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
             revert LiquidationError();
         }
 
-        if (_isUnderCollateralized(owner)) {
-            // TODO fix next line (placeholder using first token in array)
-            assets = _accounts[owner].balance[yieldTokens[0]];
-            uint256 totalUnderyling = convertYieldTokensToUnderlying(yieldTokens[0], assets);
+        // not using _isUnderCollateralized to avoid looping through balances twice
+        uint256 collateral = totalValue(owner);
 
+        if ((collateral * maximumLTV) / FIXED_POINT_SCALAR < uint256(debt)) {
             // Liquidator fee i.e. yield token price of underlying - debt owed
-            if (totalUnderyling > uint256(debt)) {
-                fee = totalUnderyling - uint256(debt);
+            if (collateral > uint256(debt)) {
+                fee = collateral - uint256(debt);
             }
 
             // zero out the liquidated users debt
@@ -255,11 +261,11 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
             // zero out the liquidated users collateral
             // _accounts[owner].balance = 0;
 
-            // TODO should we send the collateral to transmuter ?
-            // TokenUtils.safeTransfer(yieldToken, address(transmuter), uint256(debt));
+            // TODO what happens to surplus
 
             if (fee > 0) {
                 // TODO fix next line (placeholder using first token in array)
+                // need to determine how fee token gets picked
                 TokenUtils.safeTransfer(yieldTokens[0], msg.sender, fee);
             }
             return (assets, fee);
@@ -342,9 +348,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @dev If the account is undercollateralized then this will revert with an {Undercollateralized} error.
     /// @param owner The address of the account owner.
     function _validate(address owner) internal view {
-        if (_isUnderCollateralized(owner)) {
-            revert Undercollateralized();
-        }
+        if (_isUnderCollateralized(owner)) revert Undercollateralized();
     }
 
     /// @dev Checks that the account owned by `owner` is properly collateralized.
@@ -352,12 +356,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @param owner The address of the account owner.
     function _isUnderCollateralized(address owner) internal view returns (bool) {
         int256 debt = _accounts[owner].debt;
-        if (debt <= 0) {
-            return false;
-        }
-        // TODO update to reflect multiple yield tokens
-        // TODO fix next line (placeholder using first token in array)
-        uint256 collateralization = (totalValue(yieldTokens[0], owner) * maximumLTV) / FIXED_POINT_SCALAR;
+        if (debt <= 0) return false;
+
+        uint256 collateralization = (totalValue(owner) * maximumLTV) / FIXED_POINT_SCALAR;
         if (collateralization < uint256(debt)) {
             return true;
         }
