@@ -33,8 +33,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     uint256 public constant BPS = 10_000;
 
-    uint256 public maximumLTV;
-
     uint256 public protocolFee;
 
     address public protocolFeeReceiver;
@@ -47,6 +45,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     address[] public yieldTokens;
     /// @notice helper for checking if token is whitelisted
     mapping(address => bool) public isYieldToken;
+    /// @notice LTV (loan-to-value) ratio for each yield token
+    mapping(address => uint256) public LTV;
 
     address public admin;
 
@@ -113,33 +113,36 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     function initialize(InitializationParams memory params) external initializer {
         _checkArgument(params.protocolFee <= BPS);
+        _checkArgument(params._yieldTokens.length == params._LTV.length);
         debtToken = params.debtToken;
         underlyingToken = params.underlyingToken;
         for (uint256 i = 0; i < params._yieldTokens.length; i++) {
             yieldTokens.push(params._yieldTokens[i]);
             isYieldToken[params._yieldTokens[i]] = true;
+            LTV[params._yieldTokens[i]] = params._LTV[i];
         }
         admin = params.admin;
         transmuter = params.transmuter;
-        maximumLTV = params.maximumLTV;
         protocolFee = params.protocolFee;
         protocolFeeReceiver = params.protocolFeeReceiver;
         _mintingLimiter = Limiters.createLinearGrowthLimiter(params.mintingLimitMaximum, params.mintingLimitBlocks, params.mintingLimitMinimum);
     }
 
     // note must remove token before adding new token in its slot
-    function whitelistYieldToken(address yieldToken, uint256 i) external onlyAdmin {
+    function whitelistYieldToken(address yieldToken, uint256 i, uint256 _LTV) external onlyAdmin {
         // check that token is not already whitelisted
         _checkArgument(!isYieldToken[yieldToken]);
+        // check for valid LTV
+        _checkArgument(_LTV > 0 && _LTV < 1e18);
         // push regularly if no index is specified
         if(i == 0) {
             yieldTokens.push(yieldToken);
-            isYieldToken[yieldToken] = true;
         } else {
             _checkArgument(yieldTokens[i] == address(0));
             yieldTokens[i] = yieldToken;
-            isYieldToken[yieldToken] = true;
         }
+            isYieldToken[yieldToken] = true;
+            LTV[yieldToken] = _LTV;
     }
 
     // note addr is safety measure to make sure correct token is deleted
@@ -147,6 +150,14 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         _checkArgument(yieldTokens[i] == yieldToken);
         yieldTokens[i] = address(0);
         isYieldToken[yieldToken] = false;
+        LTV[yieldToken] = 0;
+    }
+
+    /// @inheritdoc IAlchemistV3
+    function setMaxLoanToValue(address yieldToken, uint256 newLTV) external override onlyAdmin {
+        _checkArgument(isYieldToken[yieldToken]);
+        _checkArgument(newLTV > 0 && newLTV < 1e18);
+        LTV[yieldToken] = newLTV;
     }
 
     /// @inheritdoc IAlchemistV3
@@ -245,7 +256,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         // not using _isUnderCollateralized to avoid looping through balances twice
         uint256 collateral = totalValue(owner);
 
-        if ((collateral * maximumLTV) / FIXED_POINT_SCALAR < uint256(debt)) {
+        //TODO using placeholder LTV, needs to be updated for multi-yield token
+        if ((collateral * LTV[yieldTokens[0]]) / FIXED_POINT_SCALAR < uint256(debt)) {
             // Liquidator fee i.e. yield token price of underlying - debt owed
             if (collateral > uint256(debt)) {
                 fee = collateral - uint256(debt);
@@ -277,12 +289,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @inheritdoc IAlchemistV3
     function approveMint(address spender, uint256 amount) external override {
         _approveMint(msg.sender, spender, amount);
-    }
-
-    /// @inheritdoc IAlchemistV3
-    function setMaxLoanToValue(uint256 maxLTV) external override {
-        _checkArgument(maxLTV > 0 && maxLTV < 1e18);
-        maximumLTV = maxLTV;
     }
 
     /// @dev Mints debt tokens to `recipient` using the account owned by `owner`.
@@ -358,7 +364,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         int256 debt = _accounts[owner].debt;
         if (debt <= 0) return false;
 
-        uint256 collateralization = (totalValue(owner) * maximumLTV) / FIXED_POINT_SCALAR;
+        //TODO using placeholder LTV, needs to be updated for multi-yield token
+        uint256 collateralization = (totalValue(owner) * LTV[yieldTokens[0]]) / FIXED_POINT_SCALAR;
         if (collateralization < uint256(debt)) {
             return true;
         }

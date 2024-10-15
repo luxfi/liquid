@@ -18,10 +18,11 @@ interface IAlchemistV3 is IAlchemistV3Errors {
         address underlyingToken;
         // The address(es) of the yield token(s) being deposited.
         address[] _yieldTokens;
+        // The maximum LTV (Loan to Value) between 0 and 1 exclusive
+        // Array matches LTV to the yield token of the same index
+        uint256[] _LTV;
         // The initial transmuter or transmuter buffer.
         address transmuter;
-        // The maximum LTV (Loan to Value) between 0 and 1 exclusive
-        uint256 maximumLTV;
         // TODO Need to discuss how fees will be accumulated since harvests will no longer be done.
         uint256 protocolFee;
         // The address that receives protocol fees.
@@ -69,8 +70,9 @@ interface IAlchemistV3 is IAlchemistV3Errors {
 
     /// @notice Sets the `maxLTV` (maximum Loan to Value) at which a loan can be taken.
     /// @notice Maximum LTV is a number between 0 and 1 exclusive.
+    /// @param yieldToken address of the yield token to set the LTV for
     /// @param maxLTV Maximum LTV.
-    function setMaxLoanToValue(uint256 maxLTV) external;
+    function setMaxLoanToValue(address yieldToken, uint256 maxLTV) external;
 
     /// @notice Reduces the debt of `user` by burning an `amount` of alAssets and Burns that `amount` of alAssets.
     /// @notice Callable by anyone.
