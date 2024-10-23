@@ -1,364 +1,374 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import "../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import "../../lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import "../interfaces/IAlchemistV3.sol";
+import "../interfaces/IYearnVaultV2.sol";
+import "../libraries/TokenUtils.sol";
+import "../libraries/Limiters.sol";
 import "../libraries/SafeCast.sol";
-import "../../lib/forge-std/src/Test.sol";
-import {SafeERC20} from "../libraries/SafeERC20.sol";
-import {console} from "../../lib/forge-std/src/console.sol";
-import {AlchemistV3} from "../AlchemistV3.sol";
-import {AlchemicTokenV3} from "../AlchemicTokenV3.sol";
-import {TransmuterV3} from "../TransmuterV3.sol";
-import {TransmuterBuffer} from "../TransmuterBuffer.sol";
-import {Whitelist} from "../utils/Whitelist.sol";
-import {TestERC20} from "./mocks/TestERC20.sol";
-import {TestYieldToken} from "./mocks/TestYieldToken.sol";
-import {IAlchemistV3} from "../interfaces/IAlchemistV3.sol";
-import {ITestYieldToken} from "../interfaces/test/ITestYieldToken.sol";
-import {InsufficientAllowance} from "../base/Errors.sol";
+import "../interfaces/ITokenAdapter.sol";
+import {Initializable} from "../../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
+import {Unauthorized, IllegalArgument, InsufficientAllowance} from "../base/Errors.sol";
 
-import "../interfaces/IAlchemistV3Errors.sol";
+/// @title  AlchemistV3
+/// @author Alchemix Finance
+contract AlchemistV3 is IAlchemistV3, Initializable {
+    using Limiters for Limiters.LinearGrowthLimiter;
 
-contract AlchemistV3Test is Test, IAlchemistV3Errors {
-    // ----- [SETUP] Variables for setting up a minimal CDP -----
+    /// @notice A user account.
+    /// @notice This account struct is included in the main contract, AlchemistV3.sol, to aid readability.
+    ///TODO: consider removing struct and having three mappings
+    struct Account {
+        /// @notice user's debt, positive values indicate debt, negative values indicate credit.
+        int256 debt;
+        /// @notice yield token balance in each yield token
+        mapping(address => uint256) balance;
+        /// @notice allowances for minting alAssets
+        mapping(address => uint256) mintAllowances;
+    }
 
-    // Callable contract variables
-    AlchemistV3 alchemist;
-    TransmuterV3 transmuter;
-    TransmuterBuffer transmuterBuffer;
-
-    // // Proxy variables
-    TransparentUpgradeableProxy proxyAlchemist;
-    TransparentUpgradeableProxy proxyTransmuter;
-    TransparentUpgradeableProxy proxyTransmuterBuffer;
-
-    // // Contract variables
-    // CheatCodes cheats = CheatCodes(HEVM_ADDRESS);
-    AlchemistV3 alchemistLogic;
-    TransmuterV3 transmuterLogic;
-    TransmuterBuffer transmuterBufferLogic;
-    AlchemicTokenV3 alToken;
-    Whitelist whitelist;
-
-    // Token addresses
-    address fakeUnderlyingToken;
-    address fakeYieldToken;
-
-    // Total minted debt
-    uint256 public minted;
-
-    // Total debt burned
-    uint256 public burned;
-
-    // Total tokens sent to transmuter
-    uint256 public sentToTransmuter;
-
-    // Parameters for AlchemicTokenV2
-    string public _name;
-    string public _symbol;
-    uint256 public _flashFee;
-    address public alOwner;
-
-    mapping(address => bool) users;
-
-    // LTV
-    uint256 public LTV = 9 * 1e17; // .9
+    string public constant version = "3.0.0";
 
     uint256 public constant FIXED_POINT_SCALAR = 1e18;
 
-    // ----- Variables for deposits & withdrawals -----
+    uint256 public constant BPS = 10_000;
 
-    // account funds to make deposits/test with
-    uint256 accountFunds = 2_000_000_000e18;
+    uint256 public protocolFee;
 
-    // amount of yield/underlying token to deposit
-    uint256 depositAmount = 100_000e18;
+    address public protocolFeeReceiver;
 
-    // minimum amount of yield/underlying token to deposit
-    uint256 minimumDeposit = 1000e18;
+    address public debtToken;
 
-    // minimum amount of yield/underlying token to deposit
-    uint256 minimumDepositOrWithdrawalLoss = 1e18;
+    address public underlyingToken;
+    
+    /// @notice list of whitelisted yield tokens
+    address[] public yieldTokens;
+    /// @notice helper for checking if token is whitelisted
+    mapping(address => bool) public isYieldToken;
+    /// @notice LTV (loan-to-value) ratio for each yield token
+    mapping(address => uint256) public LTV;
 
-    // random EOA for testing
-    address externalUser = address(0x69E8cE9bFc01AA33cD2d02Ed91c72224481Fa420);
+    address public admin;
 
-    // another random EOA for testing
-    address anotherExternalUser = address(0x420Ab24368E5bA8b727E9B8aB967073Ff9316969);
+    address public transmuter;
 
-    function setUp() external {
-        // test maniplulation for convenience
-        address caller = address(0xdead);
-        address proxyOwner = address(this);
-        vm.assume(caller != address(0));
-        vm.assume(proxyOwner != address(0));
-        vm.assume(caller != proxyOwner);
-        vm.startPrank(caller);
+    mapping(address => Account) private _accounts;
 
-        // Fake tokens
+    address public transferAdapter;
 
-        TestERC20 testToken = new TestERC20(0, 18);
-        fakeUnderlyingToken = address(testToken);
-        TestYieldToken testYieldToken = new TestYieldToken(fakeUnderlyingToken);
-        fakeYieldToken = address(testYieldToken);
+    Limiters.LinearGrowthLimiter private _mintingLimiter;
 
-        // Contracts and logic contracts
-        alOwner = caller;
-        alToken = new AlchemicTokenV3(_name, _symbol, _flashFee);
-        transmuterBufferLogic = new TransmuterBuffer();
-        transmuterLogic = new TransmuterV3();
-        alchemistLogic = new AlchemistV3();
-        whitelist = new Whitelist();
-
-        // Proxy contracts
-        // TransmuterBuffer proxy
-        bytes memory transBufParams = abi.encodeWithSelector(TransmuterBuffer.initialize.selector, alOwner, address(alToken));
-
-        proxyTransmuterBuffer = new TransparentUpgradeableProxy(address(transmuterBufferLogic), proxyOwner, transBufParams);
-
-        transmuterBuffer = TransmuterBuffer(address(proxyTransmuterBuffer));
-
-        // TransmuterV3 proxy
-        bytes memory transParams = abi.encodeWithSelector(TransmuterV3.initialize.selector, address(alToken), fakeUnderlyingToken, address(transmuterBuffer));
-
-        proxyTransmuter = new TransparentUpgradeableProxy(address(transmuterLogic), proxyOwner, transParams);
-        transmuter = TransmuterV3(address(proxyTransmuter));
-
-        // AlchemistV3 proxy
-        IAlchemistV3.InitializationParams memory params = IAlchemistV3.InitializationParams({
-            admin: alOwner,
-            yieldToken: address(fakeYieldToken),
-            debtToken: address(alToken),
-            underlyingToken: address(fakeUnderlyingToken),
-            transmuter: address(transmuterBuffer),
-            maximumLTV: LTV,
-            protocolFee: 1000,
-            protocolFeeReceiver: address(10),
-            mintingLimitMinimum: 1,
-            mintingLimitMaximum: uint256(type(uint160).max),
-            mintingLimitBlocks: 300
-        });
-
-        bytes memory alchemParams = abi.encodeWithSelector(AlchemistV3.initialize.selector, params);
-        proxyAlchemist = new TransparentUpgradeableProxy(address(alchemistLogic), proxyOwner, alchemParams);
-        alchemist = AlchemistV3(address(proxyAlchemist));
-
-        // Whitelist alchemist proxy for minting tokens
-        alToken.setWhitelist(address(proxyAlchemist), true);
-
-        whitelist.add(address(0xbeef));
-        whitelist.add(externalUser);
-        whitelist.add(anotherExternalUser);
-
-        vm.stopPrank();
-
-        // Add funds to test accounts
-        deal(address(fakeYieldToken), address(0xbeef), accountFunds);
-        deal(address(fakeYieldToken), externalUser, accountFunds);
-        deal(address(fakeUnderlyingToken), anotherExternalUser, accountFunds);
-        deal(address(fakeUnderlyingToken), address(0xbeef), accountFunds);
-
-        vm.startPrank(anotherExternalUser);
-
-        SafeERC20.safeApprove(address(fakeUnderlyingToken), address(fakeYieldToken), accountFunds);
-
-        // faking initial token vault supply
-        ITestYieldToken(address(fakeYieldToken)).mint(15_000_000e18, anotherExternalUser);
-
-        vm.stopPrank();
+    modifier onlyAdmin() {
+        _checkArgument(msg.sender == admin);
+        _;
     }
 
-    function testDeposit(uint256 amount) external {
-        amount = bound(amount, 1e18, accountFunds);
-        vm.startPrank(address(0xbeef));
-        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
-        alchemist.deposit(address(0xbeef), amount);
-        vm.assertApproxEqAbs(alchemist.totalValue(address(0xbeef)), amount, minimumDepositOrWithdrawalLoss);
-        vm.stopPrank();
+    constructor() initializer {}
+
+    // function getCDP(address owner) external view returns (uint256, int256) {
+    //     //TODO this will need to be updated if we switch off of the struct
+    //     //TODO need to rethink how balances get shown
+    //     Account storage account = _accounts[owner];
+
+    //     return (account.balance, account.debt);
+    // }
+
+    function getLoanTerms() external view returns (uint256 LTV, uint256 liquidationRatio, uint256 redemptionFee) {
+        /// TODO Return actual LTV, Liquidation ratio, and redemption fee
+        return (LTV, liquidationRatio, redemptionFee);
     }
 
-    function testWithdraw(uint256 amount) external {
-        amount = bound(amount, 1e18, accountFunds);
-        vm.startPrank(address(0xbeef));
-        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
-        alchemist.deposit(address(0xbeef), amount);
-        alchemist.withdraw(amount / 2);
-        vm.assertApproxEqAbs(alchemist.totalValue(address(0xbeef)), amount / 2, minimumDepositOrWithdrawalLoss);
-        vm.stopPrank();
+    function getTotalDeposited(address yieldToken) external view returns (uint256) {
+        _checkArgument(isYieldToken[yieldToken]);
+        // TODO does there need to be any other accounting?
+        return IERC20(yieldToken).balanceOf(address(this));
     }
 
-    function testSetMaxLTV_Variable_LTV(uint256 ltv) external {
-        ltv = bound(ltv, 0 + 1e14, LTV - 1e16);
-        vm.startPrank(address(0xbeef));
-        alchemist.setMaxLoanToValue(ltv);
-        vm.assertApproxEqAbs(alchemist.maximumLTV(), ltv, minimumDepositOrWithdrawalLoss);
-        vm.stopPrank();
+    function getMaxBorrowable(address user) external view returns (uint256 maxDebt) {
+        /// TODO Return the maximum a user can borrow at any moment. Improves frontend UX becuase if user selects “MAX” deposit, then it will use the
+        return maxDebt;
     }
 
-    function testSetMaxLTV_Invalid_LTV_Zero() external {
-        uint256 ltv = 0;
-        vm.startPrank(address(0xbeef));
-        vm.expectRevert(IllegalArgument.selector);
-        alchemist.setMaxLoanToValue(ltv);
-        vm.stopPrank();
+    function getTotalUnderlyingValue() external view returns (uint256 TVL) {
+        /// TODO Read the total value of the TVL in the alchemist, denominated in the underlying token.
+        for (uint256 i = 0; i < yieldTokens.length; i++) {
+            uint256 yieldTokenTVL = IERC20(yieldTokens[i]).balanceOf(address(this));
+            uint256 yieldTokenTVLInUnderlying = convertYieldTokensToUnderlying(yieldTokens[i], yieldTokenTVL);
+            TVL += yieldTokenTVLInUnderlying;
+        }
+        return TVL;
     }
 
-    function testSetMaxLTV_Invalid_LTV_Above_Max_Bound(uint256 ltv) external {
-        // ~ all possible LTVS above max bound
-        vm.assume(ltv > 1e18);
-        vm.startPrank(address(0xbeef));
-        vm.expectRevert(IllegalArgument.selector);
-        alchemist.setMaxLoanToValue(ltv);
-        vm.stopPrank();
+    function totalValue(address owner) public view returns (uint256) {
+        // TODO This function could be replaced by another to reflect the underlying value based on yield generated
+        uint256 totalUnderlying;
+        for (uint256 i = 0; i < yieldTokens.length; i++) {
+            address yieldToken = yieldTokens[i];
+            if(yieldToken == address(0)) continue;
+            uint256 bal = _accounts[owner].balance[yieldToken];
+            if(bal > 0) totalUnderlying += convertYieldTokensToUnderlying(yieldToken, bal);
+        }
+        return totalUnderlying;
     }
 
-    function testMint_Variable_Amount(uint256 amount) external {
-        amount = bound(amount, 1e18, accountFunds);
-        uint256 ltv = 2e17;
-        vm.startPrank(address(0xbeef));
-        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
-        alchemist.deposit(address(0xbeef), amount);
-        alchemist.mint((amount * ltv) / FIXED_POINT_SCALAR);
-        vm.assertApproxEqAbs(IERC20(alToken).balanceOf(address(0xbeef)), (amount * ltv) / FIXED_POINT_SCALAR, minimumDepositOrWithdrawalLoss);
-        vm.stopPrank();
+    function initialize(InitializationParams memory params) external initializer {
+        _checkArgument(params.protocolFee <= BPS);
+        _checkArgument(params._yieldTokens.length == params._LTV.length);
+        debtToken = params.debtToken;
+        underlyingToken = params.underlyingToken;
+        for (uint256 i = 0; i < params._yieldTokens.length; i++) {
+            yieldTokens.push(params._yieldTokens[i]);
+            isYieldToken[params._yieldTokens[i]] = true;
+            LTV[params._yieldTokens[i]] = params._LTV[i];
+        }
+        admin = params.admin;
+        transmuter = params.transmuter;
+        protocolFee = params.protocolFee;
+        protocolFeeReceiver = params.protocolFeeReceiver;
+        _mintingLimiter = Limiters.createLinearGrowthLimiter(params.mintingLimitMaximum, params.mintingLimitBlocks, params.mintingLimitMinimum);
     }
 
-    function testMint_Variable_LTV(uint256 ltv) external {
-        uint256 amount = depositAmount;
-
-        // ~ all possible LTVS up to max LTV
-        ltv = bound(ltv, 0 + 1e14, LTV - 1e16);
-        vm.startPrank(address(0xbeef));
-        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
-        alchemist.deposit(address(0xbeef), amount);
-        alchemist.mint((amount * ltv) / FIXED_POINT_SCALAR);
-        vm.assertApproxEqAbs(IERC20(alToken).balanceOf(address(0xbeef)), (amount * ltv) / FIXED_POINT_SCALAR, minimumDepositOrWithdrawalLoss);
-        vm.stopPrank();
+    // note must remove token before adding new token in its slot
+    function whitelistYieldToken(address yieldToken, uint256 i, uint256 _LTV) external onlyAdmin {
+        // check that token is not already whitelisted
+        _checkArgument(!isYieldToken[yieldToken]);
+        // check for valid LTV
+        _checkArgument(_LTV > 0 && _LTV < 1e18);
+        // push regularly if no index is specified
+        if(i == 0) {
+            yieldTokens.push(yieldToken);
+        } else {
+            _checkArgument(yieldTokens[i] == address(0));
+            yieldTokens[i] = yieldToken;
+        }
+            isYieldToken[yieldToken] = true;
+            LTV[yieldToken] = _LTV;
     }
 
-    function testMint_Revert_Exceeds_LTV(uint256 amount, uint256 ltv) external {
-        amount = bound(amount, 1e18, accountFunds);
-
-        // ~ all possible LTVS above max LTV
-        ltv = bound(ltv, LTV + 1e14, 1e18);
-        vm.startPrank(address(0xbeef));
-        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
-        alchemist.deposit(address(0xbeef), amount);
-        vm.expectRevert(Undercollateralized.selector);
-        alchemist.mint((amount * FIXED_POINT_SCALAR) / ltv);
-        vm.stopPrank();
+    // note addr is safety measure to make sure correct token is deleted
+    function removeYieldToken(address yieldToken, uint256 i) external onlyAdmin {
+        _checkArgument(yieldTokens[i] == yieldToken);
+        yieldTokens[i] = address(0);
+        isYieldToken[yieldToken] = false;
+        LTV[yieldToken] = 0;
     }
 
-    function testMintFrom_Variable_Amount_Revert_No_Allowance(uint256 amount) external {
-        amount = bound(amount, 1e18, accountFunds);
-        uint256 ltv = 2e17;
-
-        vm.startPrank(externalUser);
-        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
-        /// Make deposit for external user
-        alchemist.deposit(externalUser, amount);
-        vm.stopPrank();
-
-        vm.startPrank(address(0xbeef));
-        /// 0xbeef mints tokens from `externalUser` account, to be recieved by `externalUser`.
-        /// 0xbeef however, has not been approved for any mint amount for `externalUsers` account.
-        vm.expectRevert(InsufficientAllowance.selector);
-        alchemist.mintFrom(externalUser, ((amount * ltv) / FIXED_POINT_SCALAR), externalUser);
-        vm.stopPrank();
+    /// @inheritdoc IAlchemistV3
+    function setMaxLoanToValue(address yieldToken, uint256 newLTV) external override onlyAdmin {
+        _checkArgument(isYieldToken[yieldToken]);
+        _checkArgument(newLTV > 0 && newLTV < 1e18);
+        LTV[yieldToken] = newLTV;
     }
 
-    function testMintFrom_Variable_Amount(uint256 amount) external {
-        amount = bound(amount, 1e18, accountFunds);
-        uint256 ltv = 2e17;
+    /// @inheritdoc IAlchemistV3
+    function deposit(address user, address yieldToken, uint256 amount) external override returns (uint256) {
+        _checkArgument(user != address(0));
+        _checkArgument(isYieldToken[yieldToken]);
+        _checkArgument(amount > 0);
 
-        vm.startPrank(externalUser);
-        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
-        /// Make deposit for external user
-        alchemist.deposit(externalUser, amount);
+        _accounts[user].balance[yieldToken] += amount;
 
-        /// 0xbeef has been approved up to a mint amount for minting from `externalUser` account.
-        alchemist.approveMint(address(0xbeef), amount + 100e18);
-        vm.stopPrank();
+        // Transfer tokens from msg.sender now that the internal storage updates have been committed.
+        TokenUtils.safeTransferFrom(yieldToken, msg.sender, address(this), amount);
 
-        vm.startPrank(address(0xbeef));
-        alchemist.mintFrom(externalUser, ((amount * ltv) / FIXED_POINT_SCALAR), externalUser);
-
-        vm.assertApproxEqAbs(IERC20(alToken).balanceOf(externalUser), (amount * ltv) / FIXED_POINT_SCALAR, minimumDepositOrWithdrawalLoss);
-        vm.stopPrank();
+        return amount;
     }
 
-    function testMaxMint_Variable_Amount(uint256 amount) external {
-        amount = bound(amount, 1e18, accountFunds);
-        vm.startPrank(address(0xbeef));
-        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
-        alchemist.deposit(address(0xbeef), amount);
-        alchemist.maxMint();
-        vm.assertApproxEqAbs(IERC20(alToken).balanceOf(address(0xbeef)), (amount * LTV) / FIXED_POINT_SCALAR, minimumDepositOrWithdrawalLoss);
-        vm.stopPrank();
+    /// @inheritdoc IAlchemistV3
+    function withdraw(address yieldToken, uint256 amount) external override returns (uint256) {
+        _checkArgument(msg.sender != address(0));
+        _checkArgument(isYieldToken[yieldToken]);
+        // TODO potentially remove next check, underflow protection will naturally check
+        _checkArgument(_accounts[msg.sender].balance[yieldToken] >= amount);
+
+        _accounts[msg.sender].balance[yieldToken] -= amount;
+
+        // Assure that the collateralization invariant is still held.
+        _validate(msg.sender);
+
+        // Transfer the yield tokens to msg.sender
+        TokenUtils.safeTransfer(yieldToken, msg.sender, amount);
+
+        return amount;
     }
 
-    function testMaxMint_Variable_Amount_Multiple_Mints(uint256 amount) external {
-        amount = bound(amount, 1e18, accountFunds);
-        vm.startPrank(address(0xbeef));
-        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
-        alchemist.deposit(address(0xbeef), amount);
-        alchemist.mint((amount * 25e16) / FIXED_POINT_SCALAR);
-        alchemist.mint((amount * 25e16) / FIXED_POINT_SCALAR);
-
-        // amount/2 has now been minted. The max amount minted should be : ((total deposit * LTV) - amount/2)
-        uint256 maxMinted = alchemist.maxMint();
-        vm.assertApproxEqAbs(maxMinted, ((amount * LTV) / FIXED_POINT_SCALAR) - (amount / 2), minimumDepositOrWithdrawalLoss);
-
-        // This should result in a final alAsset balance of : deposit amount * LTV
-        vm.assertApproxEqAbs(IERC20(alToken).balanceOf(address(0xbeef)), (amount * LTV) / FIXED_POINT_SCALAR, minimumDepositOrWithdrawalLoss);
-        vm.stopPrank();
+    /// @inheritdoc IAlchemistV3
+    function mint(uint256 amount) external override {
+        _checkArgument(amount > 0);
+        // Mint tokens to self
+        _mint(msg.sender, amount, msg.sender);
     }
 
-    function testMaxMint_Variable_Amount_Revert_Zero_Deposit(uint256 amount) external {
-        amount = bound(amount, 1e18, accountFunds);
-        vm.startPrank(address(0xbeef));
-        vm.expectRevert(IllegalArgument.selector);
-        alchemist.maxMint();
-        vm.stopPrank();
+    /// @inheritdoc IAlchemistV3
+    function mintFrom(address owner, uint256 amount, address recipient) external override {
+        _checkArgument(amount > 0);
+        _checkArgument(recipient != address(0));
+
+        // Preemptively decrease the minting allowance, saving gas when the allowance is insufficient
+        _accounts[owner].mintAllowances[msg.sender] -= amount;
+
+        // Mint tokens from the message sender's account to the recipient.
+        _mint(msg.sender, amount, recipient);
     }
 
-    function testRepay_Variable_Amount(uint256 amount) external {
-        amount = bound(amount, 1e18, accountFunds);
-        vm.startPrank(address(0xbeef));
-        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
-        SafeERC20.safeApprove(address(alToken), address(alchemist), amount + 100e18);
-        alchemist.deposit(address(0xbeef), amount);
-        alchemist.maxMint();
-        uint256 supplyBeforeBurn = IERC20(alToken).totalSupply();
-        uint256 expectedSupplyAfterBurn = supplyBeforeBurn - amount / 2;
-        alchemist.repay(address(0xbeef), amount / 2);
-        uint256 supplyAfterBurn = IERC20(alToken).totalSupply();
-        (uint256 depositedCollateral, int256 debt) = alchemist.getCDP(address(0xbeef));
-
-        // User debt updates to correct value
-        vm.assertApproxEqAbs(uint256(debt), ((amount * LTV) / FIXED_POINT_SCALAR) - (amount / 2), minimumDepositOrWithdrawalLoss);
-
-        // The alAsset total supply has updated to the correct amount after burning
-        vm.assertApproxEqAbs(supplyAfterBurn, expectedSupplyAfterBurn, minimumDepositOrWithdrawalLoss);
-        vm.stopPrank();
+    /// @inheritdoc IAlchemistV3
+    function redeem() external override returns (uint256 amount) {
+        /// TODO Utilizes getRedemptionRate from the transmuter to know how much to redeem everyone
+        return amount;
     }
 
-    function testRepayUnderlying_Variable_Amount(uint256 amount) external {
-        amount = bound(amount, 1e18, accountFunds);
-        vm.startPrank(address(0xbeef));
-        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
-        SafeERC20.safeApprove(address(fakeUnderlyingToken), address(alchemist), amount + 100e18);
-        alchemist.deposit(address(0xbeef), amount);
-        alchemist.maxMint();
-        alchemist.repayWithUnderlying(address(0xbeef), amount / 2);
-        (uint256 depositedCollateral, int256 debt) = alchemist.getCDP(address(0xbeef));
+    /// @inheritdoc IAlchemistV3
+    function repay(address user, uint256 amount) external override {
+        uint256 actualAmount = _repay(user, amount);
+        TokenUtils.safeBurnFrom(debtToken, msg.sender, actualAmount);
+    }
 
-        // User debt updates to correct value
-        vm.assertApproxEqAbs(uint256(debt), ((amount * LTV) / FIXED_POINT_SCALAR) - (amount / 2), minimumDepositOrWithdrawalLoss);
+    /// @inheritdoc IAlchemistV3
+    function repayWithUnderlying(address user, uint256 amount) external override {
+        uint256 actualAmount = _repay(user, amount);
+        TokenUtils.safeTransferFrom(underlyingToken, msg.sender, transmuter, actualAmount);
+    }
 
-        // Transmuter has recieved the correct amount of underlying tokens
-        vm.assertApproxEqAbs(IERC20(fakeUnderlyingToken).balanceOf(address(transmuterBuffer)), amount / 2, minimumDepositOrWithdrawalLoss);
-        vm.stopPrank();
+    /// @dev Gets the amount of an underlying token that `amount` of `yieldToken` is exchangeable for.
+    /// @param yieldToken Which yield token to convert to underlying
+    /// @param amount The amount of yield tokens.
+    ///
+    /// @return uint256 amount of underlying tokens.
+    function convertYieldTokensToUnderlying(address yieldToken, uint256 amount) public view returns (uint256) {
+        _checkArgument(isYieldToken[yieldToken]);
+        uint8 decimals = TokenUtils.expectDecimals(yieldToken);
+        return (amount * IYearnVaultV2(yieldToken).pricePerShare()) / 10 ** decimals;
+    }
+
+    /// @inheritdoc IAlchemistV3
+    function liquidate(address owner) external override returns (uint256 assets, uint256 fee) {
+        // TODO checks if a users debt is greater than the underlying value of their collateral.
+        // If so, the users debt is zero’d out and collateral with underlying value equivalent to the debt is sent to the transmuter.
+        // The remainder is sent to the liquidator.
+        // In a multi-yield token model, this will also need to determine which assets to liquidate
+
+        int256 debt = _accounts[owner].debt;
+
+        if (debt <= 0) {
+            revert LiquidationError();
+        }
+
+        // not using _isUnderCollateralized to avoid looping through balances twice
+        uint256 collateral = totalValue(owner);
+
+        //TODO using placeholder LTV, needs to be updated for multi-yield token
+        if ((collateral * LTV[yieldTokens[0]]) / FIXED_POINT_SCALAR < uint256(debt)) {
+            // Liquidator fee i.e. yield token price of underlying - debt owed
+            if (collateral > uint256(debt)) {
+                fee = collateral - uint256(debt);
+            }
+
+            // zero out the liquidated users debt
+            _accounts[owner].debt = 0;
+
+            // TODO need to rework the rest of the function, commenting out the rest for now
+            // * needs to take into account multiple yield tokens
+            // * needs to be able to partially liquidate
+
+            // zero out the liquidated users collateral
+            // _accounts[owner].balance = 0;
+
+            // TODO what happens to surplus
+
+            if (fee > 0) {
+                // TODO fix next line (placeholder using first token in array)
+                // need to determine how fee token gets picked
+                TokenUtils.safeTransfer(yieldTokens[0], msg.sender, fee);
+            }
+            return (assets, fee);
+        } else {
+            revert LiquidationError();
+        }
+    }
+
+    /// @inheritdoc IAlchemistV3
+    function approveMint(address spender, uint256 amount) external override {
+        _approveMint(msg.sender, spender, amount);
+    }
+
+    /// @dev Mints debt tokens to `recipient` using the account owned by `owner`.
+    /// @param owner     The owner of the account to mint from.
+    /// @param amount    The amount to mint.
+    /// @param recipient The recipient of the minted debt tokens.
+    function _mint(address owner, uint256 amount, address recipient) internal {
+        // Check that the system will allow for the specified amount to be minted.
+        // TODO To review and add mint limit checks
+        // i.e. _checkMintingLimit(uint256 amount)
+        _updateDebt(recipient, SafeCast.toInt256(amount));
+
+        // Validate the owner's account to assure that the collateralization invariant is still held.
+        _validate(owner);
+
+        // Mint the debt tokens to the recipient.
+        TokenUtils.safeMint(debtToken, recipient, amount);
+    }
+
+    /// @dev Increases the debt by `amount` for the account owned by `owner`.
+    /// @param owner   The address of the account owner.
+    /// @param amount  The amount to increase the debt by.
+    function _updateDebt(address owner, int256 amount) internal {
+        Account storage account = _accounts[owner];
+        account.debt += amount;
+    }
+
+    /// @notice Reduces the debt of `user` by the `amount` of alAssets.
+    /// @notice If the `amount` speicified is > debt, amount will default to the max possible amount.
+    /// @notice Callable by anyone.
+    /// @notice Capped at existing debt of user.
+    /// @param user Address of the user having debt repaid.
+    /// @param amount Amount of alAsset tokens to repay.
+    ///
+    /// @return The actual amount of debt repaid
+    function _repay(address user, uint256 amount) internal returns (uint256) {
+        int256 debt = _accounts[user].debt;
+        _checkArgument(debt > 0);
+        uint256 actualAmount = amount > uint256(debt) ? uint256(debt) : amount;
+        _updateDebt(user, -SafeCast.toInt256(actualAmount));
+        return actualAmount;
+    }
+
+    /// @dev Set the mint allowance for `spender` to `amount` for the account owned by `owner`.
+    /// @param owner   The address of the account owner.
+    /// @param spender The address of the spender.
+    /// @param amount  The amount of debt tokens to set the mint allowance to.
+    function _approveMint(address owner, address spender, uint256 amount) internal {
+        Account storage account = _accounts[owner];
+        account.mintAllowances[spender] = amount;
+    }
+
+    /// @dev Checks an expression and reverts with an {IllegalArgument} error if the expression is {false}.
+    ///
+    /// @param expression The expression to check.
+    function _checkArgument(bool expression) internal pure {
+        if (!expression) {
+            revert IllegalArgument();
+        }
+    }
+
+    /// @dev Checks that the account owned by `owner` is properly collateralized.
+    /// @dev If the account is undercollateralized then this will revert with an {Undercollateralized} error.
+    /// @param owner The address of the account owner.
+    function _validate(address owner) internal view {
+        if (_isUnderCollateralized(owner)) revert Undercollateralized();
+    }
+
+    /// @dev Checks that the account owned by `owner` is properly collateralized.
+    /// @dev If the account is undercollateralized then this will revert with an {Undercollateralized} error.
+    /// @param owner The address of the account owner.
+    function _isUnderCollateralized(address owner) internal view returns (bool) {
+        int256 debt = _accounts[owner].debt;
+        if (debt <= 0) return false;
+
+        //TODO using placeholder LTV, needs to be updated for multi-yield token
+        uint256 collateralization = (totalValue(owner) * LTV[yieldTokens[0]]) / FIXED_POINT_SCALAR;
+        if (collateralization < uint256(debt)) {
+            return true;
+        }
+        return false;
     }
 }

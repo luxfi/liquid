@@ -8,4 +8,7 @@ pragma solidity >=0.5.0;
 interface IAlchemistV3Errors {
     /// @notice An error which is used to indicate that an operation failed because an account became undercollateralized.
     error Undercollateralized();
+
+    /// @notice An error which is used to indicate that a liquidate operation failed because an account is sufficiaenly collateralized.
+    error LiquidationError();
 }
