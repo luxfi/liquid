@@ -156,4 +156,4 @@ contract TransmuterTest is Test {
         vm.prank(address(0xbeef));
         transmuter.claimRedemption(1);
     }
-}
+} // TODO: Add test for new fenwick tree
