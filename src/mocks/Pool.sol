@@ -44,8 +44,17 @@ library Pool {
   ///
   /// @param _ctx the pool context.
   function update(Data storage _data, Context storage _ctx) internal {
+    uint256 _elapsedTime = block.number - (_data.lastUpdatedBlock);
+    uint256 _distributeAmount;
+    if (block.number - (_data.lastUpdatedBlock) != 0) {
+      uint256 _rewardRate = _data.getRewardRate(_ctx);
+      _distributeAmount = _rewardRate * (_elapsedTime);
+    }
+
     _data.accumulatedRewardWeight = _data.getUpdatedAccumulatedRewardWeight(_ctx);
+
     _data.lastUpdatedBlock = block.number;
+    _data.totalDeposited -= _distributeAmount;
   }
 
   /// @dev Gets the rate at which the pool will distribute rewards to stakers.
