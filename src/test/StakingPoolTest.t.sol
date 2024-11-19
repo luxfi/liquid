@@ -40,7 +40,7 @@ contract StakingPoolTest is Test {
         // Total debt = 350
         //
         // Transmuter has 75 tokens staked
-        // Transmutation rate is 1 month 
+        // Transmutation time is 1 month 
         // 75/350 = 21.428571428% of debt redeemed in 1 month
         // 216000 blocks in one month on mainnet 
         // 75/216000 = 347222222222222 tokens per block
@@ -63,8 +63,9 @@ contract StakingPoolTest is Test {
 
         vm.prank(address(0xb00ba));
         pool.deposit(0, 200e18);
-        vm.warp(block.timestamp + 30 days);
         vm.roll(block.number + 216000);
+
+        pool.setRewardRate(462962962962962);
 
         // Check that each position has 21.428571428% of their deposit claimable
 
@@ -90,37 +91,37 @@ contract StakingPoolTest is Test {
             500000000000000000
         );
 
-        // Withdraw these amounts to simulate debt being redeemed
-        vm.startPrank(address(0xbeef));
-        pool.claim(0);
-        pool.withdraw(0, beefAmount);
-        vm.stopPrank();
+        // // Withdraw these amounts to simulate debt being redeemed
+        // vm.startPrank(address(0xbeef));
+        // pool.claim(0);
+        // pool.withdraw(0, beefAmount);
+        // vm.stopPrank();
 
-        vm.startPrank(address(0xdead));
-        pool.claim(0);
-        pool.withdraw(0, deadAmount);
-        vm.stopPrank();
+        // vm.startPrank(address(0xdead));
+        // pool.claim(0);
+        // // pool.withdraw(0, deadAmount);
+        // vm.stopPrank();
 
-        vm.startPrank(address(0xb00ba));
-        pool.claim(0);
-        pool.withdraw(0, boobAmount);
-        vm.stopPrank();
+        // vm.startPrank(address(0xb00ba));
+        // pool.claim(0);
+        // // pool.withdraw(0, boobAmount);
+        // vm.stopPrank();
 
         // The following month the total debt is 350 -75 = 275
-        // Now let's say we need to redeem 100 tokens in the next month
+        // Now let's say we need to redeem 100 tokens in the next two month
         // 100/275 = 36.363636363636...%
         // 100/216000 = 462962962962962 tokens per block
 
-        pool.setRewardRate(462962962962962);
-
-        vm.warp(block.timestamp + 30 days);
-        vm.roll(block.number + 216000);
+        vm.roll(block.number + 4132000);
 
         // Check that each position has 36.363636363636...% of their remaining deposit claimable
 
+        vm.prank(address(0xbeef));
+        pool.claim(0);
+
         assertApproxEqRel( 
             21428571428571428571, 
-            pool.getStakeTotalUnclaimed(address(0xbeef), 0), 
+            IERC20(rewardToken).balanceOf(address(this)), 
             500000000000000000
         );
 

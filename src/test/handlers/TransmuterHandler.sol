@@ -14,10 +14,14 @@ contract TransmuterHandler is CommonBase, StdCheats, StdUtils{
         _transmuter = transmuter;
     }
 
-    // TODO create and claim redemptions using tokens from main test and make sure to send returns to there as well
-    // Bound these values to random number between 0 and balance of msg.sender
+    // TODO: Bind amounts to createRedemption and pick random alchemists and collaterals
 
-    function createRedemption(address alchemist , address collateral, uint256 depositAmount) public {}
+    function createRedemption(address alchemist, address collateral, uint256 depositAmount) public {
+        _transmuter.createRedemption(alchemist, collateral, depositAmount);
+    }
 
-    function claimRedemption(uint256 id) public {}
+    // TODO: Pick random user. Find way to log IDs
+    function claimRedemption(uint256 id) public {
+        _transmuter.claimRedemption(id);
+    }
 }

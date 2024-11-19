@@ -20,7 +20,7 @@ library StakingGraph {
     function _update(mapping(uint256 => int256) storage graph, uint256 index, int256 delta) internal {
         index += 1;        
         // TODO: Update this with actual size value we want to use
-        while (index <= 500000000) {
+        while (index <= 2**256 - 1) {
             graph[index] += delta;
 
             assembly {
