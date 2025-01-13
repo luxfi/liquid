@@ -42,9 +42,6 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
     // Nonce to increment nft IDs.
     uint256 public nonce;
 
-    // The current redemption rate
-    uint256 public redemptionRate;
-
     /// @dev Array of all registered alchemists.
     address[] public alchemists;
 
@@ -96,14 +93,6 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
         TokenUtils.safeTransfer(syntheticToken, msg.sender, TokenUtils.safeBalanceOf(syntheticToken, address(this)));
     }
 
-    // Allows alchemist to update redemption rate when new debt is minted or repayed
-    function updateRedemptionRate() external {
-        if(alchemistEntries[msg.sender].isActive == false)
-            revert NotRegisteredAlchemist();
-
-        _updateRedemptionRate();
-    }
-
     /* ---------------EXTERNAL FUNCTIONS--------------- */
 
     // IDs can be seen from UI, which will input them into this function to get data
@@ -118,10 +107,7 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
         return userPositions;
     }
 
-    // TODO: If we decide to let users take split of collateral from all alchemists then this needs to be updated
-    // TODO: Specifying the alchemist isn't plausible so need to change this
-    // If not then we should be pull collateral address from alchemist once it is merged in
-    function createRedemption(address alchemist, address collateral, uint256 depositAmount) external {
+    function createRedemption(address alchemist, address underlying, uint256 depositAmount) external {
         if(depositAmount == 0)
             revert DepositZeroAmount();
 
@@ -135,16 +121,14 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
             depositAmount
         );
 
-        // TODO: Add `data` param if we decide we need this
+        // TODO: Add `data` param if we decide we need this. ERC1155
         _mint(msg.sender, ++nonce, depositAmount, "");
 
-        positions[msg.sender][nonce] = StakingPosition(alchemist, collateral, depositAmount, block.number + timeToTransmute);
+        positions[msg.sender][nonce] = StakingPosition(alchemist, underlying, depositAmount, block.number + timeToTransmute);
 
         // Update Fenwick Tree
-        graph.updateStakingGraph(depositAmount.toInt256(), timeToTransmute);
+        graph.updateStakingGraph(depositAmount.toInt256()/ timeToTransmute.toInt256(), timeToTransmute);
         
-        _updateRedemptionRate();
-
         emit PositionCreated(msg.sender, alchemist, depositAmount, nonce);
     }
 
@@ -152,50 +136,28 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
         // TODO: Potentially add allowances for other addresses
         StakingPosition storage position = positions[msg.sender][id];
 
-        if(position.positionMaturationDate > block.number)
+        if(position.positionMaturationBlock > block.number)
             revert PrematureClaim();
 
-        if(position.positionMaturationDate == 0)
+        if(position.positionMaturationBlock == 0)
             revert PositionNotFound();
-
-        TokenUtils.safeTransferFrom(
-            position.collateralAsset, // TODO: Change to alchemist.collaterAsset() later
-            position.alchemist,
-            msg.sender,
-            position.amount
-        );
 
         delete positions[msg.sender][id];
 
         _burn(msg.sender, id, position.amount);
 
-        _updateRedemptionRate();
+        // If the contract has a balance of underlying tokens from alchemist repayments then we only need to redeem partial or none from Alchemist earmarked
+        uint256 underlyingBalance = TokenUtils.safeBalanceOf(position.underlyingAsset, address(this));
+        uint256 amountToRedeem = position.amount > underlyingBalance ? position.amount - underlyingBalance : 0;
+
+        if (amountToRedeem > 0) IAlchemistV3(position.alchemist).redeem(amountToRedeem);
+
+        TokenUtils.safeTransfer(position.underlyingAsset, msg.sender, position.amount);
 
         emit PositionClaimed(msg.sender, position.alchemist, position.amount);
     }
 
-    /* ---------------INTERNAL FUNCTIONS--------------- */
-
-    // Called when position is claimed or created
-    function _updateRedemptionRate() internal {
-        uint256 alchemistDebt = IERC20Minimal(syntheticToken).totalSupply();
-
-        uint256 currentStaked = graph.currentStaked(block.number);
-
-        // TODO: create variable or bitmap of how many blocks each 'bucket' lasts for
-        // This will help us determine what the rate per block should be
-        // For example, if the most recent 'bucket' is for 100 tokens and there are total of 1000
-        // in the alchemist and the 'bucket' lasts 20 blocks, then we need to redeem 0.5% of each users
-        // debt each block. 
-
-        // After the 20 blocks the next 'bucket' would be less than the previous one
-        // This would require another update to debt or new transmuter stake to reflect new 'bucket'
-        // This would lead to some small periods of time where we are slightly over redeeming users debt
-        // If we keep track of when 'buckets' end then we can adjust the rate to reflect any previous extra redemptions
-
-        // For now I will just use this value not scaled for blocks like described above.
-        redemptionRate = (currentStaked * 1e18 / alchemistDebt);
-
-        emit RedemptionRateUpdated(block.number, redemptionRate);
+    function queryGraph(uint256 startBlock, uint256 endBlock) external view returns (uint256) {
+        return graph.rangeQuery(startBlock, endBlock);
     }
 }

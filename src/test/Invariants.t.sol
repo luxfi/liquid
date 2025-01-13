@@ -120,20 +120,14 @@ contract InvariantTests is Test {
         // proxyTransmuter = new TransparentUpgradeableProxy(address(transmuterLogic), proxyOwner, transParams);
         transmuter = new Transmuter(InitializationParams(address(alToken), 30 days));
 
-        address[] memory yields = new address[](1);
-        yields[0] = fakeYieldToken;
-
-        uint256[] memory ltvs = new uint256[](1);
-        ltvs[0] = LTV;
-
         // AlchemistV3 proxy
         IAlchemistV3.InitializationParams memory params = IAlchemistV3.InitializationParams({
             admin: alOwner,
-            _yieldTokens: yields,
+            yieldToken: fakeYieldToken,
             debtToken: address(alToken),
             underlyingToken: address(fakeUnderlyingToken),
             transmuter: address(transmuter),
-            _LTV: ltvs,
+            LTV: LTV,
             protocolFee: 1000,
             protocolFeeReceiver: address(10),
             mintingLimitMinimum: 1,
@@ -224,38 +218,38 @@ contract InvariantTests is Test {
 			// userShares += balance;
 		}
         
-        totalBalance = alchemist.getTotalDeposited(address(fakeYieldToken));
+        totalBalance = alchemist.getTotalDeposited();
 
         assertEq(userShares, totalBalance);
     }
 
-    // Every alchemist CDP must be updated properly when redeem is called
-    // Redeem will cause the users debts to update based on redemption rate
-    // TODO: update this once redemption system is coded fully
-    function invariant_redeem_user_cdp () public {
-        uint256 totalDebtBefore;
-        uint256 balance;
-        uint256 debt;
-        uint256 userShares;
+    // // Every alchemist CDP must be updated properly when redeem is called
+    // // Redeem will cause the users debts to update based on redemption rate
+    // // TODO: update this once redemption system is coded fully
+    // function invariant_redeem_user_cdp () public {
+    //     uint256 totalDebtBefore;
+    //     uint256 balance;
+    //     uint256 debt;
+    //     uint256 userShares;
 
-        // Once alchemist getCDP function is complete we can uncomment this
-        for (uint256 i = 0; i < userList.length; i++) {
-			// (balance, debt) = alchemist.getCDP(userList[i], address(fakeYieldToken));
-			// totalDebtBefore += debt;
-		}
+    //     // Once alchemist getCDP function is complete we can uncomment this
+    //     for (uint256 i = 0; i < userList.length; i++) {
+	// 		// (balance, debt) = alchemist.getCDP(userList[i], address(fakeYieldToken));
+	// 		// totalDebtBefore += debt;
+	// 	}
 
-        vm.roll(block.number + 3000);
+    //     vm.roll(block.number + 3000);
 
-        alchemist.redeem();
+    //     // alchemist.redeem();
 
-        uint256 totalDebtAfter;
+    //     uint256 totalDebtAfter;
 
-        for (uint256 i = 0; i < userList.length; i++) {
-			// (balance, debt) = alchemist.getCDP(userList[i], address(fakeYieldToken));
-			// totalDebtAfter += debt;
-		}
+    //     for (uint256 i = 0; i < userList.length; i++) {
+	// 		// (balance, debt) = alchemist.getCDP(userList[i], address(fakeYieldToken));
+	// 		// totalDebtAfter += debt;
+	// 	}
 
-        // Sum of debt before with redemption rate applied over time compared to current sum of user debt
-        assertEq(totalDebtBefore - (totalDebtBefore * (transmuter.redemptionRate() * 3000)), totalDebtAfter);
-    }
+    //     // Sum of debt before with redemption rate applied over time compared to current sum of user debt
+    //     assertEq(totalDebtBefore - (totalDebtBefore * (transmuter.redemptionRate() * 3000)), totalDebtAfter);
+    // }
 }

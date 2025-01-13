@@ -10,6 +10,7 @@ import {Transmuter, InitializationParams} from "../Transmuter.sol";
 contract TransmuterTest is Test {
     AlEth public alETH;
     AlEth public collateralToken;
+    AlEth public underlyingToken;
     Transmuter public transmuter;
 
     address public alchemist = address(0x123);
@@ -17,11 +18,14 @@ contract TransmuterTest is Test {
     function setUp() public {
         alETH = new AlEth();
         collateralToken = new AlEth();
-        transmuter = new Transmuter(InitializationParams(address(alETH), 365 days));
+        underlyingToken = new AlEth();
+
+        transmuter = new Transmuter(InitializationParams(address(alETH), 5256000));
 
         transmuter.addAlchemist(alchemist);
 
         deal(address(collateralToken), alchemist, type(uint256).max);
+        deal(address(underlyingToken), address(transmuter), type(uint256).max);
         deal(address(alETH), address(0xbeef), type(uint256).max);
 
         vm.prank(alchemist);
@@ -81,7 +85,7 @@ contract TransmuterTest is Test {
     // TODO: Update once create redemption is modified
     function testCreateRedemption() public {
         vm.prank(address(0xbeef));
-        transmuter.createRedemption(alchemist, address(0xadbc), 100e18);
+        transmuter.createRedemption(alchemist, address(underlyingToken), 100e18);
 
         uint256[] memory ids = new uint256[](1);
         ids[0] = 1;
@@ -109,7 +113,6 @@ contract TransmuterTest is Test {
     function testCreateRedemptionNoTokens() public {
         vm.expectRevert();
         transmuter.createRedemption(address(0xbeef), address(0xadbc), 0);
-
     }
 
     function testCreateRedemptioNotRegistered() public {
@@ -119,27 +122,28 @@ contract TransmuterTest is Test {
 
     function testClaimRedemption() public {
         vm.prank(address(0xbeef));
-        transmuter.createRedemption(alchemist, address(collateralToken), 100e18);
+        transmuter.createRedemption(alchemist, address(underlyingToken), 100e18);
 
-        vm.warp(block.timestamp + 365 days);
+        vm.roll(block.number + 5256000);
 
         vm.prank(address(0xbeef));
         transmuter.claimRedemption(1);
 
-        assertEq(collateralToken.balanceOf(address(0xbeef)), 100e18);
+        assertEq(underlyingToken.balanceOf(address(0xbeef)), 100e18);
     }
 
     function testFuzzClaimRedemption(uint256 amount) public {
         vm.assume(amount > 0);
 
         vm.prank(address(0xbeef));
-        transmuter.createRedemption(alchemist, address(collateralToken), amount);
+        transmuter.createRedemption(alchemist, address(underlyingToken), amount);
 
-        vm.warp(block.timestamp + 365 days);
+        vm.roll(block.number + 5256001);
+
         vm.prank(address(0xbeef));
         transmuter.claimRedemption(1);
 
-        assertEq(collateralToken.balanceOf(address(0xbeef)), amount);
+        assertEq(underlyingToken.balanceOf(address(0xbeef)), amount);
     }
 
     function testClaimRedemptionPremature() public {
@@ -147,8 +151,10 @@ contract TransmuterTest is Test {
         transmuter.createRedemption(alchemist, address(collateralToken), 100e18);
 
         vm.expectRevert();
-        vm.prank(address(0xbeef));
+        vm.startPrank(address(0xbeef));
+        vm.expectRevert();
         transmuter.claimRedemption(1);
+        vm.stopPrank();
     }
 
     function testClaimRedemptionNoPosition() public {

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.26;
 
 interface ITransmuter {
     struct AlchemistEntry {
@@ -16,18 +16,19 @@ interface ITransmuter {
         // For now will handle as single collateral asset.
         address alchemist;
 
-        // Address of the collateral address that the user requested. 
-        // TODO: Once this code is combined with the AlchemistV3 code we can just pull this data from there instead of storing it here.
-        address collateralAsset;
+        // Address of the underlying token address that the user requested. 
+        address underlyingAsset;
 
         // Amount staked.
         uint256 amount;
 
         // Time when the transmutation will be complete/claimable.
-        uint256 positionMaturationDate;
+        uint256 positionMaturationBlock;
     }
 
     // TODO: Fill this in with functions events and full comments:) 
+
+    function queryGraph(uint256 startBlock, uint256 endBlock) external view returns (uint256);
 
     /// @notice Emitted when the admin address is updated.
     ///

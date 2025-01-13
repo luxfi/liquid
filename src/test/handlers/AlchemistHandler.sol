@@ -16,20 +16,20 @@ contract AlchemistHandler is CommonBase, StdCheats, StdUtils{
 
     // TODO: Bind amounts to each function and randomly select a yield token for deposits and withdraw
 
-    function deposit(address yieldToken, uint256 amount) public {
-        _alchemist.deposit(address(this), yieldToken, amount);
+    function deposit(uint256 amount) public {
+        _alchemist.deposit(address(this), amount, address(this));
     }
 
-    function withdraw(address yieldToken, uint256 amount) public {
-        _alchemist.withdraw(yieldToken, amount);
+    function withdraw(uint256 amount) public {
+        _alchemist.withdraw(amount, address(this));
     }
 
     function mint(uint256 amount) public {
-        _alchemist.mint(amount);
+        _alchemist.mint(amount, address(this));
     }
 
     function repay(uint256 amount) public {
-        _alchemist.repay(address(this), amount);
+        _alchemist.repay(amount, address(this));
     }
 
     function liquidate() public {

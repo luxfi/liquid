@@ -14,13 +14,19 @@ library StakingGraph {
     }
 
     function currentStaked(mapping(uint256 => int256) storage graph, uint256 blockNumber) public view returns (uint256) {
-        return uint256(_query(graph, blockNumber));
+        return _query(graph, blockNumber).toUint256();
+    }
+
+    function rangeQuery(mapping(uint256 => int256) storage graph, uint256 l, uint256 r) public view returns (uint256) {
+        return (_query(graph, r) - _query(graph, l - 1)).toUint256();
     }
 
     function _update(mapping(uint256 => int256) storage graph, uint256 index, int256 delta) internal {
         index += 1;        
-        // TODO: Update this with actual size value we want to use
-        while (index <= 2**256 - 1) {
+        // TODO: Update this to reflect total size we want to update over. 
+        // Using max size here will run out of gas
+        // For now we use 20 years
+        while (index <= 630720000) {
             graph[index] += delta;
 
             assembly {
@@ -36,7 +42,7 @@ library StakingGraph {
 
             assembly {
                 index := sub(index, and(index, sub(0, index)))
-            }
+            }        
         }
     }
 }
