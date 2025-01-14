@@ -13,7 +13,6 @@ import {Unauthorized, IllegalArgument, InsufficientAllowance} from "./base/Error
 
 // TODO: Potentially switch from proprietary librariies
 // TODO: Add events
-// TODO: Scale all division
 // TODO: comments for state variables. Alphabetize.
 
 /// @title  AlchemistV3
