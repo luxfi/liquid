@@ -13,11 +13,6 @@ import "./interfaces/ITransmuterErrors.sol";
 import "./interfaces/IAlchemistV3.sol";
 import "./interfaces/IERC20Minimal.sol";
 
-struct InitializationParams {
-    address syntheticToken;
-    uint256 timeToTransmute;
-}
-
 /// @title AlchemixV3 Transmuter
 ///
 /// @notice A contract which facilitates the exchange of alAssets to yield bearing assets.
@@ -26,33 +21,29 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
     using SafeCast for int256;
     using SafeCast for uint256;
 
-    // Alchemix synthetic asset to be transmuted.
-    // TODO make this ERC20 rather than addess
-    address public syntheticToken;
+    /// @inheritdoc ITransmuter
+    address public override syntheticToken;
 
-    // Nft contract for transmuter positions.
-    address public transmuterNFT;
+    /// @inheritdoc ITransmuter
+    uint256 public override timeToTransmute;
 
-    // Time to transmute a position, denominated in blocks.
-    uint256 public timeToTransmute;
+    /// @inheritdoc ITransmuter
+    uint256 public override totalLocked;
 
-    // Total alAssets locked in the system.
-    uint256 public totalLocked;
+    /// @dev Array of registered alchemists.
+    address[] public override alchemists;
 
-    // Nonce to increment nft IDs.
-    uint256 public nonce;
+    /// @dev Map of alchemist addresses to corresponding entry data.
+    mapping(address => AlchemistEntry) private _alchemistEntries;
 
-    /// @dev Array of all registered alchemists.
-    address[] public alchemists;
+    /// @dev Map of user positoins data.
+    mapping(address => mapping(uint256 => StakingPosition)) private _positions;
 
-    /// @dev Map of addresses to index in `alchemists` array
-    mapping(address => AlchemistEntry) public alchemistEntries;
+    /// @dev Staking graph fenwick tree.
+    mapping(uint256 => int256) private _graph;
 
-    /// @dev Map of addresses to a map of NFT tokenId to associated position.
-    mapping(address => mapping(uint256 => StakingPosition)) private positions;
-
-    /// @dev Fenwick Tree of user staking positions.
-    mapping(uint256 => int256) internal graph;
+    /// @dev Nonce data used for minting of new nft positions.
+    uint256 private _nonce;
 
     // TODO: Replace with upgradeable initializer
     constructor(InitializationParams memory params) ERC1155("https://alchemix.fi/transmuter/{id}.json") {
@@ -64,54 +55,56 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
 
     /* ----------------ADMIN FUNCTIONS---------------- */
 
-    // Adds an Alchemist to the transmuter
-    function addAlchemist(address alchemist) external {
-        if(alchemistEntries[alchemist].isActive == true) 
+    /// @inheritdoc ITransmuter
+    function addAlchemist(address alchemist) external override {
+        if(_alchemistEntries[alchemist].isActive == true) 
             revert AlchemistDuplicateEntry();
 
         alchemists.push(alchemist);
-        alchemistEntries[alchemist] = AlchemistEntry(alchemists.length-1, true);
+        _alchemistEntries[alchemist] = AlchemistEntry(alchemists.length-1, true);
     }
 
-    // Removes an Alchemist from the transmuter
-    function removeAlchemist(address alchemist) external {
-        if(alchemistEntries[alchemist].isActive == false) 
+    /// @inheritdoc ITransmuter
+    function removeAlchemist(address alchemist) external override {
+        if(_alchemistEntries[alchemist].isActive == false) 
             revert NotRegisteredAlchemist();
 
-        alchemists[alchemistEntries[alchemist].index] = alchemists[alchemists.length-1];
+        alchemists[_alchemistEntries[alchemist].index] = alchemists[alchemists.length-1];
         alchemists.pop();
-        delete alchemistEntries[alchemist];
+        delete _alchemistEntries[alchemist];
     }
 
-    // Sets the transmutation time, denoted in days.
-    function setTransmutationTime(uint256 time) external {
+    /// @inheritdoc ITransmuter
+    function setTransmutationTime(uint256 time) external override {
         timeToTransmute = time;
-    }
-
-    // Sweeps locked alAssets
-    function sweepTokens() external {
-        TokenUtils.safeTransfer(syntheticToken, msg.sender, TokenUtils.safeBalanceOf(syntheticToken, address(this)));
     }
 
     /* ---------------EXTERNAL FUNCTIONS--------------- */
 
-    // IDs can be seen from UI, which will input them into this function to get data
-    // Potentially move this to the NFT entirely, but likely need some on chain data
-    function getPositions(address account, uint256[] calldata ids) external view returns(StakingPosition[] memory) {
+    /// @inheritdoc ITransmuter
+    function alchemistEntries(address alchemist) external view override returns (uint256, bool) {
+        AlchemistEntry storage entry = _alchemistEntries[alchemist];
+
+        return (entry.index, entry.isActive);
+    }
+
+    /// @inheritdoc ITransmuter
+    function getPositions(address account, uint256[] calldata ids) external view override returns(StakingPosition[] memory) {
         StakingPosition[] memory userPositions = new StakingPosition[](ids.length);
 
         for (uint256 i = 0; i < ids.length; i++) {
-            userPositions[i] = positions[account][ids[i]];
+            userPositions[i] = _positions[account][ids[i]];
         }
 
         return userPositions;
     }
 
-    function createRedemption(address alchemist, address underlying, uint256 depositAmount) external {
+    /// @inheritdoc ITransmuter
+    function createRedemption(address alchemist, address underlying, uint256 depositAmount) external override {
         if(depositAmount == 0)
             revert DepositZeroAmount();
 
-        if(alchemistEntries[alchemist].isActive == false)
+        if(_alchemistEntries[alchemist].isActive == false)
             revert NotRegisteredAlchemist();
 
         TokenUtils.safeTransferFrom(
@@ -122,27 +115,28 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
         );
 
         // TODO: Add `data` param if we decide we need this. ERC1155
-        _mint(msg.sender, ++nonce, depositAmount, "");
+        _mint(msg.sender, ++_nonce, depositAmount, "");
 
-        positions[msg.sender][nonce] = StakingPosition(alchemist, underlying, depositAmount, block.number + timeToTransmute);
+        _positions[msg.sender][_nonce] = StakingPosition(alchemist, underlying, depositAmount, block.number + timeToTransmute);
 
         // Update Fenwick Tree
-        graph.updateStakingGraph(depositAmount.toInt256()/ timeToTransmute.toInt256(), timeToTransmute);
+        _graph.updateStakingGraph(depositAmount.toInt256()/ timeToTransmute.toInt256(), timeToTransmute);
         
-        emit PositionCreated(msg.sender, alchemist, depositAmount, nonce);
+        emit PositionCreated(msg.sender, alchemist, depositAmount, _nonce);
     }
 
-    function claimRedemption(uint256 id) external {
+    /// @inheritdoc ITransmuter
+    function claimRedemption(uint256 id) external override {
         // TODO: Potentially add allowances for other addresses
-        StakingPosition storage position = positions[msg.sender][id];
-
-        if(position.positionMaturationBlock > block.number)
-            revert PrematureClaim();
+        StakingPosition storage position = _positions[msg.sender][id];
 
         if(position.positionMaturationBlock == 0)
             revert PositionNotFound();
 
-        delete positions[msg.sender][id];
+        if(position.positionMaturationBlock > block.number)
+            revert PrematureClaim();
+
+        delete _positions[msg.sender][id];
 
         _burn(msg.sender, id, position.amount);
 
@@ -157,7 +151,8 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
         emit PositionClaimed(msg.sender, position.alchemist, position.amount);
     }
 
-    function queryGraph(uint256 startBlock, uint256 endBlock) external view returns (uint256) {
-        return graph.rangeQuery(startBlock, endBlock);
+    /// @inheritdoc ITransmuter
+    function queryGraph(uint256 startBlock, uint256 endBlock) external view override returns (uint256) {
+        return _graph.rangeQuery(startBlock, endBlock);
     }
 }

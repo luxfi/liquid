@@ -5,7 +5,9 @@ import {Test} from "../../../lib/forge-std/src/Test.sol";
 import {StdCheats} from "../../../lib/forge-std/src/StdCheats.sol";
 
 import {AlEth} from "../external/AlETH.sol";
-import {Transmuter, InitializationParams} from "../Transmuter.sol";
+import {Transmuter} from "../Transmuter.sol";
+
+import "../interfaces/ITransmuter.sol";
 
 contract TransmuterTest is Test {
     AlEth public alETH;
@@ -20,7 +22,7 @@ contract TransmuterTest is Test {
         collateralToken = new AlEth();
         underlyingToken = new AlEth();
 
-        transmuter = new Transmuter(InitializationParams(address(alETH), 5256000));
+        transmuter = new Transmuter(ITransmuter.InitializationParams(address(alETH), 5256000));
 
         transmuter.addAlchemist(alchemist);
 
@@ -72,14 +74,6 @@ contract TransmuterTest is Test {
         transmuter.setTransmutationTime(20 days);
 
         assertEq(transmuter.timeToTransmute(), 20 days);
-    }
-
-    function testSweepTokens() public {
-        deal(address(alETH), address(transmuter), 100e18);
-
-        transmuter.sweepTokens();
-
-        assertEq(alETH.balanceOf(address(this)), 100e18);
     }
 
     // TODO: Update once create redemption is modified
