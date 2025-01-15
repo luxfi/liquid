@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: MIT 
-pragma solidity >0.8.0;
-
-import "./IAlchemistV3Errors.sol";
+pragma solidity ^0.8.26;
 
 /// @notice Contract initialization parameters.
 struct InitializationParams {
@@ -492,6 +490,14 @@ interface IAlchemistV3State {
         uint256 rate,
         uint256 maximum
     );
+}
+
+interface IAlchemistV3Errors {
+    /// @notice An error which is used to indicate that an operation failed because an account became undercollateralized.
+    error Undercollateralized();
+
+    /// @notice An error which is used to indicate that a liquidate operation failed because an account is sufficiaenly collateralized.
+    error LiquidationError();
 }
 
 /// @title  IAlchemistV3
