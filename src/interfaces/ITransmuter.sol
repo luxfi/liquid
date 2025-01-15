@@ -26,9 +26,87 @@ interface ITransmuter {
         uint256 positionMaturationBlock;
     }
 
-    // TODO: Fill this in with functions events and full comments:) 
+    struct InitializationParams {
+        address syntheticToken;
+        uint256 timeToTransmute;
+    }
 
-    function queryGraph(uint256 startBlock, uint256 endBlock) external view returns (uint256);
+    /// @notice Returns the address of the synthetic token.
+    function syntheticToken() external view returns (address);
+
+    /// @notice Returns the current time to transmute (in blocks).
+    function timeToTransmute() external view returns (uint256);
+
+    /// @notice Returns the total locked debt tokens in the transmuter.
+    function totalLocked() external view returns (uint256);
+
+    /// @notice Returns array of alchemists.
+    function alchemists(uint256) external view returns (address);
+
+    /// @notice Adds `alchemist` address to list of active alchemists.
+    ///
+    /// @notice `alchemist` must not have been previously added.
+    ///
+    /// @param alchemist    The address to add.
+    function addAlchemist(address alchemist) external;
+
+    /// @notice Removes `alchemist` address to list of active alchemists.
+    ///
+    /// @notice `alchemist` must have been previously added.
+    ///
+    /// @param alchemist    The address to remove.
+    function removeAlchemist(address alchemist) external;
+
+    /// @notice Sets time to transmute to `time`.
+    ///
+    /// @param time    The new transmutation time.
+    function setTransmutationTime(uint256 time) external;
+
+    /// @notice Gets entry data for `alchemist`.
+    ///
+    /// @param alchemist    Address of the alchemist to query.
+    ///
+    /// @return index   Index of `alchemist` in the list of alchemists.
+    /// @return active  Status of `alchemist` activation.
+    function alchemistEntries(address alchemist) external view returns (uint256 index, bool active);
+
+    /// @notice Gets position info for `account`.
+    ///
+    /// @param account  Account address to query
+    /// @param ids      Array of position Ids to query
+    ///
+    /// @return positions   Array of position data.
+    function getPositions(address account, uint256[] calldata ids) external view returns(StakingPosition[] memory positions);
+
+    /// @notice Creates a new staking position in the transmuter.
+    ///
+    /// @notice `depositAmount` must be non-zero or this call will revert with a {DepositZeroAmount} error.
+    /// @notice `alchemist` must be registered in the transmuter or this call will revert with a {NotRegisteredAlchemist} error.
+    ///
+    /// @notice Emits a {PositionCreated} event.
+    ///
+    /// @param alchemist        Alchemist deployment to pull funds from.
+    /// @param underlying       Address of the underlying token to receive during the transmutation.
+    /// @param depositAmount    Amount of debt tokens to deposit.
+    function createRedemption(address alchemist, address underlying, uint256 depositAmount) external;
+
+    /// @notice Claims a staking position from the transmuter.
+    ///
+    /// @notice `id` must return a valid position or this call will revert with a {PositionNotFound} error.
+    /// @notice End block of position must be <= to current block or this call will revert with a {PrematureClaim} error.
+    ///
+    /// @notice Emits a {PositionClaimed} event.
+    ///
+    /// @param id   Id of the nft representing the position.
+    function claimRedemption(uint256 id) external;
+
+    /// @notice Queries the staking graph from `startBlock` to `endBlock`.
+    ///
+    /// @param startBlock   The block to start query from.
+    /// @param endBlock     The last block to query up to.
+    ///
+    /// @return totalValue  Total value of tokens needed to fulfill redemptions between `startBlock` and `endBlock`.
+    function queryGraph(uint256 startBlock, uint256 endBlock) external view returns (uint256 totalValue);
 
     /// @notice Emitted when the admin address is updated.
     ///
@@ -57,14 +135,5 @@ interface ITransmuter {
         address indexed claimer,
         address indexed alchemist,
         uint256 amountClaimed
-    );
-
-    /// @dev Emitted when redemption rate is updated through claim or stake.
-    ///
-    /// @param timestamp        The time at which redemption rate was changed.
-    /// @param rate             The new rate (BPS per year).
-    event RedemptionRateUpdated(
-        uint256 timestamp,
-        uint256 rate
     );
 }   
