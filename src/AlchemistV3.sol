@@ -2,7 +2,6 @@
 pragma solidity 0.8.26;
 
 import "./interfaces/IAlchemistV3.sol";
-import "./interfaces/IYearnVaultV2.sol";
 import "./interfaces/ITokenAdapter.sol";
 import "./interfaces/ITransmuter.sol";
 
@@ -33,46 +32,46 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     uint256 public constant FIXED_POINT_SCALAR = 1e18;
 
     /// @inheritdoc IAlchemistV3Immutables
-    address public override debtToken;
+    address public debtToken;
 
     /// @inheritdoc IAlchemistV3State
-    uint256 public override cumulativeEarmarked;
+    uint256 public cumulativeEarmarked;
 
     /// @inheritdoc IAlchemistV3State
-    uint256 public override lastEarmarkBlock;
+    uint256 public lastEarmarkBlock;
 
     /// @inheritdoc IAlchemistV3State
-    uint256 public override minimumCollateralization;
+    uint256 public minimumCollateralization;
 
     /// @inheritdoc IAlchemistV3State
-    uint256 public override totalDebt;
+    uint256 public totalDebt;
 
     /// @inheritdoc IAlchemistV3State
-    uint256 public override protocolFee;
+    uint256 public protocolFee;
 
     /// @inheritdoc IAlchemistV3State
-    uint256 public override underlyingDecimals;
+    uint256 public underlyingDecimals;
 
     /// @inheritdoc IAlchemistV3State
-    uint256 public override underlyingConversionFactor;
+    uint256 public underlyingConversionFactor;
 
     /// @inheritdoc IAlchemistV3State
-    address public override protocolFeeReceiver;
+    address public protocolFeeReceiver;
 
     /// @inheritdoc IAlchemistV3State
-    address public override underlyingToken;
+    address public underlyingToken;
     
     /// @inheritdoc IAlchemistV3State
-    address public override yieldToken;
+    address public yieldToken;
     
     /// @inheritdoc IAlchemistV3State
-    address public override admin;
+    address public admin;
 
     /// @inheritdoc IAlchemistV3State
-    address public override transmuter;
+    address public transmuter;
 
     /// @inheritdoc IAlchemistV3State
-    address public override pendingAdmin;
+    address public pendingAdmin;
 
     uint256 private _earmarkWeight;
 
@@ -95,14 +94,14 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     constructor() initializer {}
 
     /// @inheritdoc IAlchemistV3AdminActions
-    function setPendingAdmin(address value) external override onlyAdmin {
+    function setPendingAdmin(address value) external onlyAdmin {
         pendingAdmin = value;
 
         emit PendingAdminUpdated(value);
     }
 
     /// @inheritdoc IAlchemistV3AdminActions
-    function acceptAdmin() external override {
+    function acceptAdmin() external {
         _checkState(pendingAdmin != address(0));
 
         if (msg.sender != pendingAdmin) {
@@ -134,7 +133,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     /// @inheritdoc IAlchemistV3State
     function getMintLimitInfo()
-        external view override
+        external view
         returns (
             uint256 currentLimit,
             uint256 rate,
@@ -149,7 +148,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     }
 
     /// @inheritdoc IAlchemistV3State
-    function getCDP(address owner) external view override returns (uint256, uint256) {
+    function getCDP(address owner) external view returns (uint256, uint256) {
         return (_accounts[owner].collateralBalance, _calculateUnrealizedDebt(owner));
     }
 
@@ -159,7 +158,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     // }
 
     /// @inheritdoc IAlchemistV3State
-    function getTotalDeposited() external view override returns (uint256) {
+    function getTotalDeposited() external view returns (uint256) {
         return IERC20(yieldToken).balanceOf(address(this));
     }
 
@@ -170,7 +169,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     /// @inheritdoc IAlchemistV3State
     function mintAllowance(address owner, address spender)
-        external view override
+        external view
         returns (uint256)
     {
         Account storage account = _accounts[owner];
@@ -193,7 +192,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     }
 
     /// @inheritdoc IAlchemistV3AdminActions
-    function setMinimumCollateralization(uint256 value) external override onlyAdmin {
+    function setMinimumCollateralization(uint256 value) external onlyAdmin {
         _checkArgument(value < 1e18);
         minimumCollateralization = value;
 
@@ -201,7 +200,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     }
 
     /// @inheritdoc IAlchemistV3Actions
-    function deposit(uint256 amount, address recipient) external override returns (uint256) {
+    function deposit(uint256 amount, address recipient) external returns (uint256) {
         _checkArgument(recipient != address(0));
         _checkArgument(amount > 0);
 
@@ -216,7 +215,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     }
 
     /// @inheritdoc IAlchemistV3Actions
-    function withdraw(uint256 amount, address recipient) external override returns (uint256) {
+    function withdraw(uint256 amount, address recipient) external returns (uint256) {
         _checkArgument(msg.sender != address(0));
         // TODO potentially remove next check, underflow protection will naturally check
         _checkArgument(_accounts[msg.sender].collateralBalance >= amount);
@@ -235,7 +234,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     }
 
     /// @inheritdoc IAlchemistV3Actions
-    function mint(uint256 amount, address recipient) external override {
+    function mint(uint256 amount, address recipient) external {
         _checkArgument(msg.sender != address(0));
         _checkArgument(amount > 0);
 
@@ -253,7 +252,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     }
 
     /// @inheritdoc IAlchemistV3Actions
-    function mintFrom(address owner, uint256 amount, address recipient) external override {
+    function mintFrom(address owner, uint256 amount, address recipient) external {
         _checkArgument(amount > 0);
         _checkArgument(recipient != address(0));
 
@@ -274,7 +273,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     }
 
     /// @inheritdoc IAlchemistV3Actions
-    function burn(uint256 amount, address recipient) external override returns (uint256) {
+    function burn(uint256 amount, address recipient) external returns (uint256) {
         _checkArgument(amount > 0);
         _checkArgument(recipient != address(0));
 
@@ -304,7 +303,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     }
 
     /// @inheritdoc IAlchemistV3Actions
-    function repay(uint256 amount, address recipient) external override returns (uint256) {
+    function repay(uint256 amount, address recipient) external returns (uint256) {
         _checkArgument(amount > 0);
         _checkArgument(recipient != address(0));
 
@@ -344,7 +343,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     }
 
     /// @inheritdoc IAlchemistV3Actions
-    function liquidate(address owner) external override returns (uint256 assets, uint256 fee) {
+    function liquidate(address owner) external returns (uint256 assets, uint256 fee) {
         // TODO checks if a users debt is greater than the underlying value of their collateral.
         // If so, the users debt is zero’d out and collateral with underlying value equivalent to the debt is sent to the transmuter.
         // The remainder is sent to the liquidator.
@@ -396,11 +395,13 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     }
 
     /// @inheritdoc IAlchemistV3Actions
-    function redeem(uint256 amount) external override onlyTransmuter() {
+    function redeem(uint256 amount) external onlyTransmuter() {
         _redemptionWeight += amount * FIXED_POINT_SCALAR / cumulativeEarmarked;
         cumulativeEarmarked -= amount;
 
-        // TODO: Need to unwrap yield tokens here
+        uint256 yieldToUnwrap = amount * TokenUtils.expectDecimals(underlyingToken) / ITokenAdapter(yieldToken).price();
+
+        ITokenAdapter(yieldToken).unwrap(yieldToUnwrap, address(this));
 
         TokenUtils.safeTransfer(underlyingToken, transmuter, amount);
 
@@ -408,12 +409,12 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     }
 
     /// @inheritdoc IAlchemistV3Actions
-    function poke(address owner) external override {
+    function poke(address owner) external {
         _sync(owner);
     }
 
     /// @inheritdoc IAlchemistV3Actions
-    function approveMint(address spender, uint256 amount) external override {
+    function approveMint(address spender, uint256 amount) external {
         _approveMint(msg.sender, spender, amount);
     }
 
@@ -425,7 +426,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @inheritdoc IAlchemistV3State
     function convertYieldTokensToUnderlying(uint256 amount) public view returns (uint256) {
         uint8 decimals = TokenUtils.expectDecimals(yieldToken);
-        return (amount * IYearnVaultV2(yieldToken).pricePerShare()) / 10 ** decimals;
+        return (amount * ITokenAdapter(yieldToken).price()) / 10 ** decimals;
     }
 
     /// @inheritdoc IAlchemistV3State
