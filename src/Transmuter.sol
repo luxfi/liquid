@@ -12,7 +12,6 @@ import "./interfaces/ITransmuter.sol";
 import "./interfaces/ITransmuterErrors.sol";
 import "./interfaces/IAlchemistV3.sol";
 import "./interfaces/IERC20Minimal.sol";
-import {console} from "../../lib/forge-std/src/console.sol";
 
 /// @title AlchemixV3 Transmuter
 ///
@@ -23,16 +22,16 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
     using SafeCast for uint256;
 
     /// @inheritdoc ITransmuter
-    address public override syntheticToken;
+    address public syntheticToken;
 
     /// @inheritdoc ITransmuter
-    uint256 public override timeToTransmute;
+    uint256 public timeToTransmute;
 
     /// @inheritdoc ITransmuter
-    uint256 public override totalLocked;
+    uint256 public totalLocked;
 
     /// @dev Array of registered alchemists.
-    address[] public override alchemists;
+    address[] public alchemists;
 
     /// @dev Map of alchemist addresses to corresponding entry data.
     mapping(address => AlchemistEntry) private _alchemistEntries;
@@ -57,7 +56,7 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
     /* ----------------ADMIN FUNCTIONS---------------- */
 
     /// @inheritdoc ITransmuter
-    function addAlchemist(address alchemist) external override {
+    function addAlchemist(address alchemist) external {
         if(_alchemistEntries[alchemist].isActive == true) 
             revert AlchemistDuplicateEntry();
 
@@ -66,7 +65,7 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
     }
 
     /// @inheritdoc ITransmuter
-    function removeAlchemist(address alchemist) external override {
+    function removeAlchemist(address alchemist) external {
         if(_alchemistEntries[alchemist].isActive == false) 
             revert NotRegisteredAlchemist();
 
@@ -76,21 +75,21 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
     }
 
     /// @inheritdoc ITransmuter
-    function setTransmutationTime(uint256 time) external override {
+    function setTransmutationTime(uint256 time) external {
         timeToTransmute = time;
     }
 
     /* ---------------EXTERNAL FUNCTIONS--------------- */
 
     /// @inheritdoc ITransmuter
-    function alchemistEntries(address alchemist) external view override returns (uint256, bool) {
+    function alchemistEntries(address alchemist) external view returns (uint256, bool) {
         AlchemistEntry storage entry = _alchemistEntries[alchemist];
 
         return (entry.index, entry.isActive);
     }
 
     /// @inheritdoc ITransmuter
-    function getPositions(address account, uint256[] calldata ids) external view override returns(StakingPosition[] memory) {
+    function getPositions(address account, uint256[] calldata ids) external view returns(StakingPosition[] memory) {
         StakingPosition[] memory userPositions = new StakingPosition[](ids.length);
 
         for (uint256 i = 0; i < ids.length; i++) {
@@ -101,7 +100,7 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
     }
 
     /// @inheritdoc ITransmuter
-    function createRedemption(address alchemist, address underlying, uint256 depositAmount) external override {
+    function createRedemption(address alchemist, address underlying, uint256 depositAmount) external {
         if(depositAmount == 0)
             revert DepositZeroAmount();
 
@@ -127,7 +126,7 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
     }
 
     /// @inheritdoc ITransmuter
-    function claimRedemption(uint256 id) external override {
+    function claimRedemption(uint256 id) external {
         // TODO: Potentially add allowances for other addresses
         StakingPosition storage position = _positions[msg.sender][id];
 
@@ -153,7 +152,7 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
     }
 
     /// @inheritdoc ITransmuter
-    function queryGraph(uint256 startBlock, uint256 endBlock) external view override returns (uint256) {
+    function queryGraph(uint256 startBlock, uint256 endBlock) external view returns (uint256) {
         return _graph.rangeQuery(startBlock, endBlock);
     }
 }
