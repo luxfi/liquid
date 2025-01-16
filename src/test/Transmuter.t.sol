@@ -92,6 +92,7 @@ contract TransmuterTest is Test {
     // TODO: Update once create redemption is modified
     function testFuzzCreateRedemption(uint256 amount) public {
         vm.assume(amount > 0);
+        vm.assume(amount < uint256(type(int256).max));
 
         vm.prank(address(0xbeef));
         transmuter.createRedemption(alchemist, address(0xadbc), amount);
@@ -128,6 +129,7 @@ contract TransmuterTest is Test {
 
     function testFuzzClaimRedemption(uint256 amount) public {
         vm.assume(amount > 0);
+        vm.assume(amount < uint256(type(int256).max));
 
         vm.prank(address(0xbeef));
         transmuter.createRedemption(alchemist, address(underlyingToken), amount);

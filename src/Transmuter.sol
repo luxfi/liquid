@@ -12,6 +12,7 @@ import "./interfaces/ITransmuter.sol";
 import "./interfaces/ITransmuterErrors.sol";
 import "./interfaces/IAlchemistV3.sol";
 import "./interfaces/IERC20Minimal.sol";
+import {console} from "../../lib/forge-std/src/console.sol";
 
 /// @title AlchemixV3 Transmuter
 ///
@@ -136,8 +137,6 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
         if(position.positionMaturationBlock > block.number)
             revert PrematureClaim();
 
-        delete _positions[msg.sender][id];
-
         _burn(msg.sender, id, position.amount);
 
         // If the contract has a balance of underlying tokens from alchemist repayments then we only need to redeem partial or none from Alchemist earmarked
@@ -149,6 +148,8 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
         TokenUtils.safeTransfer(position.underlyingAsset, msg.sender, position.amount);
 
         emit PositionClaimed(msg.sender, position.alchemist, position.amount);
+
+        delete _positions[msg.sender][id];
     }
 
     /// @inheritdoc ITransmuter
