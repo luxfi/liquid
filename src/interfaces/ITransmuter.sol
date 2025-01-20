@@ -29,19 +29,39 @@ interface ITransmuter {
     struct InitializationParams {
         address syntheticToken;
         uint256 timeToTransmute;
+        uint256 transmutationFee;
+        uint256 exitFee;
     }
 
+    /// @notice Gets the address of the admin.
+    ///
+    /// @return admin The admin address.
+    function admin() external view returns (address admin);
+    
+    /// @notice Returns the version of the alchemist.
+    function version() external view returns (string memory version);
+
     /// @notice Returns the address of the synthetic token.
-    function syntheticToken() external view returns (address);
+    function syntheticToken() external view returns (address token);
+
+    /// @notice Returns the transmutation early exit fee.
+    /// @notice This is for users who choose to pull from the transmuter before their position has fully matured.
+    function exitFee() external view returns (uint256 fee);
+
+    /// @notice Returns the transmutation fee.
+    /// @notice This fee affects all claims.
+    function transmutationFee() external view returns (uint256 fee);
 
     /// @notice Returns the current time to transmute (in blocks).
-    function timeToTransmute() external view returns (uint256);
+    function timeToTransmute() external view returns (uint256 transmutationTime);
 
     /// @notice Returns the total locked debt tokens in the transmuter.
-    function totalLocked() external view returns (uint256);
+    function totalLocked() external view returns (uint256 totalLocked);
 
     /// @notice Returns array of alchemists.
-    function alchemists(uint256) external view returns (address);
+    function alchemists(uint256) external view returns (address alchemist);
+
+    function protocolFeeReceiver() external view returns (address receiver);
 
     /// @notice Adds `alchemist` address to list of active alchemists.
     ///
@@ -61,6 +81,16 @@ interface ITransmuter {
     ///
     /// @param time    The new transmutation time.
     function setTransmutationTime(uint256 time) external;
+
+    /// @notice Sets the transmutation fee to `fee`.
+    ///
+    /// @param fee    The new transmutation fee.
+    function setTransmutationFee(uint256 fee) external;
+
+    /// @notice Sets the early exit fee to `fee`.
+    ///
+    /// @param fee    The new exit fee.
+    function setExitFee(uint256 fee) external;
 
     /// @notice Gets entry data for `alchemist`.
     ///
@@ -136,4 +166,13 @@ interface ITransmuter {
         address indexed alchemist,
         uint256 amountClaimed
     );
-}   
+
+    /// @dev Emitted when the transmutaiton fee is updated.
+    ///
+    /// @param fee  The new transmutation fee.
+    event TransmutationFeeUpdated(uint256 fee);
+
+    /// @dev Emitted when the early exit fee is updated.
+    ///
+    /// @param fee  The new exit fee.
+    event ExitFeeUpdated(uint256 fee);}   

@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
-import "./libraries/TokenUtils.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
-import {ERC1155} from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
-import {SafeCast} from "./libraries/SafeCast.sol";
-import {StakingGraph} from "./libraries/StakingGraph.sol";
-
 import "./interfaces/ITransmuter.sol";
 import "./interfaces/ITransmuterErrors.sol";
 import "./interfaces/IAlchemistV3.sol";
 import "./interfaces/IERC20Minimal.sol";
+
+import "./libraries/TokenUtils.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ERC1155} from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import {SafeCast} from "./libraries/SafeCast.sol";
+import {StakingGraph} from "./libraries/StakingGraph.sol";
+
+import {Unauthorized, IllegalArgument, IllegalState, InsufficientAllowance} from "./base/Errors.sol";
 
 /// @title AlchemixV3 Transmuter
 ///
@@ -22,13 +23,30 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
     using SafeCast for uint256;
 
     /// @inheritdoc ITransmuter
-    address public syntheticToken;
+    string public constant version = "1.0.0";
+
+    uint256 public constant BPS = 10_000;
+
+    /// @inheritdoc ITransmuter
+    uint256 public exitFee;
+
+    /// @inheritdoc ITransmuter
+    uint256 public transmutationFee;
 
     /// @inheritdoc ITransmuter
     uint256 public timeToTransmute;
 
     /// @inheritdoc ITransmuter
     uint256 public totalLocked;
+
+    /// @inheritdoc ITransmuter
+    address public admin;
+
+    /// @inheritdoc ITransmuter
+    address public protocolFeeReceiver;
+
+    /// @inheritdoc ITransmuter
+    address public syntheticToken;
 
     /// @dev Array of registered alchemists.
     address[] public alchemists;
@@ -45,18 +63,21 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
     /// @dev Nonce data used for minting of new nft positions.
     uint256 private _nonce;
 
+    modifier onlyAdmin() {
+        _checkArgument(msg.sender == admin);
+        _;
+    }
+
     // TODO: Replace with upgradeable initializer
     constructor(InitializationParams memory params) ERC1155("https://alchemix.fi/transmuter/{id}.json") {
         syntheticToken = params.syntheticToken;
         timeToTransmute = params.timeToTransmute;
+        transmutationFee = params.transmutationFee;
+        exitFee = params.exitFee;
     }
 
-    //TODO: Add access control for admin things
-
-    /* ----------------ADMIN FUNCTIONS---------------- */
-
     /// @inheritdoc ITransmuter
-    function addAlchemist(address alchemist) external {
+    function addAlchemist(address alchemist) external onlyAdmin {
         if(_alchemistEntries[alchemist].isActive == true) 
             revert AlchemistDuplicateEntry();
 
@@ -65,7 +86,7 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
     }
 
     /// @inheritdoc ITransmuter
-    function removeAlchemist(address alchemist) external {
+    function removeAlchemist(address alchemist) external onlyAdmin {
         if(_alchemistEntries[alchemist].isActive == false) 
             revert NotRegisteredAlchemist();
 
@@ -75,11 +96,25 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
     }
 
     /// @inheritdoc ITransmuter
-    function setTransmutationTime(uint256 time) external {
-        timeToTransmute = time;
+    function setTransmutationFee(uint256 fee) external onlyAdmin {
+        _checkArgument(fee <= BPS);
+
+        transmutationFee = fee;
+        emit TransmutationFeeUpdated(fee);
     }
 
-    /* ---------------EXTERNAL FUNCTIONS--------------- */
+    /// @inheritdoc ITransmuter
+    function setExitFee(uint256 fee) external onlyAdmin {
+        _checkArgument(fee <= BPS);
+
+        exitFee = fee;
+        emit ExitFeeUpdated(fee);
+    }
+
+    /// @inheritdoc ITransmuter
+    function setTransmutationTime(uint256 time) external onlyAdmin {
+        timeToTransmute = time;
+    }
 
     /// @inheritdoc ITransmuter
     function alchemistEntries(address alchemist) external view returns (uint256, bool) {
@@ -133,19 +168,32 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
         if(position.positionMaturationBlock == 0)
             revert PositionNotFound();
 
-        if(position.positionMaturationBlock > block.number)
-            revert PrematureClaim();
+        // TODO: Gas optimize. Possible make internal function.
+        uint256 blocksLeft = position.positionMaturationBlock > block.number ? position.positionMaturationBlock - block.number: 0;
+        uint256 amountEarly = blocksLeft > 0 ? position.amount * blocksLeft / timeToTransmute : 0;
+        uint256 amountMatured = position.amount - amountEarly;
 
         _burn(msg.sender, id, position.amount);
 
         // If the contract has a balance of underlying tokens from alchemist repayments then we only need to redeem partial or none from Alchemist earmarked
         uint256 underlyingBalance = TokenUtils.safeBalanceOf(position.underlyingAsset, address(this));
-        uint256 amountToRedeem = position.amount > underlyingBalance ? position.amount - underlyingBalance : 0;
+        uint256 amountToRedeem = amountMatured > underlyingBalance ? amountMatured - underlyingBalance : 0;
 
         if (amountToRedeem > 0) IAlchemistV3(position.alchemist).redeem(amountToRedeem);
 
-        TokenUtils.safeTransfer(position.underlyingAsset, msg.sender, position.amount);
+        uint256 feeAmount = amountMatured * transmutationFee / BPS;
+        uint256 claimAmount = amountMatured - feeAmount;
 
+        uint256 syntheticFee = amountEarly * exitFee / BPS;
+        uint256 syntheticReturned = amountEarly - syntheticFee;
+
+        TokenUtils.safeTransfer(position.underlyingAsset, msg.sender, claimAmount);
+        TokenUtils.safeTransfer(position.underlyingAsset, protocolFeeReceiver, feeAmount);
+
+        TokenUtils.safeTransfer(syntheticToken, msg.sender, syntheticReturned);
+        TokenUtils.safeTransfer(syntheticToken, protocolFeeReceiver, syntheticFee);
+
+        // TODO: update this with more values for matured vs non matured
         emit PositionClaimed(msg.sender, position.alchemist, position.amount);
 
         delete _positions[msg.sender][id];
@@ -154,5 +202,14 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
     /// @inheritdoc ITransmuter
     function queryGraph(uint256 startBlock, uint256 endBlock) external view returns (uint256) {
         return _graph.rangeQuery(startBlock, endBlock);
+    }
+
+    /// @dev Checks an expression and reverts with an {IllegalArgument} error if the expression is {false}.
+    ///
+    /// @param expression The expression to check.
+    function _checkArgument(bool expression) internal pure {
+        if (!expression) {
+            revert IllegalArgument();
+        }
     }
 }
