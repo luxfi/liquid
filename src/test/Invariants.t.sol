@@ -119,7 +119,7 @@ contract InvariantTests is Test {
         // bytes memory transParams = abi.encodeWithSelector(Transmuter.initialize.selector, address(alToken), fakeUnderlyingToken);
 
         // proxyTransmuter = new TransparentUpgradeableProxy(address(transmuterLogic), proxyOwner, transParams);
-        transmuter = new Transmuter(ITransmuter.InitializationParams(address(alToken), 30 days));
+        transmuter = new Transmuter(ITransmuter.InitializationParams(address(alToken), 30 days, 0, 0));
 
         // AlchemistV3 proxy
         InitializationParams memory params = InitializationParams({

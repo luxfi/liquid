@@ -263,6 +263,24 @@ interface IAlchemistV3AdminActions {
     ///
     /// @param value The new minimum collateralization ratio.
     function setMinimumCollateralization(uint256 value) external;
+
+    /// @notice Set a new protocol fee receiver.
+    ///
+    /// @notice `msg.sender` must be the admin or this call will revert with an {Unauthorized} error.
+    ///
+    /// @notice Emits a {ProtocolFeeReceiverUpdated} event.
+    ///
+    /// @param receiver The address of the new fee receiver.
+    function setProtocolFeeReceiver(address receiver) external;
+
+    /// @notice Set a new transmuter to `value`.
+    ///
+    /// @notice `msg.sender` must be the admin or this call will revert with an {Unauthorized} error.
+    ///
+    /// @notice Emits a {ProtocolFeeReceiverUpdated} event.
+    ///
+    /// @param value The address of the new fee transmuter.
+    function setTransmuter(address value) external;
 }
 
 interface IAlchemistV3Events {
@@ -350,6 +368,11 @@ interface IAlchemistV3Events {
     ///
     /// @param amount   The amount of debt to redeem.
     event Redeem(uint256 amount);
+
+    /// @notice Emitted when the fee receiver is updated.
+    ///
+    /// @param receiver   The address of the new receiver.
+    event ProtocolFeeReceiverUpdated(address receiver);
 }
 
 interface IAlchemistV3Immutables {

@@ -13,8 +13,6 @@ import {Initializable} from "../lib/openzeppelin-contracts-upgradeable/contracts
 import {Unauthorized, IllegalArgument, IllegalState, InsufficientAllowance} from "./base/Errors.sol";
 
 // TODO: Potentially switch from proprietary librariies
-// TODO: Add events
-// TODO: comments for state variables. Alphabetize.
 // TODO: Set fees
 // TODO: Add sentinels
 // TODO: Add vault caps here
@@ -93,6 +91,22 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     constructor() initializer {}
 
+    function initialize(InitializationParams memory params) external initializer {
+        _checkArgument(params.protocolFee <= BPS);
+        debtToken = params.debtToken;
+        underlyingToken = params.underlyingToken;
+        underlyingDecimals = TokenUtils.expectDecimals(params.underlyingToken);
+        underlyingConversionFactor = 10**(TokenUtils.expectDecimals(params.debtToken) - TokenUtils.expectDecimals(params.underlyingToken));
+        yieldToken = params.yieldToken;
+        minimumCollateralization = params.minimumCollateralization;
+        admin = params.admin;
+        transmuter = params.transmuter;
+        protocolFee = params.protocolFee;
+        protocolFeeReceiver = params.protocolFeeReceiver;
+        lastEarmarkBlock = block.number;
+        _mintingLimiter = Limiters.createLinearGrowthLimiter(params.mintingLimitMaximum, params.mintingLimitBlocks, params.mintingLimitMinimum);
+    }
+
     /// @inheritdoc IAlchemistV3AdminActions
     function setPendingAdmin(address value) external onlyAdmin {
         pendingAdmin = value;
@@ -115,20 +129,18 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         emit PendingAdminUpdated(address(0));
     }
 
-    function initialize(InitializationParams memory params) external initializer {
-        _checkArgument(params.protocolFee <= BPS);
-        debtToken = params.debtToken;
-        underlyingToken = params.underlyingToken;
-        underlyingDecimals = TokenUtils.expectDecimals(params.underlyingToken);
-        underlyingConversionFactor = 10**(TokenUtils.expectDecimals(params.debtToken) - TokenUtils.expectDecimals(params.underlyingToken));
-        yieldToken = params.yieldToken;
-        minimumCollateralization = params.minimumCollateralization;
-        admin = params.admin;
-        transmuter = params.transmuter;
-        protocolFee = params.protocolFee;
-        protocolFeeReceiver = params.protocolFeeReceiver;
-        lastEarmarkBlock = block.number;
-        _mintingLimiter = Limiters.createLinearGrowthLimiter(params.mintingLimitMaximum, params.mintingLimitBlocks, params.mintingLimitMinimum);
+    /// @inheritdoc IAlchemistV3AdminActions
+    function setProtocolFeeReceiver(address value) external onlyAdmin {
+        _checkArgument(value != address(0));
+        protocolFeeReceiver = value;
+        emit ProtocolFeeReceiverUpdated(value);
+    }
+
+    /// @inheritdoc IAlchemistV3AdminActions
+    function setTransmuter(address value) external onlyAdmin {
+        _checkArgument(value != address(0));
+        transmuter = value;
+        emit TransmuterUpdated(value);
     }
 
     /// @inheritdoc IAlchemistV3State
@@ -506,7 +518,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     /// @dev Update the user's earmarked and redeemed debt amounts.
     function _sync(address owner) internal {
-        // TODO: Compare to V2 for storage usage
         Account storage account = _accounts[owner];
 
         // Earmark User Debt
@@ -537,7 +548,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     ///
     /// @return The amount of debt that the account owned by `owner` will have after an update.    
     function _calculateUnrealizedDebt(address owner) internal view returns (uint256) {
-        // TODO: update this for redemptions
             Account storage account = _accounts[owner];
 
             uint256 amount = ITransmuter(transmuter).queryGraph(lastEarmarkBlock + 1, block.number);
@@ -554,7 +564,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         uint256 debt = _accounts[owner].debt;
         if (debt == 0) return false;
 
-        //TODO using placeholder LTV, needs to be updated for multi-yield token
         uint256 collateralization = totalValue(owner) * FIXED_POINT_SCALAR / debt;
         if (collateralization < minimumCollateralization) {
             return true;
