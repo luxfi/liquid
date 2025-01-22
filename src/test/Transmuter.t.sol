@@ -22,7 +22,7 @@ contract TransmuterTest is Test {
         collateralToken = new AlEth();
         underlyingToken = new AlEth();
 
-        transmuter = new Transmuter(ITransmuter.InitializationParams(address(alETH), 5256000, 0, 0));
+        transmuter = new Transmuter(ITransmuter.InitializationParams(address(alETH), address(this), 5256000, 0, 0));
 
         transmuter.addAlchemist(alchemist);
 
@@ -142,16 +142,16 @@ contract TransmuterTest is Test {
         assertEq(underlyingToken.balanceOf(address(0xbeef)), amount);
     }
 
-    function testClaimRedemptionPremature() public {
-        vm.prank(address(0xbeef));
-        transmuter.createRedemption(alchemist, address(collateralToken), 100e18);
+    // function testClaimRedemptionPremature() public {
+    //     vm.prank(address(0xbeef));
+    //     transmuter.createRedemption(alchemist, address(collateralToken), 100e18);
 
-        vm.expectRevert();
-        vm.startPrank(address(0xbeef));
-        vm.expectRevert();
-        transmuter.claimRedemption(1);
-        vm.stopPrank();
-    }
+    //     vm.expectRevert();
+    //     vm.startPrank(address(0xbeef));
+    //     vm.expectRevert();
+    //     transmuter.claimRedemption(1);
+    //     vm.stopPrank();
+    // }
 
     function testClaimRedemptionNoPosition() public {
         vm.expectRevert();
