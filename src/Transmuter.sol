@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
-import "./interfaces/ITransmuter.sol";
-import "./interfaces/ITransmuterErrors.sol";
 import "./interfaces/IAlchemistV3.sol";
 import "./interfaces/IERC20Minimal.sol";
+import "./interfaces/ITransmuter.sol";
+import "./interfaces/TransmuterErrors.sol";
 
 import "./libraries/TokenUtils.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -17,7 +17,7 @@ import {Unauthorized, IllegalArgument, IllegalState, InsufficientAllowance} from
 /// @title AlchemixV3 Transmuter
 ///
 /// @notice A contract which facilitates the exchange of alAssets to yield bearing assets.
-contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
+contract Transmuter is ITransmuter, ERC1155 {
     using StakingGraph for mapping(uint256 => int256);
     using SafeCast for int256;
     using SafeCast for uint256;
@@ -28,7 +28,13 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
     uint256 public constant BPS = 10_000;
 
     /// @inheritdoc ITransmuter
+    uint256 public depositCap;
+
+    /// @inheritdoc ITransmuter
     uint256 public exitFee;
+
+    /// @inheritdoc ITransmuter
+    uint256 public graphSize;
 
     /// @inheritdoc ITransmuter
     uint256 public transmutationFee;
@@ -52,16 +58,19 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
     address[] public alchemists;
 
     /// @dev Map of alchemist addresses to corresponding entry data.
-    mapping(address => AlchemistEntry) private _alchemistEntries;
+    mapping(address => AlchemistEntry) internal _alchemistEntries;
 
     /// @dev Map of user positoins data.
-    mapping(address => mapping(uint256 => StakingPosition)) private _positions;
+    mapping(address => mapping(uint256 => StakingPosition)) internal _positions;
 
-    /// @dev Staking graph fenwick tree.
-    mapping(uint256 => int256) private _graph;
+    /// @dev Mapping used for staking graph.
+    mapping(uint256 => int256) internal _graph1;
+
+    /// @dev Mapping used for staking graph.
+    mapping(uint256 => int256) internal _graph2;
 
     /// @dev Nonce data used for minting of new nft positions.
-    uint256 private _nonce;
+    uint256 internal _nonce;
 
     modifier onlyAdmin() {
         _checkArgument(msg.sender == admin);
@@ -76,6 +85,7 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
         exitFee = params.exitFee;
         protocolFeeReceiver = params.feeReceiver;
         admin = msg.sender;
+        graphSize = params.graphSize;
     }
 
     /// @inheritdoc ITransmuter
@@ -98,6 +108,14 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
     }
 
     /// @inheritdoc ITransmuter
+    function setDepositCap(uint256 cap) external onlyAdmin {
+        _checkArgument(cap >= totalLocked);
+
+        depositCap = cap;
+        emit DepositCapUpdated(cap);
+    } 
+
+    /// @inheritdoc ITransmuter
     function setTransmutationFee(uint256 fee) external onlyAdmin {
         _checkArgument(fee <= BPS);
 
@@ -111,6 +129,14 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
 
         exitFee = fee;
         emit ExitFeeUpdated(fee);
+    }
+
+    /// @inheritdoc ITransmuter
+    function setGraphSize(uint256 size) external onlyAdmin() {
+        _checkArgument(size > graphSize);
+
+        graphSize = size;
+        emit GraphSizeUpdated(size);
     }
 
     /// @inheritdoc ITransmuter
@@ -144,9 +170,14 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
     }
 
     /// @inheritdoc ITransmuter
-    function createRedemption(address alchemist, address underlying, uint256 depositAmount) external {
-        if(depositAmount == 0)
+    function createRedemption(address alchemist, address yieldToken, uint256 syntheticDepositAmount) external {
+        if(syntheticDepositAmount == 0)
             revert DepositZeroAmount();
+
+        // TODO cap deposit so that when it is converted to int it wont break
+
+        if(totalLocked + syntheticDepositAmount > depositCap)
+            revert DepositCapReached();
 
         if(_alchemistEntries[alchemist].isActive == false)
             revert NotRegisteredAlchemist();
@@ -155,23 +186,24 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
             syntheticToken,
             msg.sender,
             address(this),
-            depositAmount
+            syntheticDepositAmount
         );
 
         // TODO: Add `data` param if we decide we need this. ERC1155
-        _mint(msg.sender, ++_nonce, depositAmount, "");
+        _mint(msg.sender, ++_nonce, syntheticDepositAmount, "");
 
-        _positions[msg.sender][_nonce] = StakingPosition(alchemist, underlying, depositAmount, block.number + timeToTransmute);
+        _positions[msg.sender][_nonce] = StakingPosition(alchemist, yieldToken, syntheticDepositAmount, block.number + timeToTransmute);
 
         // Update Fenwick Tree
-        _graph.updateStakingGraph(depositAmount.toInt256()/ timeToTransmute.toInt256(), timeToTransmute);
+        updateStakingGraph(syntheticDepositAmount.toInt256() / timeToTransmute.toInt256(), timeToTransmute);
+
+        totalLocked += syntheticDepositAmount;
         
-        emit PositionCreated(msg.sender, alchemist, depositAmount, _nonce);
+        emit PositionCreated(msg.sender, alchemist, syntheticDepositAmount, _nonce);
     }
 
     /// @inheritdoc ITransmuter
     function claimRedemption(uint256 id) external {
-        // TODO: Potentially add allowances for other addresses
         StakingPosition storage position = _positions[msg.sender][id];
 
         if(position.positionMaturationBlock == 0)
@@ -182,13 +214,14 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
         uint256 amountEarly = blocksLeft > 0 ? position.amount * blocksLeft / timeToTransmute : 0;
         uint256 amountMatured = position.amount - amountEarly;
 
+        // Burn position NFT
         _burn(msg.sender, id, position.amount);
 
-        // TODO: burn remaining synths
-
-        // If the contract has a balance of underlying tokens from alchemist repayments then we only need to redeem partial or none from Alchemist earmarked
-        uint256 underlyingBalance = TokenUtils.safeBalanceOf(position.underlyingAsset, address(this));
-        uint256 amountToRedeem = amountMatured > underlyingBalance ? amountMatured - underlyingBalance : 0;
+        // If the contract has a balance of yield tokens from alchemist repayments then we only need to redeem partial or none from Alchemist earmarked
+        uint256 yieldTokenBalance = TokenUtils.safeBalanceOf(position.yieldToken, address(this));
+        // TODO: This will break if balance exceeds a certain amount due to overflow. Come up with limits to make sure that this will never fail.
+        uint256 underlyingValue = IAlchemistV3(position.alchemist).convertYieldTokensToUnderlying(yieldTokenBalance);
+        uint256 amountToRedeem = amountMatured > underlyingValue ? amountMatured - underlyingValue : 0;
 
         if (amountToRedeem > 0) IAlchemistV3(position.alchemist).redeem(amountToRedeem);
 
@@ -198,11 +231,27 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
         uint256 syntheticFee = amountEarly * exitFee / BPS;
         uint256 syntheticReturned = amountEarly - syntheticFee;
 
-        TokenUtils.safeTransfer(position.underlyingAsset, msg.sender, claimAmount);
-        TokenUtils.safeTransfer(position.underlyingAsset, protocolFeeReceiver, feeAmount);
+        if (amountEarly > 0) updateStakingGraph(amountEarly.toInt256() / blocksLeft.toInt256(), blocksLeft);
+
+        TokenUtils.safeTransfer(
+            position.yieldToken,
+            msg.sender,
+            IAlchemistV3(position.alchemist).convertUnderlyingTokensToYield(claimAmount)
+        );
+
+        TokenUtils.safeTransfer(
+            position.yieldToken,
+            protocolFeeReceiver,
+            IAlchemistV3(position.alchemist).convertUnderlyingTokensToYield(feeAmount)
+        );
 
         TokenUtils.safeTransfer(syntheticToken, msg.sender, syntheticReturned);
         TokenUtils.safeTransfer(syntheticToken, protocolFeeReceiver, syntheticFee);
+
+        // Burn remaining synths that were not returned
+        TokenUtils.safeBurn(syntheticToken, position.amount - amountEarly);
+
+        totalLocked -= position.amount;
 
         // TODO: update this with more values for matured vs non matured
         emit PositionClaimed(msg.sender, position.alchemist, position.amount);
@@ -211,8 +260,23 @@ contract Transmuter is ITransmuter, ITransmuterErrors, ERC1155 {
     }
 
     /// @inheritdoc ITransmuter
+    function updateStakingGraph(int256 amount, uint256 blocks) public {
+        //TODO: Optimize this to reduce amount of reads and writes. Currently gas heavy.
+        uint256 currentBlock = block.number; 
+        uint256 expirationBlock = currentBlock + blocks;
+
+        _graph1.update(currentBlock, graphSize, amount);
+        _graph1.update(expirationBlock + 1, graphSize, -amount);
+
+        _graph2.update(currentBlock, graphSize, amount * (currentBlock - 1).toInt256());
+        _graph2.update(expirationBlock + 1, graphSize, -amount * expirationBlock.toInt256());
+    }
+
+    /// @inheritdoc ITransmuter
     function queryGraph(uint256 startBlock, uint256 endBlock) external view returns (uint256) {
-        return _graph.rangeQuery(startBlock, endBlock);
+        int256 queried = (endBlock.toInt256() * _graph1.query(endBlock) - _graph2.query(endBlock)) - ((startBlock - 1).toInt256() * _graph1.query(startBlock - 1) - _graph2.query(startBlock - 1));
+
+        return queried.toUint256();
     }
 
     /// @dev Checks an expression and reverts with an {IllegalArgument} error if the expression is {false}.
