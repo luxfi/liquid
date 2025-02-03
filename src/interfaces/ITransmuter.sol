@@ -16,8 +16,8 @@ interface ITransmuter {
         // For now will handle as single collateral asset.
         address alchemist;
 
-        // Address of the underlying token address that the user requested. 
-        address underlyingAsset;
+        // Address of the yield token address that the user requested. 
+        address yieldToken;
 
         // Amount staked.
         uint256 amount;
@@ -32,6 +32,7 @@ interface ITransmuter {
         uint256 timeToTransmute;
         uint256 transmutationFee;
         uint256 exitFee;
+        uint256 graphSize;
     }
 
     /// @notice Gets the address of the admin.
@@ -45,9 +46,16 @@ interface ITransmuter {
     /// @notice Returns the address of the synthetic token.
     function syntheticToken() external view returns (address token);
 
+    /// @notice Returns the current transmuter deposit cap.
+    function depositCap() external view returns (uint256 cap);
+
     /// @notice Returns the transmutation early exit fee.
     /// @notice This is for users who choose to pull from the transmuter before their position has fully matured.
     function exitFee() external view returns (uint256 fee);
+
+    /// @notice Returns the size in blocks of the transmuter staking graph.
+    /// @notice This is used to optimize the amount of reads and writes made to the graph and can be extended over time.
+    function graphSize() external view returns (uint256 size);
 
     /// @notice Returns the transmutation fee.
     /// @notice This fee affects all claims.
@@ -82,6 +90,24 @@ interface ITransmuter {
     ///
     /// @param alchemist    The address to remove.
     function removeAlchemist(address alchemist) external;
+
+    /// @notice Updates transmuter deposit limit to `cap`.
+    ///
+    /// @notice `cap` must be greater or equal to current synths locked in the transmuter.
+    ///
+    /// @notice `msg.sender` must be the admin or this call will revert with an {Unauthorized} error.
+    ///
+    ///
+    /// @param cap    The new deposit cap.
+    function setDepositCap(uint256 cap) external;
+
+    /// @notice Updates staking graph size to `size`.
+    ///
+    /// @notice `msg.sender` must be the admin or this call will revert with an {Unauthorized} error.
+    ///
+    ///
+    /// @param size    The new graph size.
+    function setGraphSize(uint256 size) external;
 
     /// @notice Sets time to transmute to `time`.
     ///
@@ -151,6 +177,9 @@ interface ITransmuter {
     /// @param id   Id of the nft representing the position.
     function claimRedemption(uint256 id) external;
 
+
+    function updateStakingGraph(int256 amount, uint256 blocks) external;
+
     /// @notice Queries the staking graph from `startBlock` to `endBlock`.
     ///
     /// @param startBlock   The block to start query from.
@@ -187,6 +216,16 @@ interface ITransmuter {
         address indexed alchemist,
         uint256 amountClaimed
     );
+
+    /// @dev Emitted when the graph size is extended.
+    ///
+    /// @param size  The new length of the graph.
+    event GraphSizeUpdated(uint256 size);
+
+    /// @dev Emitted when the deposit cap is updated.
+    ///
+    /// @param cap  The new transmuter deposit cap.
+    event DepositCapUpdated(uint256 cap);
 
     /// @dev Emitted when the transmutaiton fee is updated.
     ///

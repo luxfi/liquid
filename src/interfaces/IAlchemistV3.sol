@@ -181,7 +181,7 @@ interface IAlchemistV3Actions {
     /// @return amountBurned The amount of tokens that were burned.
     function burn(uint256 amount, address recipient) external returns (uint256 amountBurned);
 
-    /// @notice Repay `amount` debt using underlying tokenw to credit the account owned by `recipient`.
+    /// @notice Repay `amount` debt using yield tokens to credit the account owned by `recipient`.
     ///
     /// @notice `amount` will be limited up to the amount of debt that `recipient` currently holds.
     ///
@@ -196,7 +196,7 @@ interface IAlchemistV3Actions {
     /// @notice AlchemistV3(alchemistAddress).repay(amtRepay, msg.sender);
     /// @notice ```
     ///
-    /// @param amount          The amount of the underlying token to repay.
+    /// @param amount          The amount of the yield tokens to repay with.
     /// @param recipient       The address of the recipient which will receive credit.
     ///
     /// @return amountRepaid The amount of tokens that were repaid.
@@ -222,7 +222,7 @@ interface IAlchemistV3Actions {
     /// @return fee                 Underlying tokens sent to the liquidator.
     function liquidate(address owner) external returns (uint256 underlyingAmount, uint256 fee);
 
-    /// @notice Redeems `amount` debt from the alchemist in exchange for underlying tokens sent to the transmuter.
+    /// @notice Redeems `amount` debt from the alchemist in exchange for yield tokens sent to the transmuter.
     ///
     /// @notice This function is only callable by the transmuter.
     ///
