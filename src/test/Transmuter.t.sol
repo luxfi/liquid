@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.26;
 
-import {Test} from "../../../lib/forge-std/src/Test.sol";
-import {StdCheats} from "../../../lib/forge-std/src/StdCheats.sol";
+import {Test} from "forge-std/Test.sol";
+import {StdCheats} from "forge-std/StdCheats.sol";
 
 import {AlchemistV3} from "../AlchemistV3.sol";
-import {AlEth} from "../external/AlETH.sol";
+import {AlEth} from "../external/Aleth.sol";
 import {Transmuter} from "../Transmuter.sol";
 
 import "../interfaces/ITransmuter.sol";

@@ -1,7 +1,6 @@
 pragma solidity 0.8.26;
 
 import {SafeCast} from "./SafeCast.sol";
-import {console} from "../../lib/forge-std/src/console.sol";
 
 library StakingGraph {
     using SafeCast for int256;
