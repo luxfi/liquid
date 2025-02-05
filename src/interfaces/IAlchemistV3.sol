@@ -367,7 +367,7 @@ interface IAlchemistV3Events {
     /// @notice Emitted when the transmuter triggers a redemption.
     ///
     /// @param amount   The amount of debt to redeem.
-    event Redeem(uint256 amount);
+    event Redemption(uint256 amount);
 
     /// @notice Emitted when the fee receiver is updated.
     ///
@@ -468,7 +468,8 @@ interface IAlchemistV3State {
     ///
     /// @return collateral  Collateral balance.
     /// @return debt        Current debt.
-    function getCDP(address owner) external view returns (uint256 collateral, uint256 debt);
+    /// @return earmarked   Current debt that is earmarked for redemption.
+    function getCDP(address owner) external view returns (uint256 collateral, uint256 debt, uint256 earmarked);
 
     /// @dev Gets total value of `owner` in units of underlying tokens.
     ///
@@ -531,6 +532,12 @@ interface IAlchemistV3Errors {
 
     /// @notice An error which is used to indicate that a liquidate operation failed because an account is sufficiaenly collateralized.
     error LiquidationError();
+
+    /// @notice An error which is used to indicate that a minting operation failed because the minting limit has been exceeded.
+    ///
+    /// @param amount    The amount of debt tokens that were requested to be minted.
+    /// @param available The amount of debt tokens which are available to mint.
+    error MintingLimitExceeded(uint256 amount, uint256 available);
 }
 
 /// @title  IAlchemistV3

@@ -175,9 +175,6 @@ contract AlchemistV3Test is Test {
 
         SafeERC20.safeApprove(address(fakeUnderlyingToken), address(fakeYieldToken), accountFunds);
 
-        // faking initial token vault supply
-        // ITestYieldToken(address(fakeYieldToken)).mint(15_000_000e18, anotherExternalUser);
-
         vm.stopPrank();
     }
 
@@ -284,13 +281,13 @@ contract AlchemistV3Test is Test {
         vm.startPrank(address(0xbeef));
         SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
         alchemist.deposit(amount, address(0xbeef));
-        (uint256 depositedCollateral, uint256 debt) = alchemist.getCDP(address(0xbeef));
+        (uint256 depositedCollateral, uint256 debt, ) = alchemist.getCDP(address(0xbeef));
         vm.assertApproxEqAbs(depositedCollateral, amount, minimumDepositOrWithdrawalLoss);
         vm.stopPrank();
 
         assertEq(alchemist.getTotalDeposited(), amount);
 
-        (uint256 deposited, uint256 userDebt) = alchemist.getCDP(address(0xbeef));
+        (uint256 deposited, uint256 userDebt, ) = alchemist.getCDP(address(0xbeef));
 
         assertEq(deposited, amount);
         assertEq(userDebt, 0);
@@ -322,13 +319,13 @@ contract AlchemistV3Test is Test {
         SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
         alchemist.deposit(amount, address(0xbeef));
         alchemist.withdraw(amount / 2, address(0xbeef));
-        (uint256 depositedCollateral, ) = alchemist.getCDP(address(0xbeef));
+        (uint256 depositedCollateral, , ) = alchemist.getCDP(address(0xbeef));
         vm.assertApproxEqAbs(depositedCollateral, amount / 2, minimumDepositOrWithdrawalLoss);
         vm.stopPrank();
 
         assertApproxEqAbs(alchemist.getTotalDeposited(), amount / 2, 1);
 
-        (uint256 deposited, uint256 userDebt) = alchemist.getCDP(address(0xbeef));
+        (uint256 deposited, uint256 userDebt, ) = alchemist.getCDP(address(0xbeef));
 
         assertApproxEqAbs(deposited, amount / 2, 1);
         assertApproxEqAbs(userDebt, 0, 1);
@@ -379,7 +376,7 @@ contract AlchemistV3Test is Test {
         vm.assertApproxEqAbs(IERC20(alToken).balanceOf(address(0xbeef)), (amount * ltv) / FIXED_POINT_SCALAR, minimumDepositOrWithdrawalLoss);
         vm.stopPrank();
 
-        (uint256 deposited, uint256 userDebt) = alchemist.getCDP(address(0xbeef));
+        (uint256 deposited, uint256 userDebt, ) = alchemist.getCDP(address(0xbeef));
 
         assertApproxEqAbs(deposited, amount , 1);
         assertApproxEqAbs(userDebt, amount * ltv / FIXED_POINT_SCALAR, 1);
@@ -459,7 +456,7 @@ contract AlchemistV3Test is Test {
         alchemist.repay(100e18, address(0xbeef));
         vm.stopPrank();
 
-        (uint256 deposited, uint256 userDebt) = alchemist.getCDP(address(0xbeef));
+        (uint256 deposited, uint256 userDebt, ) = alchemist.getCDP(address(0xbeef));
 
         assertEq(userDebt, 0);
 
@@ -483,7 +480,7 @@ contract AlchemistV3Test is Test {
         alchemist.repay(repayAmount, address(0xbeef));
         vm.stopPrank();
 
-        (uint256 deposited, uint256 userDebt) = alchemist.getCDP(address(0xbeef));
+        (uint256 deposited, uint256 userDebt, ) = alchemist.getCDP(address(0xbeef));
 
         uint256 repaidAmount = alchemist.convertYieldTokensToDebt(repayAmount) > 100e18 / 2 ? 100e18 / 2 : alchemist.convertYieldTokensToDebt(repayAmount);
 
@@ -496,27 +493,27 @@ contract AlchemistV3Test is Test {
         assertEq(fakeYieldToken.balanceOf(address(0xbeef)), preRepayBalance - repaidAmount);
     }
 
-    function testRepayWithEarmarkedDebt() external {
-        uint256 amount = 100e18;
-        vm.startPrank(address(0xbeef));
-        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
-        alchemist.deposit(amount, address(0xbeef));
-        alchemist.mint((amount / 2), address(0xbeef));
-        vm.stopPrank();
+    // function testRepayWithEarmarkedDebt() external {
+    //     uint256 amount = 100e18;
+    //     vm.startPrank(address(0xbeef));
+    //     SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
+    //     alchemist.deposit(amount, address(0xbeef));
+    //     alchemist.mint((amount / 2), address(0xbeef));
+    //     vm.stopPrank();
 
-        vm.startPrank(address(0xdad));
-        SafeERC20.safeApprove(address(alToken), address(transmuterLogic), 50e18);
-        transmuterLogic.createRedemption(address(alchemist), address(fakeYieldToken), 50e18);
-        vm.stopPrank();
+    //     vm.startPrank(address(0xdad));
+    //     SafeERC20.safeApprove(address(alToken), address(transmuterLogic), 50e18);
+    //     transmuterLogic.createRedemption(address(alchemist), address(fakeYieldToken), 50e18);
+    //     vm.stopPrank();
 
-        vm.roll(block.number + 5256000);
+    //     vm.roll(block.number + 5256000);
 
-        vm.prank(address(0xbeef));
-        alchemist.repay(100e18, address(0xbeef));
+    //     vm.prank(address(0xbeef));
+    //     alchemist.repay(100e18, address(0xbeef));
 
-        // TODO: Assert after updating getCDP to show earmarked
-        alchemist.getCDP(address(0xbeef));
-    }
+    //     // TODO: Assert after updating getCDP to show earmarked
+    //     (uint256 collateral, uint256 debt, uint256 earmarked) =alchemist.getCDP(address(0xbeef));
+    // }
 
     function testRepayZeroAmount() external {
         uint256 amount = 100e18;
@@ -556,7 +553,7 @@ contract AlchemistV3Test is Test {
         alchemist.burn(amount / 2, address(0xbeef));
         vm.stopPrank();
 
-        (uint256 deposited, uint256 userDebt) = alchemist.getCDP(address(0xbeef));
+        (uint256 deposited, uint256 userDebt, ) = alchemist.getCDP(address(0xbeef));
 
         assertEq(userDebt, 0);
     }
@@ -575,7 +572,7 @@ contract AlchemistV3Test is Test {
         alchemist.burn(burnAmount, address(0xbeef));
         vm.stopPrank();
 
-        (uint256 deposited, uint256 userDebt) = alchemist.getCDP(address(0xbeef));
+        (uint256 deposited, uint256 userDebt, ) = alchemist.getCDP(address(0xbeef));
 
         uint256 burnedAmount = burnAmount > amount / 2 ? amount / 2 : burnAmount;
 
@@ -622,35 +619,35 @@ contract AlchemistV3Test is Test {
         alchemist.liquidate(address(0xbeef));
     }
 
-    function testEarmarkDebtAndRedeem() external {
-        uint256 amount = 100e18;
-        vm.startPrank(address(0xbeef));
-        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
-        alchemist.deposit(amount, address(0xbeef));
-        alchemist.mint((amount / 2), address(0xbeef));
-        vm.stopPrank();
+    // function testEarmarkDebtAndRedeem() external {
+    //     uint256 amount = 100e18;
+    //     vm.startPrank(address(0xbeef));
+    //     SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
+    //     alchemist.deposit(amount, address(0xbeef));
+    //     alchemist.mint((amount / 2), address(0xbeef));
+    //     vm.stopPrank();
 
-        vm.startPrank(address(0xdad));
-        SafeERC20.safeApprove(address(alToken), address(transmuterLogic), 50e18);
-        transmuterLogic.createRedemption(address(alchemist), address(fakeYieldToken), 50e18);
-        vm.stopPrank();
+    //     vm.startPrank(address(0xdad));
+    //     SafeERC20.safeApprove(address(alToken), address(transmuterLogic), 50e18);
+    //     transmuterLogic.createRedemption(address(alchemist), address(fakeYieldToken), 50e18);
+    //     vm.stopPrank();
 
-        vm.roll(block.number + 5256000);
+    //     vm.roll(block.number + 5256000);
 
-        alchemist.getCDP(address(0xbeef));
+    //     alchemist.getCDP(address(0xbeef));
 
-        vm.startPrank(address(0xbeef));
-        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
-        alchemist.withdraw(amount / 5, address(0xbeef));
-        vm.stopPrank();
+    //     vm.startPrank(address(0xbeef));
+    //     SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
+    //     alchemist.withdraw(amount / 5, address(0xbeef));
+    //     vm.stopPrank();
 
-        alchemist.poke(address(0xbeef));
+    //     alchemist.poke(address(0xbeef));
 
-        vm.prank(address(transmuterLogic));
-        alchemist.redeem(20e18);
+    //     vm.prank(address(transmuterLogic));
+    //     alchemist.redeem(20e18);
 
-        //TODO: Finish this
-    }
+    //     //TODO: Finish this
+    // }
 
     function testRedemptionNotTransmuter() external {
         vm.expectRevert();

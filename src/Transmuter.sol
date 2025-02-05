@@ -132,14 +132,6 @@ contract Transmuter is ITransmuter, ERC1155 {
     }
 
     /// @inheritdoc ITransmuter
-    function setGraphSize(uint256 size) external onlyAdmin() {
-        _checkArgument(size > graphSize);
-
-        graphSize = size;
-        emit GraphSizeUpdated(size);
-    }
-
-    /// @inheritdoc ITransmuter
     function setTransmutationTime(uint256 time) external onlyAdmin {
         timeToTransmute = time;
     }
@@ -195,7 +187,8 @@ contract Transmuter is ITransmuter, ERC1155 {
         _positions[msg.sender][_nonce] = StakingPosition(alchemist, yieldToken, syntheticDepositAmount, block.number + timeToTransmute);
 
         // Update Fenwick Tree
-        updateStakingGraph(syntheticDepositAmount.toInt256() / timeToTransmute.toInt256(), timeToTransmute);
+        // TODO: Scaling factor for this
+        _updateStakingGraph(syntheticDepositAmount.toInt256() / timeToTransmute.toInt256(), timeToTransmute);
 
         totalLocked += syntheticDepositAmount;
         
@@ -209,7 +202,7 @@ contract Transmuter is ITransmuter, ERC1155 {
         if(position.positionMaturationBlock == 0)
             revert PositionNotFound();
 
-        // TODO: Gas optimize. Possible make internal function.
+        // TODO: Optimize this
         uint256 blocksLeft = position.positionMaturationBlock > block.number ? position.positionMaturationBlock - block.number: 0;
         uint256 amountEarly = blocksLeft > 0 ? position.amount * blocksLeft / timeToTransmute : 0;
         uint256 amountMatured = position.amount - amountEarly;
@@ -231,7 +224,7 @@ contract Transmuter is ITransmuter, ERC1155 {
         uint256 syntheticFee = amountEarly * exitFee / BPS;
         uint256 syntheticReturned = amountEarly - syntheticFee;
 
-        if (amountEarly > 0) updateStakingGraph(amountEarly.toInt256() / blocksLeft.toInt256(), blocksLeft);
+        if (amountEarly > 0) _updateStakingGraph(amountEarly.toInt256() / blocksLeft.toInt256(), blocksLeft);
 
         TokenUtils.safeTransfer(
             position.yieldToken,
@@ -260,7 +253,14 @@ contract Transmuter is ITransmuter, ERC1155 {
     }
 
     /// @inheritdoc ITransmuter
-    function updateStakingGraph(int256 amount, uint256 blocks) public {
+    function queryGraph(uint256 startBlock, uint256 endBlock) external view returns (uint256) {
+        int256 queried = (endBlock.toInt256() * _graph1.query(endBlock) - _graph2.query(endBlock)) - ((startBlock - 1).toInt256() * _graph1.query(startBlock - 1) - _graph2.query(startBlock - 1));
+
+        return queried.toUint256();
+    }
+
+    /// @dev Updates staking graphs 
+    function _updateStakingGraph(int256 amount, uint256 blocks) private {
         //TODO: Optimize this to reduce amount of reads and writes. Currently gas heavy.
         uint256 currentBlock = block.number; 
         uint256 expirationBlock = currentBlock + blocks;
@@ -270,13 +270,6 @@ contract Transmuter is ITransmuter, ERC1155 {
 
         _graph2.update(currentBlock, graphSize, amount * (currentBlock - 1).toInt256());
         _graph2.update(expirationBlock + 1, graphSize, -amount * expirationBlock.toInt256());
-    }
-
-    /// @inheritdoc ITransmuter
-    function queryGraph(uint256 startBlock, uint256 endBlock) external view returns (uint256) {
-        int256 queried = (endBlock.toInt256() * _graph1.query(endBlock) - _graph2.query(endBlock)) - ((startBlock - 1).toInt256() * _graph1.query(startBlock - 1) - _graph2.query(startBlock - 1));
-
-        return queried.toUint256();
     }
 
     /// @dev Checks an expression and reverts with an {IllegalArgument} error if the expression is {false}.
