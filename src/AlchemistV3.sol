@@ -12,8 +12,7 @@ import {Initializable} from "../lib/openzeppelin-contracts-upgradeable/contracts
 
 import {Unauthorized, IllegalArgument, IllegalState} from "./base/Errors.sol";
 
-// TODO: Add sentinels
-// TODO: Add vault caps here
+// TODO: Add vault caps
 
 /// @title  AlchemistV3
 /// @author Alchemix Finance
@@ -172,8 +171,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     }
 
     /// @inheritdoc IAlchemistV3State
-    function getCDP(address owner) external view returns (uint256, uint256) {
-        return (_accounts[owner].collateralBalance, _calculateUnrealizedDebt(owner));
+    function getCDP(address owner) external view returns (uint256, uint256, uint256) {
+        (uint256 debt, uint256 earmarked) = _calculateUnrealizedDebt(owner);
+        return (_accounts[owner].collateralBalance, debt, earmarked);
     }
 
     /// @inheritdoc IAlchemistV3State
@@ -184,7 +184,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @inheritdoc IAlchemistV3State
     function getMaxBorrowable(address owner) external view returns (uint256) {
         uint256 debtValueOfCollateral = convertYieldTokensToDebt(_accounts[owner].collateralBalance);
-        uint256 debt = _calculateUnrealizedDebt(owner);
+        (uint256 debt, ) = _calculateUnrealizedDebt(owner);
 
         return (debtValueOfCollateral * FIXED_POINT_SCALAR / minimumCollateralization) - debt;
     }
@@ -393,11 +393,11 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         totalDebt -= amount;
 
         // TODO: Check this for decimals
-        uint256 collateralToRedeem = amount * TokenUtils.expectDecimals(underlyingToken) / ITokenAdapter(yieldToken).price();
+        uint256 collateralToRedeem = convertDebtTokensToYield(amount);
 
         TokenUtils.safeTransfer(yieldToken, transmuter, collateralToRedeem);
 
-        emit Redeem(amount);
+        emit Redemption(amount);
     }
 
     /// @inheritdoc IAlchemistV3Actions
@@ -448,8 +448,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @param recipient The recipient of the minted debt tokens.
     function _mint(address owner, uint256 amount, address recipient) internal {
         // Check that the system will allow for the specified amount to be minted.
-        // TODO To review and add mint limit checks
-        // i.e. _checkMintingLimit(uint256 amount)
+        _checkMintingLimit(amount);
+
         _addDebt(recipient, amount);
 
         // Validate the owner's account to assure that the collateralization invariant is still held.
@@ -530,6 +530,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     // }
 
     /// @dev Increases the debt by `amount` for the account owned by `owner`.
+    ///
     /// @param owner   The address of the account owner.
     /// @param amount  The amount to increase the debt by.
     function _addDebt(address owner, uint256 amount) internal {
@@ -588,6 +589,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     /// @dev Checks that the account owned by `owner` is properly collateralized.
     /// @dev If the account is undercollateralized then this will revert with an {Undercollateralized} error.
+    ///
     /// @param owner The address of the account owner.
     function _validate(address owner) internal view {
         if (_isUnderCollateralized(owner)) revert Undercollateralized();
@@ -626,25 +628,28 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @param owner The address of the account owner.
     ///
     /// @return The amount of debt that the account owned by `owner` will have after an update.    
-    function _calculateUnrealizedDebt(address owner) internal view returns (uint256) {
-        // TODO: have this return total debt and earmarked debt
+    /// @return The amount of debt which is currently earmarked fro redemption.
+    function _calculateUnrealizedDebt(address owner) internal view returns (uint256, uint256) {
         Account storage account = _accounts[owner];
 
         uint256 amount;
         uint256 earmarkWeightCopy;
-        uint256 debtToEarmark;
 
-        if (lastEarmarkBlock < block.number) {
+        if (block.number > lastEarmarkBlock) {
             amount = ITransmuter(transmuter).queryGraph(lastEarmarkBlock + 1, block.number);
             earmarkWeightCopy = _earmarkWeight + (amount * FIXED_POINT_SCALAR / totalDebt);
-            debtToEarmark = account.debt * (earmarkWeightCopy - account.lastAccruedEarmarkWeight) / FIXED_POINT_SCALAR;
         }
 
-        return account.debt - debtToEarmark;
+        uint256 debtToEarmark = account.debt * (earmarkWeightCopy - account.lastAccruedEarmarkWeight) / FIXED_POINT_SCALAR;
+        uint256 earmarkedCopy = account.earmarked + debtToEarmark;
+        uint256 earmarkToRedeem = earmarkedCopy * (_redemptionWeight - account.lastAccruedRedemptionWeight) / FIXED_POINT_SCALAR;
+
+        return (account.debt - earmarkToRedeem, earmarkedCopy);
     }
 
     /// @dev Checks that the account owned by `owner` is properly collateralized.
     /// @dev If the account is undercollateralized then this will revert with an {Undercollateralized} error.
+    ///
     /// @param owner The address of the account owner.
     function _isUnderCollateralized(address owner) internal view returns (bool) {
         uint256 debt = _accounts[owner].debt;
@@ -655,5 +660,17 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
             return true;
         }
         return false;
+    }
+
+    /// @dev Checks if `amount` of debt tokens can be minted.
+    /// @dev `amount` must be less than the current minting limit or this call will revert with a
+    ///      {MintingLimitExceeded} error.
+    ///
+    /// @param amount The amount to check.
+    function _checkMintingLimit(uint256 amount) internal view {
+        uint256 limit = _mintingLimiter.get();
+        if (amount > limit) {
+            revert MintingLimitExceeded(amount, limit);
+        }
     }
 }

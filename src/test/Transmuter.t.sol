@@ -82,10 +82,6 @@ contract TransmuterTest is Test {
         transmuter.setExitFee(10001);
     }
 
-    function testSetGraphSize() external {
-        transmuter.setGraphSize(52560000);
-    }
-
     function testAddAlchemist() public {
         transmuter.addAlchemist(address(0xdead));
 

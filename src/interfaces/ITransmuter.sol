@@ -101,14 +101,6 @@ interface ITransmuter {
     /// @param cap    The new deposit cap.
     function setDepositCap(uint256 cap) external;
 
-    /// @notice Updates staking graph size to `size`.
-    ///
-    /// @notice `msg.sender` must be the admin or this call will revert with an {Unauthorized} error.
-    ///
-    ///
-    /// @param size    The new graph size.
-    function setGraphSize(uint256 size) external;
-
     /// @notice Sets time to transmute to `time`.
     ///
     /// @notice `msg.sender` must be the admin or this call will revert with an {Unauthorized} error.
@@ -176,9 +168,6 @@ interface ITransmuter {
     ///
     /// @param id   Id of the nft representing the position.
     function claimRedemption(uint256 id) external;
-
-
-    function updateStakingGraph(int256 amount, uint256 blocks) external;
 
     /// @notice Queries the staking graph from `startBlock` to `endBlock`.
     ///
