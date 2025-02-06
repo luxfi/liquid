@@ -62,7 +62,7 @@ contract Transmuter is ITransmuter, ERC1155 {
     /// @dev Map of alchemist addresses to corresponding entry data.
     mapping(address => AlchemistEntry) internal _alchemistEntries;
 
-    /// @dev Map of user positoins data.
+    /// @dev Map of user positions data.
     mapping(address => mapping(uint256 => StakingPosition)) internal _positions;
 
     /// @dev Mapping used for staking graph.
@@ -168,6 +168,8 @@ contract Transmuter is ITransmuter, ERC1155 {
         if(syntheticDepositAmount == 0)
             revert DepositZeroAmount();
 
+        // TODO: add other caps
+
         // TODO cap deposit so that when it is converted to int it wont break
 
         if(totalLocked + syntheticDepositAmount > depositCap)
@@ -186,10 +188,10 @@ contract Transmuter is ITransmuter, ERC1155 {
         // TODO: Add `data` param if we decide we need this. ERC1155
         _mint(msg.sender, ++_nonce, syntheticDepositAmount, "");
 
-        _positions[msg.sender][_nonce] = StakingPosition(alchemist, yieldToken, syntheticDepositAmount, block.number + timeToTransmute - 1);
+        _positions[msg.sender][_nonce] = StakingPosition(alchemist, yieldToken, syntheticDepositAmount, block.number + timeToTransmute);
 
         // Update Fenwick Tree
-        _updateStakingGraph(syntheticDepositAmount.toInt256() * BLOCK_SCALING_FACTOR / timeToTransmute.toInt256(), timeToTransmute - 1);
+        _updateStakingGraph(syntheticDepositAmount.toInt256() * BLOCK_SCALING_FACTOR / timeToTransmute.toInt256(), timeToTransmute);
 
         totalLocked += syntheticDepositAmount;
         

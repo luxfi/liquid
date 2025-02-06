@@ -77,16 +77,30 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @inheritdoc IAlchemistV3State
     address public pendingAdmin;
 
+    /// @inheritdoc IAlchemistV3State
+    bool public depositsPaused;
+
+    /// @inheritdoc IAlchemistV3State
+    bool public loansPaused;
+
+    /// @inheritdoc IAlchemistV3State
+    mapping(address => bool) public gaurdians;
+
     uint256 private _earmarkWeight;
 
     uint256 private _redemptionWeight;
 
     mapping(address => Account) private _accounts;
 
-    Limiters.LinearGrowthLimiter private _mintingLimiter;
-
     modifier onlyAdmin() {
         if (msg.sender != admin) {
+            revert Unauthorized();
+        }
+        _;
+    }
+
+    modifier onlyAdminOrGaurdian() {
+        if (msg.sender != admin && !gaurdians[msg.sender]) {
             revert Unauthorized();
         }
         _;
@@ -119,10 +133,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         protocolFeeReceiver = params.protocolFeeReceiver;
         liquidatorFee = params.liquidatorFee;
         lastEarmarkBlock = block.number;
-        _mintingLimiter = Limiters.createLinearGrowthLimiter(params.mintingLimitMaximum, params.mintingLimitBlocks, params.mintingLimitMinimum);
     }
-
-    // TODO: Add pause function and gaurdian role
 
     /// @inheritdoc IAlchemistV3AdminActions
     function setPendingAdmin(address value) external onlyAdmin {
@@ -153,12 +164,20 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         emit ProtocolFeeReceiverUpdated(value);
     }
 
+    /// @inheritdoc IAlchemistV3AdminActions
     function setProtocolFee(uint256 fee) external onlyAdmin {
+        _checkArgument(fee <= BPS);
 
+        protocolFee = fee;
+        emit ProtocolFeeUpdated(fee);
     }
-    
+
+    /// @inheritdoc IAlchemistV3AdminActions
     function setLiquidatorFee(uint256 fee) external onlyAdmin {
-        
+        _checkArgument(fee <= BPS);
+
+        liquidatorFee = fee;
+        emit LiquidatorFeeUpdated(fee);
     }
 
     /// @inheritdoc IAlchemistV3AdminActions
@@ -166,6 +185,14 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         _checkArgument(value != address(0));
         transmuter = value;
         emit TransmuterUpdated(value);
+    }
+
+    /// @inheritdoc IAlchemistV3AdminActions
+    function setGaurdian(address gaurdian, bool isActive) external onlyAdmin {
+        _checkArgument(gaurdian != address(0));
+
+        gaurdians[gaurdian] = isActive;
+        emit GaurdianSet(gaurdian, isActive);
     }
     
     /// @inheritdoc IAlchemistV3AdminActions
@@ -191,20 +218,16 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         emit CollateralizationLowerBoundUpdated(value);
     }
 
-    /// @inheritdoc IAlchemistV3State
-    function getMintLimitInfo()
-        external view
-        returns (
-            uint256 currentLimit,
-            uint256 rate,
-            uint256 maximum
-        )
-    {
-        return (
-            _mintingLimiter.get(),
-            _mintingLimiter.rate,
-            _mintingLimiter.maximum
-        );
+    /// @inheritdoc IAlchemistV3AdminActions
+    function pauseDeposits(bool isPaused) external onlyAdminOrGaurdian {
+        depositsPaused = isPaused;
+        emit DepositsPaused(isPaused);
+    }
+    
+    /// @inheritdoc IAlchemistV3AdminActions
+    function pauseLoans(bool isPaused) external onlyAdminOrGaurdian {
+        loansPaused = isPaused;
+        emit LoansPaused(isPaused);
     }
 
     /// @inheritdoc IAlchemistV3State
@@ -253,6 +276,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     function deposit(uint256 amount, address recipient) external returns (uint256) {
         _checkArgument(recipient != address(0));
         _checkArgument(amount > 0);
+        _checkState(depositsPaused == false);
 
         _accounts[recipient].collateralBalance += amount;
 
@@ -292,6 +316,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     function mint(uint256 amount, address recipient) external {
         _checkArgument(msg.sender != address(0));
         _checkArgument(amount > 0);
+        _checkState(loansPaused == false);
 
         // Query transmuter and earmark global debt
         _earmark();
@@ -307,6 +332,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     function mintFrom(address owner, uint256 amount, address recipient) external {
         _checkArgument(amount > 0);
         _checkArgument(recipient != address(0));
+        _checkState(loansPaused == false);
 
         // Preemptively try and decrease the minting allowance. This will save gas when the allowance is not sufficient.
         _decreaseMintAllowance(owner, msg.sender, amount);
@@ -343,9 +369,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         // Update the recipient's debt.
         _subDebt(recipient, credit);
-
-        // Increase the global amount of mintable debt tokens
-        _mintingLimiter.increase(amount);
 
         emit Burn(msg.sender, credit, recipient);
 
@@ -486,16 +509,10 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @param amount    The amount to mint.
     /// @param recipient The recipient of the minted debt tokens.
     function _mint(address owner, uint256 amount, address recipient) internal {
-        // Check that the system will allow for the specified amount to be minted.
-        _checkMintingLimit(amount);
-
         _addDebt(owner, amount);
 
         // Validate the owner's account to assure that the collateralization invariant is still held.
         _validate(owner);
-
-        // Decrease the global amount of mintable debt tokens.
-        _mintingLimiter.decrease(amount);
 
         // Mint the debt tokens to the recipient.
         TokenUtils.safeMint(debtToken, recipient, amount);
@@ -691,18 +708,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
             return true;
         }
         return false;
-    }
-
-    /// @dev Checks if `amount` of debt tokens can be minted.
-    /// @dev `amount` must be less than the current minting limit or this call will revert with a
-    ///      {MintingLimitExceeded} error.
-    ///
-    /// @param amount The amount to check.
-    function _checkMintingLimit(uint256 amount) internal view {
-        uint256 limit = _mintingLimiter.get();
-        if (amount > limit) {
-            revert MintingLimitExceeded(amount, limit);
-        }
     }
 
     /// @dev Calculates the amount required to reduce an accounts debt and collateral by to achieve the target `minimumCollateralization` ratio.

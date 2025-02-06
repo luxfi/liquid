@@ -19,6 +19,7 @@ import {IAlchemistV3, IAlchemistV3Errors, InitializationParams} from "../interfa
 import {ITransmuter} from "../interfaces/ITransmuter.sol";
 import {ITestYieldToken} from "../interfaces/test/ITestYieldToken.sol";
 import {InsufficientAllowance} from "../base/Errors.sol";
+import {Unauthorized, IllegalArgument, IllegalState, MissingInputData} from "../base/Errors.sol";
 import "../interfaces/IYearnVaultV2.sol";
 
 contract AlchemistV3Test is Test {
@@ -154,10 +155,7 @@ contract AlchemistV3Test is Test {
             globalMinimumCollateralization: 1_111_111_111_111_111_111, // 1.1
             protocolFee: 1000,
             protocolFeeReceiver: address(10),
-            liquidatorFee: 300, // in bps? 3%
-            mintingLimitMinimum: 1,
-            mintingLimitMaximum: uint256(type(uint160).max),
-            mintingLimitBlocks: 300
+            liquidatorFee: 300 // in bps? 3%
         });
 
         bytes memory alchemParams = abi.encodeWithSelector(AlchemistV3.initialize.selector, params);
@@ -202,6 +200,36 @@ contract AlchemistV3Test is Test {
         deal(address(fakeUnderlyingToken), someWhale, whaleSupply);
         SafeERC20.safeApprove(address(fakeUnderlyingToken), address(fakeYieldToken), whaleSupply + 100e18);
         vm.stopPrank();
+    }
+
+    function testSetProtocolFeeTooHigh() public { 
+        vm.startPrank(alOwner);
+        vm.expectRevert();
+        alchemist.setProtocolFee(10001);
+        vm.stopPrank();
+    }
+
+    function testSetLiquidationFeeTooHigh() public { 
+        vm.startPrank(alOwner);
+        vm.expectRevert();
+        alchemist.setLiquidatorFee(10001);
+        vm.stopPrank();
+    }
+
+    function testSetProtocolFee() public { 
+        vm.startPrank(alOwner);
+        alchemist.setProtocolFee(100);
+        vm.stopPrank();
+
+        assertEq(alchemist.protocolFee(), 100);
+    }
+
+    function testSetLiquidationFee() public { 
+        vm.startPrank(alOwner);
+        alchemist.setLiquidatorFee(100);
+        vm.stopPrank();
+
+        assertEq(alchemist.liquidatorFee(), 100);
     }
 
     function testSetMinimumCollaterization_Invalid_Ratio_Below_One(uint256 collateralizationRatio) external {
@@ -288,6 +316,19 @@ contract AlchemistV3Test is Test {
         assertEq(alchemist.pendingAdmin(), address(0));
     }
 
+    function testSetGaurdianAndRemove() external {
+        assertEq(alchemist.gaurdians(address(0xbad)), false);
+        vm.prank(alOwner);
+        alchemist.setGaurdian(address(0xbad), true);
+
+        assertEq(alchemist.gaurdians(address(0xbad)), true);
+
+        vm.prank(alOwner);
+        alchemist.setGaurdian(address(0xbad), false);
+
+        assertEq(alchemist.gaurdians(address(0xbad)), false);
+    }
+
     function testSetProtocolFeeReceiver() external {
         vm.prank(alOwner);
         alchemist.setProtocolFeeReceiver(address(0xbeef));
@@ -354,6 +395,52 @@ contract AlchemistV3Test is Test {
         alchemist.setMinimumCollateralization(0);
     }
 
+    function testPauseDeposits() external {
+        assertEq(alchemist.depositsPaused(), false);
+
+        vm.prank(alOwner);
+        alchemist.pauseDeposits(true);
+
+        assertEq(alchemist.depositsPaused(), true);
+
+        vm.prank(alOwner);
+        alchemist.setGaurdian(address(0xbad), true);
+
+        vm.prank(address(0xbad));
+        alchemist.pauseDeposits(false);
+
+        assertEq(alchemist.depositsPaused(), false);
+
+        // Test for onlyAdminOrGaurdian modifier
+        vm.expectRevert();
+        alchemist.pauseDeposits(true);
+
+        assertEq(alchemist.depositsPaused(), false);
+    }
+
+    function testPauseLoans() external {
+        assertEq(alchemist.loansPaused(), false);
+
+        vm.prank(alOwner);
+        alchemist.pauseLoans(true);
+
+        assertEq(alchemist.loansPaused(), true);
+
+        vm.prank(alOwner);
+        alchemist.setGaurdian(address(0xbad), true);
+
+        vm.prank(address(0xbad));
+        alchemist.pauseLoans(false);
+
+        assertEq(alchemist.loansPaused(), false);
+
+        // Test for onlyAdminOrGaurdian modifier
+        vm.expectRevert();
+        alchemist.pauseLoans(true);
+
+        assertEq(alchemist.loansPaused(), false);
+    }
+
     function testDeposit(uint256 amount) external {
         amount = bound(amount, 1e18, 1000e18);
         vm.startPrank(address(0xbeef));
@@ -388,6 +475,17 @@ contract AlchemistV3Test is Test {
         vm.startPrank(address(0xbeef));
         vm.expectRevert();
         alchemist.deposit(10e18, address(0));
+        vm.stopPrank();
+    }
+
+    function testDepositPaused() external {
+        vm.prank(alOwner);
+        alchemist.pauseDeposits(true);
+
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist),100e18);
+        vm.expectRevert(IllegalState.selector);
+        alchemist.deposit(100e18, address(0xbeef));
         vm.stopPrank();
     }
 
@@ -518,6 +616,18 @@ contract AlchemistV3Test is Test {
         assertEq(alchemist.mintAllowance(externalUser, address(0xbeef)), (amount + 100e18) - (amount * ltv) / FIXED_POINT_SCALAR);
 
         vm.assertApproxEqAbs(IERC20(alToken).balanceOf(externalUser), (amount * ltv) / FIXED_POINT_SCALAR, minimumDepositOrWithdrawalLoss);
+        vm.stopPrank();
+    }
+
+    function testMintPaused() external {
+        vm.prank(alOwner);
+        alchemist.pauseLoans(true);
+
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist),100e18);
+        alchemist.deposit(100e18, address(0xbeef));
+        vm.expectRevert(IllegalState.selector);
+        alchemist.mint(10e18, address(0xbeef));
         vm.stopPrank();
     }
 

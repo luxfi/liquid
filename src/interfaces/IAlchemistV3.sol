@@ -25,12 +25,6 @@ struct InitializationParams {
     address protocolFeeReceiver;
     // Fee paid to liquidators.
     uint256 liquidatorFee;
-    // A limit used to prevent administrators from making minting functionality inoperable.
-    uint256 mintingLimitMinimum;
-    // The maximum number of tokens that can be minted per period of time.
-    uint256 mintingLimitMaximum;
-    // The number of blocks that it takes for the minting limit to be refreshed.
-    uint256 mintingLimitBlocks;
 }
 
 /// @notice A user account.
@@ -263,8 +257,18 @@ interface IAlchemistV3AdminActions {
     ///
     /// @dev This is the first step in the two-step process of setting a new administrator. After this function is called, the pending administrator will then need to call {acceptAdmin} to complete the process.
     ///
-    /// @param value the address to set the pending admin to.
+    /// @param value The address to set the pending admin to.
     function setPendingAdmin(address value) external;
+
+    /// @notice Sets the active state of a gaurdian.
+    ///
+    /// @notice `msg.sender` must be the admin or this call will will revert with an {Unauthorized} error.
+    ///
+    /// @notice Emits a {GaurdianSet} event.
+    ///
+    /// @param gaurdian The address of the target gaurdian.
+    /// @param isActive The active state to set for the gaurdian.
+    function setGaurdian(address gaurdian, bool isActive) external;
 
     /// @notice Allows for `msg.sender` to accepts the role of administrator.
     ///
@@ -295,6 +299,24 @@ interface IAlchemistV3AdminActions {
     /// @param receiver The address of the new fee receiver.
     function setProtocolFeeReceiver(address receiver) external;
 
+    /// @notice Set a new protocol debt fee.
+    ///
+    /// @notice `msg.sender` must be the admin or this call will revert with an {Unauthorized} error.
+    ///
+    /// @notice Emits a {ProtocolFeeUpdated} event.
+    ///
+    /// @param fee The new protocol debt fee.
+    function setProtocolFee(uint256 fee) external;
+
+    /// @notice Set a new liquidator fee.
+    ///
+    /// @notice `msg.sender` must be the admin or this call will revert with an {Unauthorized} error.
+    ///
+    /// @notice Emits a {LiquidatorFeeUpdated} event.
+    ///
+    /// @param fee The new liquidator fee.
+    function setLiquidatorFee(uint256 fee) external;
+
     /// @notice Set a new transmuter to `value`.
     ///
     /// @notice `msg.sender` must be the admin or this call will revert with an {Unauthorized} error.
@@ -321,6 +343,24 @@ interface IAlchemistV3AdminActions {
     ///
     /// @param value The new collateralization lower bound ratio.
     function setCollateralizationLowerBound(uint256 value) external;
+
+    /// @notice Pause all future deposits in the Alchemist.
+    ///
+    /// @notice `msg.sender` must be the admin or gaurdian or this call will revert with an {Unauthorized} error.
+    ///
+    /// @notice Emits a {DepositsPaused} event.
+    ///
+    /// @param isPaused The new pause state for deposits in the alchemist.
+    function pauseDeposits(bool isPaused) external;
+
+    /// @notice Pause all future loans in the Alchemist.
+    ///
+    /// @notice `msg.sender` must be the admin or gaurdian or this call will revert with an {Unauthorized} error.
+    ///
+    /// @notice Emits a {LoansPaused} event.
+    ///
+    /// @param isPaused The new pause state for loans in the alchemist.
+    function pauseLoans(bool isPaused) external;
 }
 
 interface IAlchemistV3Events {
@@ -333,6 +373,12 @@ interface IAlchemistV3Events {
     ///
     /// @param admin The address of the administrator.
     event AdminUpdated(address admin);
+
+    /// @notice Emitted when a gaurdian is added or removed from the alchemist.
+    ///
+    /// @param gaurdian The addres of the new gaurdian.
+    /// @param state    The active state of the gaurdian.
+    event GaurdianSet(address gaurdian, bool state);
 
     /// @notice Emitted when the transmuter is updated.
     ///
@@ -354,11 +400,15 @@ interface IAlchemistV3Events {
     /// @param collateralizationLowerBound The updated collateralization lower bound.
     event CollateralizationLowerBoundUpdated(uint256 collateralizationLowerBound);
 
-    /// @notice Emitted when the minting limit is updated.
+    /// @notice Emitted when deposits are paused or unpaused in the alchemist.
     ///
-    /// @param maximum The updated maximum minting limit.
-    /// @param blocks  The updated number of blocks it will take for the maximum minting limit to be replenished when it is completely exhausted.
-    event MintingLimitUpdated(uint256 maximum, uint256 blocks);
+    /// @param isPaused The current pause state of deposits in the alchemist.
+    event DepositsPaused(bool isPaused);
+
+    /// @notice Emitted when loans are paused or unpaused in the alchemist.
+    ///
+    /// @param isPaused The current pause state of loans in the alchemist.
+    event LoansPaused(bool isPaused);
 
     /// @notice Emitted when `owner` grants `spender` the ability to mint debt tokens on its behalf.
     ///
@@ -419,6 +469,16 @@ interface IAlchemistV3Events {
     /// @param amount   The amount of debt to redeem.
     event Redemption(uint256 amount);
 
+    /// @notice Emitted when the protocol debt fee is updated.
+    ///
+    /// @param fee  The new protocol fee.
+    event ProtocolFeeUpdated(uint256 fee);
+
+    /// @notice Emitted when the liquidator fee is updated.
+    ///
+    /// @param fee  The new liquidator fee.
+    event LiquidatorFeeUpdated(uint256 fee);
+
     /// @notice Emitted when the fee receiver is updated.
     ///
     /// @param receiver   The address of the new receiver.
@@ -459,6 +519,8 @@ interface IAlchemistV3State {
     /// @return admin The admin address.
     function admin() external view returns (address admin);
 
+    function gaurdians(address gaurdian) external view returns (bool isActive);
+
     function cumulativeEarmarked() external view returns (uint256 earmarked);
 
     function lastEarmarkBlock() external view returns (uint256 block);
@@ -478,6 +540,10 @@ interface IAlchemistV3State {
     function underlyingToken() external view returns (address token);
 
     function yieldToken() external view returns (address token);
+
+    function depositsPaused() external view returns(bool isPaused);
+
+    function loansPaused() external view returns(bool isPaused);
 
     /// @notice Gets the address of the pending administrator.
     ///
@@ -591,19 +657,6 @@ interface IAlchemistV3State {
     ///
     /// @return allowance The amount of debt tokens that `spender` can mint on behalf of `owner`.
     function mintAllowance(address owner, address spender) external view returns (uint256 allowance);
-
-    /// @notice Gets current limit, maximum, and rate of the minting limiter.
-    ///
-    /// @return currentLimit The current amount of debt tokens that can be minted.
-    /// @return rate         The maximum possible amount of tokens that can be liquidated at a time.
-    /// @return maximum      The highest possible maximum amount of debt tokens that can be minted at a time.
-    function getMintLimitInfo()
-    external view 
-    returns (
-        uint256 currentLimit,
-        uint256 rate,
-        uint256 maximum
-    );
 }
 
 interface IAlchemistV3Errors {
