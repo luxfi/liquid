@@ -347,6 +347,6 @@ contract TransmuterTest is Test {
 
         uint256 treeQuery = transmuter.queryGraph(block.number - 5256000, block.number);
 
-        // assertEq(treeQuery, 100e18);
+        // assertApproxEq(treeQuery, 100e18, 1);
     }
 } // TODO: More fenwick tree tests

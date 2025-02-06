@@ -13,12 +13,18 @@ struct InitializationParams {
     address yieldToken;
     // The minimum collateralization between 0 and 1 exclusive
     uint256 minimumCollateralization;
+    // The global minimum collateralization, >= minimumCollateralization.
+    uint256 globalMinimumCollateralization;
+    // The minimum collateralization for liquidation eligibility. between 1 and minimumCollateralization inclusive.
+    uint256 collateralizationLowerBound;
     // The initial transmuter or transmuter buffer.
     address transmuter;
     // TODO Need to discuss how fees will be accumulated since harvests will no longer be done.
     uint256 protocolFee;
     // The address that receives protocol fees.
     address protocolFeeReceiver;
+    // Fee paid to liquidators.
+    uint256 liquidatorFee;
     // A limit used to prevent administrators from making minting functionality inoperable.
     uint256 mintingLimitMinimum;
     // The maximum number of tokens that can be minted per period of time.
@@ -222,6 +228,22 @@ interface IAlchemistV3Actions {
     /// @return fee                 Underlying tokens sent to the liquidator.
     function liquidate(address owner) external returns (uint256 underlyingAmount, uint256 fee);
 
+    /// @notice Liquidates `owners` if the debt for account `owner` is greater than the underlying value of their collateral * LTV.
+    ///
+    /// @notice `owner` must be non-zero or this call will revert with an {IllegalArgument} error.
+    ///
+    ///
+    /// @notice **Example:**
+    /// @notice ```
+    /// @notice AlchemistV3(alchemistAddress).batchLiquidate([user1, user2]);
+    /// @notice ```
+    ///
+    /// @param owners    The address accounts to liquidate.
+    ///
+    /// @return totalAmountLiquidated    Equivalent amount of underlying tokens in yield tokens sent to the transmuter.
+    /// @return totalFees                Amount sent to liquidator in yield tokens.
+    function batchLiquidate(address[] memory owners) external returns (uint256 totalAmountLiquidated, uint256 totalFees);
+
     /// @notice Redeems `amount` debt from the alchemist in exchange for yield tokens sent to the transmuter.
     ///
     /// @notice This function is only callable by the transmuter.
@@ -281,6 +303,24 @@ interface IAlchemistV3AdminActions {
     ///
     /// @param value The address of the new fee transmuter.
     function setTransmuter(address value) external;
+
+    /// @notice Set the global minimum collateralization ratio.
+    ///
+    /// @notice `msg.sender` must be the admin or this call will revert with an {Unauthorized} error.
+    ///
+    /// @notice Emits a {GlobalMinimumCollateralizationUpdated} event.
+    ///
+    /// @param value The new global minimum collateralization ratio.
+    function setGlobalMinimumCollateralization(uint256 value) external;
+
+    /// @notice Set the collateralization lower bound ratio.
+    ///
+    /// @notice `msg.sender` must be the admin or this call will revert with an {Unauthorized} error.
+    ///
+    /// @notice Emits a {CollateralizationLowerBoundUpdated} event.
+    ///
+    /// @param value The new collateralization lower bound ratio.
+    function setCollateralizationLowerBound(uint256 value) external;
 }
 
 interface IAlchemistV3Events {
@@ -303,6 +343,16 @@ interface IAlchemistV3Events {
     ///
     /// @param minimumCollateralization The updated minimum collateralization.
     event MinimumCollateralizationUpdated(uint256 minimumCollateralization);
+
+    /// @notice Emitted when the global minimum collateralization is updated.
+    ///
+    /// @param globalMinimumCollateralization The updated global minimum collateralization.
+    event GlobalMinimumCollateralizationUpdated(uint256 globalMinimumCollateralization);
+
+    /// @notice Emitted when the collateralization lower bound (for a liquidation) is updated.
+    ///
+    /// @param collateralizationLowerBound The updated collateralization lower bound.
+    event CollateralizationLowerBoundUpdated(uint256 collateralizationLowerBound);
 
     /// @notice Emitted when the minting limit is updated.
     ///
@@ -373,6 +423,22 @@ interface IAlchemistV3Events {
     ///
     /// @param receiver   The address of the new receiver.
     event ProtocolFeeReceiverUpdated(address receiver);
+
+    /// @notice Emitted when account for 'owner' has been liquidated.
+    ///
+    /// @param owner        The address of the account liquidated
+    /// @param liquidator   The address of the liquidator
+    /// @param amount       The amount liquidated
+    /// @param fee          The liquidation fee sent to 'liquidator'
+    event Liquidated(address indexed owner, address liquidator, uint256 amount, uint256 fee);
+
+    /// @notice Emitted when account for 'owner' has been liquidated.
+    ///
+    /// @param owners       The address of the accounts liquidated
+    /// @param liquidator   The address of the liquidator
+    /// @param amount       The amount liquidated
+    /// @param fee          The liquidation fee sent to 'liquidator'
+    event BatchLiquidated(address[] indexed owners, address liquidator, uint256 amount, uint256 fee);
 }
 
 interface IAlchemistV3Immutables {
@@ -400,6 +466,8 @@ interface IAlchemistV3State {
     function totalDebt() external view returns (uint256 debt);
 
     function protocolFee() external view returns (uint256 fee);
+
+    function liquidatorFee() external view returns (uint256 fee);
 
     function underlyingDecimals() external view returns (uint8 decimals);
 
@@ -430,6 +498,18 @@ interface IAlchemistV3State {
     /// @return minimumCollateralization The minimum collateralization.
     function minimumCollateralization() external view returns (uint256 minimumCollateralization);
 
+    /// @notice Gets the global minimum collateralization.
+    ///
+    /// @notice Collateralization is determined by taking the total value of collateral deposited in the alchemist and dividing it by the total debt.
+    ///
+    /// @dev The value returned is a 18 decimal fixed point integer.
+    ///
+    /// @return globalMinimumCollateralization The global minimum collateralization.
+    function globalMinimumCollateralization() external view returns (uint256 globalMinimumCollateralization);
+
+    ///  @notice Gets collaterlization level that will result in an account being eligible for partial liquidation
+    function collateralizationLowerBound() external view returns (uint256 ratio);
+    
     /// @dev Returns the debt value of `amount` yield tokens.
     ///
     /// @param amount   The amount to convert.

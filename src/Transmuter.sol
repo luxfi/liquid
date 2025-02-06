@@ -27,6 +27,8 @@ contract Transmuter is ITransmuter, ERC1155 {
 
     uint256 public constant BPS = 10_000;
 
+    int256 public constant BLOCK_SCALING_FACTOR = 1e8;
+
     /// @inheritdoc ITransmuter
     uint256 public depositCap;
 
@@ -187,8 +189,7 @@ contract Transmuter is ITransmuter, ERC1155 {
         _positions[msg.sender][_nonce] = StakingPosition(alchemist, yieldToken, syntheticDepositAmount, block.number + timeToTransmute);
 
         // Update Fenwick Tree
-        // TODO: Scaling factor for this
-        _updateStakingGraph(syntheticDepositAmount.toInt256() / timeToTransmute.toInt256(), timeToTransmute);
+        _updateStakingGraph(syntheticDepositAmount.toInt256() * BLOCK_SCALING_FACTOR / timeToTransmute.toInt256(), timeToTransmute);
 
         totalLocked += syntheticDepositAmount;
         
@@ -256,7 +257,7 @@ contract Transmuter is ITransmuter, ERC1155 {
     function queryGraph(uint256 startBlock, uint256 endBlock) external view returns (uint256) {
         int256 queried = (endBlock.toInt256() * _graph1.query(endBlock) - _graph2.query(endBlock)) - ((startBlock - 1).toInt256() * _graph1.query(startBlock - 1) - _graph2.query(startBlock - 1));
 
-        return queried.toUint256();
+        return (queried / BLOCK_SCALING_FACTOR).toUint256();
     }
 
     /// @dev Updates staking graphs 
