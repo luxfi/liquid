@@ -489,7 +489,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         // Check that the system will allow for the specified amount to be minted.
         _checkMintingLimit(amount);
 
-        _addDebt(recipient, amount);
+        _addDebt(owner, amount);
 
         // Validate the owner's account to assure that the collateralization invariant is still held.
         _validate(owner);

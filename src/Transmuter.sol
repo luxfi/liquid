@@ -186,10 +186,10 @@ contract Transmuter is ITransmuter, ERC1155 {
         // TODO: Add `data` param if we decide we need this. ERC1155
         _mint(msg.sender, ++_nonce, syntheticDepositAmount, "");
 
-        _positions[msg.sender][_nonce] = StakingPosition(alchemist, yieldToken, syntheticDepositAmount, block.number + timeToTransmute);
+        _positions[msg.sender][_nonce] = StakingPosition(alchemist, yieldToken, syntheticDepositAmount, block.number + timeToTransmute - 1);
 
         // Update Fenwick Tree
-        _updateStakingGraph(syntheticDepositAmount.toInt256() * BLOCK_SCALING_FACTOR / timeToTransmute.toInt256(), timeToTransmute);
+        _updateStakingGraph(syntheticDepositAmount.toInt256() * BLOCK_SCALING_FACTOR / timeToTransmute.toInt256(), timeToTransmute - 1);
 
         totalLocked += syntheticDepositAmount;
         
