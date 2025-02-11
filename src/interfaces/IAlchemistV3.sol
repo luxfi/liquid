@@ -11,6 +11,8 @@ struct InitializationParams {
     address underlyingToken;
     // The address(es) of the yield token(s) being deposited.
     address yieldToken;
+    // Chain specific number of blocks within 1 year.
+    uint256 blocksPerYear;
     // The minimum collateralization between 0 and 1 exclusive
     uint256 minimumCollateralization;
     // The global minimum collateralization, >= minimumCollateralization.
@@ -41,6 +43,9 @@ struct Account {
 
     /// @notice Last weight of debt from most recent account sync.
     uint256 lastAccruedEarmarkWeight;
+    
+    /// @notice Last weight of debt fee from most recent account sync.
+    uint256 lastAccruedFeeWeight;
 
     /// @notice Last weight of debt from most recent account sync.
     uint256 lastAccruedRedemptionWeight;
@@ -520,6 +525,8 @@ interface IAlchemistV3State {
     function admin() external view returns (address admin);
 
     function gaurdians(address gaurdian) external view returns (bool isActive);
+
+    function blocksPerYear() external view returns (uint256 blocks);
 
     function cumulativeEarmarked() external view returns (uint256 earmarked);
 
