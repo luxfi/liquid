@@ -10,6 +10,9 @@ import "./libraries/Limiters.sol";
 import "./libraries/SafeCast.sol";
 import {Initializable} from "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 
+import {console} from "../../lib/forge-std/src/console.sol";
+
+
 import {Unauthorized, IllegalArgument, IllegalState, MissingInputData} from "./base/Errors.sol";
 
 /// @title  AlchemistV3
@@ -32,6 +35,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     /// @inheritdoc IAlchemistV3State
     uint8 public underlyingConversionFactor;
+
+    /// @inheritdoc IAlchemistV3State
+    uint256 public blocksPerYear;
 
     /// @inheritdoc IAlchemistV3State
     uint256 public cumulativeEarmarked;
@@ -84,6 +90,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @inheritdoc IAlchemistV3State
     mapping(address => bool) public gaurdians;
 
+    uint256 private _feeWeight;
+
     uint256 private _earmarkWeight;
 
     uint256 private _redemptionWeight;
@@ -122,6 +130,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         underlyingDecimals = TokenUtils.expectDecimals(params.underlyingToken);
         underlyingConversionFactor = uint8(10)**(TokenUtils.expectDecimals(params.debtToken) - TokenUtils.expectDecimals(params.underlyingToken));
         yieldToken = params.yieldToken;
+        blocksPerYear = params.blocksPerYear;
         minimumCollateralization = params.minimumCollateralization;
         globalMinimumCollateralization = params.globalMinimumCollateralization;
         collateralizationLowerBound = params.collateralizationLowerBound;
@@ -448,15 +457,12 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @inheritdoc IAlchemistV3Actions
     function redeem(uint256 amount) external onlyTransmuter() {
         _earmark();
-    
-        _redemptionWeight += amount * FIXED_POINT_SCALAR / cumulativeEarmarked;
-        
-        cumulativeEarmarked -= amount;
 
+        _redemptionWeight += amount * FIXED_POINT_SCALAR / cumulativeEarmarked;
+        cumulativeEarmarked -= amount;
         totalDebt -= amount;
 
         uint256 collateralToRedeem = convertDebtTokensToYield(amount);
-
         TokenUtils.safeTransfer(yieldToken, transmuter, collateralToRedeem);
 
         emit Redemption(amount);
@@ -654,6 +660,11 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         account.lastAccruedEarmarkWeight = _earmarkWeight;
         account.earmarked += debtToEarmark;
 
+        // Calculate how much of the users debt 
+        uint256 debtFee = account.debt * (_feeWeight - account.lastAccruedFeeWeight) / FIXED_POINT_SCALAR;
+        account.debt += debtFee;
+        account.lastAccruedFeeWeight = _feeWeight;
+
         // Calculate how much of user earmarked amount has been redeemed and subtract it
         uint256 earmarkToRedeem = account.earmarked * (_redemptionWeight - account.lastAccruedRedemptionWeight) / FIXED_POINT_SCALAR;
         account.debt -= earmarkToRedeem;
@@ -669,6 +680,11 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
             uint256 amount = ITransmuter(transmuter).queryGraph(lastEarmarkBlock + 1, block.number);
             cumulativeEarmarked += amount;
             _earmarkWeight += amount * FIXED_POINT_SCALAR / totalDebt;
+
+            uint256 debtForFee = (protocolFee * totalDebt / BPS) * (block.number - lastEarmarkBlock) / blocksPerYear;
+            totalDebt += debtForFee;
+            _feeWeight += debtForFee * FIXED_POINT_SCALAR / totalDebt;
+
             lastEarmarkBlock = block.number;
         }
     }
@@ -684,17 +700,22 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         uint256 amount;
         uint256 earmarkWeightCopy = _earmarkWeight;
+        uint256 feeWeightCopy = _feeWeight;
 
         if (block.number > lastEarmarkBlock) {
             amount = ITransmuter(transmuter).queryGraph(lastEarmarkBlock + 1, block.number);
             earmarkWeightCopy += (amount * FIXED_POINT_SCALAR / totalDebt);
+
+            uint256 debtForFee = (protocolFee * totalDebt / BPS) * (block.number - lastEarmarkBlock) / blocksPerYear;
+            feeWeightCopy += debtForFee * FIXED_POINT_SCALAR / totalDebt;
         }
 
         uint256 debtToEarmark = account.debt * (earmarkWeightCopy - account.lastAccruedEarmarkWeight) / FIXED_POINT_SCALAR;
         uint256 earmarkedCopy = account.earmarked + debtToEarmark;
         uint256 earmarkToRedeem = earmarkedCopy * (_redemptionWeight - account.lastAccruedRedemptionWeight) / FIXED_POINT_SCALAR;
+        uint256 debtFee = account.debt * (feeWeightCopy - account.lastAccruedFeeWeight) / FIXED_POINT_SCALAR;
 
-        return (account.debt - earmarkToRedeem, earmarkedCopy - earmarkToRedeem);
+        return (account.debt - earmarkToRedeem + debtFee, earmarkedCopy - earmarkToRedeem);
     }
 
     /// @dev Checks that the account owned by `owner` is properly collateralized.
