@@ -4,7 +4,7 @@ pragma solidity ^0.8.26;
 import "./interfaces/IAlchemistV3.sol";
 import "./interfaces/IERC20Minimal.sol";
 import "./interfaces/ITransmuter.sol";
-import "./interfaces/TransmuterErrors.sol";
+import "./base/TransmuterErrors.sol";
 
 import "./libraries/TokenUtils.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -92,7 +92,7 @@ contract Transmuter is ITransmuter, ERC1155 {
 
     /// @inheritdoc ITransmuter
     function addAlchemist(address alchemist) external onlyAdmin {
-        if(_alchemistEntries[alchemist].isActive == true) 
+        if (_alchemistEntries[alchemist].isActive == true) 
             revert AlchemistDuplicateEntry();
 
         alchemists.push(alchemist);
@@ -101,7 +101,7 @@ contract Transmuter is ITransmuter, ERC1155 {
 
     /// @inheritdoc ITransmuter
     function removeAlchemist(address alchemist) external onlyAdmin {
-        if(_alchemistEntries[alchemist].isActive == false) 
+        if (_alchemistEntries[alchemist].isActive == false) 
             revert NotRegisteredAlchemist();
 
         alchemists[_alchemistEntries[alchemist].index] = alchemists[alchemists.length-1];
@@ -165,17 +165,16 @@ contract Transmuter is ITransmuter, ERC1155 {
 
     /// @inheritdoc ITransmuter
     function createRedemption(address alchemist, address yieldToken, uint256 syntheticDepositAmount) external {
-        if(syntheticDepositAmount == 0)
+        if (syntheticDepositAmount == 0)
             revert DepositZeroAmount();
 
-        // TODO: add other caps
+        if ( syntheticDepositAmount > type(int256).max.toUint256())
+            revert DepositTooLarge();
 
-        // TODO cap deposit so that when it is converted to int it wont break
-
-        if(totalLocked + syntheticDepositAmount > depositCap)
+        if (totalLocked + syntheticDepositAmount > depositCap)
             revert DepositCapReached();
 
-        if(_alchemistEntries[alchemist].isActive == false)
+        if (_alchemistEntries[alchemist].isActive == false)
             revert NotRegisteredAlchemist();
 
         TokenUtils.safeTransferFrom(
@@ -185,15 +184,14 @@ contract Transmuter is ITransmuter, ERC1155 {
             syntheticDepositAmount
         );
 
-        // TODO: Add `data` param if we decide we need this. ERC1155
-        _mint(msg.sender, ++_nonce, syntheticDepositAmount, "");
-
-        _positions[msg.sender][_nonce] = StakingPosition(alchemist, yieldToken, syntheticDepositAmount, block.number + timeToTransmute);
+        _positions[msg.sender][++_nonce] = StakingPosition(alchemist, yieldToken, syntheticDepositAmount, block.number, block.number + timeToTransmute);
 
         // Update Fenwick Tree
         _updateStakingGraph(syntheticDepositAmount.toInt256() * BLOCK_SCALING_FACTOR / timeToTransmute.toInt256(), timeToTransmute);
 
         totalLocked += syntheticDepositAmount;
+
+        _mint(msg.sender, _nonce, syntheticDepositAmount, "");
         
         emit PositionCreated(msg.sender, alchemist, syntheticDepositAmount, _nonce);
     }
@@ -202,11 +200,10 @@ contract Transmuter is ITransmuter, ERC1155 {
     function claimRedemption(uint256 id) external {
         StakingPosition storage position = _positions[msg.sender][id];
 
-        if(position.positionMaturationBlock == 0)
+        if (position.maturationBlock == 0)
             revert PositionNotFound();
 
-        // TODO: Optimize this
-        uint256 blocksLeft = position.positionMaturationBlock > block.number ? position.positionMaturationBlock - block.number: 0;
+        uint256 blocksLeft = position.maturationBlock > block.number ? position.maturationBlock - block.number: 0;
         uint256 amountEarly = blocksLeft > 0 ? position.amount * blocksLeft / timeToTransmute : 0;
         uint256 amountMatured = position.amount - amountEarly;
 
@@ -215,7 +212,6 @@ contract Transmuter is ITransmuter, ERC1155 {
 
         // If the contract has a balance of yield tokens from alchemist repayments then we only need to redeem partial or none from Alchemist earmarked
         uint256 yieldTokenBalance = TokenUtils.safeBalanceOf(position.yieldToken, address(this));
-        // TODO: This will break if balance exceeds a certain amount due to overflow. Come up with limits to make sure that this will never fail.
         uint256 underlyingValue = IAlchemistV3(position.alchemist).convertYieldTokensToUnderlying(yieldTokenBalance);
         uint256 amountToRedeem = amountMatured > underlyingValue ? amountMatured - underlyingValue : 0;
 
@@ -227,7 +223,8 @@ contract Transmuter is ITransmuter, ERC1155 {
         uint256 syntheticFee = amountEarly * exitFee / BPS;
         uint256 syntheticReturned = amountEarly - syntheticFee;
 
-        if (amountEarly > 0) _updateStakingGraph(amountEarly.toInt256() / blocksLeft.toInt256(), blocksLeft);
+        uint256 transmutationTime = position.maturationBlock - position.startBlock;
+        if (amountEarly > 0) _updateStakingGraph(-position.amount.toInt256() * BLOCK_SCALING_FACTOR / transmutationTime.toInt256(), blocksLeft);
 
         TokenUtils.safeTransfer(
             position.yieldToken,
@@ -249,29 +246,30 @@ contract Transmuter is ITransmuter, ERC1155 {
 
         totalLocked -= position.amount;
 
-        // TODO: update this with more values for matured vs non matured
-        emit PositionClaimed(msg.sender, position.alchemist, position.amount);
+        emit PositionClaimed(msg.sender, position.alchemist, claimAmount, syntheticReturned);
 
         delete _positions[msg.sender][id];
     }
 
     /// @inheritdoc ITransmuter
     function queryGraph(uint256 startBlock, uint256 endBlock) external view returns (uint256) {
-        int256 queried = (endBlock.toInt256() * _graph1.query(endBlock) - _graph2.query(endBlock)) - ((startBlock - 1).toInt256() * _graph1.query(startBlock - 1) - _graph2.query(startBlock - 1));
+        int256 queried = ((endBlock.toInt256() * _graph1.query(endBlock)) - _graph2.query(endBlock)) - (((startBlock - 1).toInt256() * _graph1.query(startBlock - 1)) - _graph2.query(startBlock - 1));
 
-        return (queried / BLOCK_SCALING_FACTOR).toUint256();
+        // + 1 for rounding error
+        return (queried / BLOCK_SCALING_FACTOR).toUint256() + 1;
     }
 
     /// @dev Updates staking graphs 
     function _updateStakingGraph(int256 amount, uint256 blocks) private {
         //TODO: Optimize this to reduce amount of reads and writes. Currently gas heavy.
-        uint256 currentBlock = block.number; 
-        uint256 expirationBlock = currentBlock + blocks;
+        // Start at block number + 1 in order to correctly log when funds are needed
+        uint256 startBlock = block.number + 1;
+        uint256 expirationBlock = block.number + blocks;
 
-        _graph1.update(currentBlock, graphSize, amount);
+        _graph1.update(startBlock, graphSize, amount);
         _graph1.update(expirationBlock + 1, graphSize, -amount);
 
-        _graph2.update(currentBlock, graphSize, amount * (currentBlock - 1).toInt256());
+        _graph2.update(startBlock, graphSize, amount * (startBlock - 1).toInt256());
         _graph2.update(expirationBlock + 1, graphSize, -amount * expirationBlock.toInt256());
     }
 

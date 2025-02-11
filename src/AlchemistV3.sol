@@ -12,8 +12,6 @@ import {Initializable} from "../lib/openzeppelin-contracts-upgradeable/contracts
 
 import {Unauthorized, IllegalArgument, IllegalState, MissingInputData} from "./base/Errors.sol";
 
-// TODO: Add vault caps
-
 /// @title  AlchemistV3
 /// @author Alchemix Finance
 contract AlchemistV3 is IAlchemistV3, Initializable {
@@ -395,14 +393,14 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         uint256 yieldToDebt = convertYieldTokensToDebt(amount);
         uint256 credit = yieldToDebt > debt ? debt : yieldToDebt;
         uint256 creditToYield = convertDebtTokensToYield(credit);
+
+        // Transfer the repaid tokens to the transmuter.
+        TokenUtils.safeTransferFrom(yieldToken, msg.sender, transmuter, creditToYield);
         
         _subDebt(recipient, credit);
 
         // Repay debt from earmarked amount of debt first
         account.earmarked -= credit > account.earmarked ? account.earmarked : credit;
-
-        // Transfer the repaid tokens to the transmuter.
-        TokenUtils.safeTransferFrom(yieldToken, msg.sender, transmuter, creditToYield);
 
         emit Repay(msg.sender, amount, recipient, creditToYield);
 
@@ -452,7 +450,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         _earmark();
     
         _redemptionWeight += amount * FIXED_POINT_SCALAR / cumulativeEarmarked;
+        
         cumulativeEarmarked -= amount;
+
         totalDebt -= amount;
 
         uint256 collateralToRedeem = convertDebtTokensToYield(amount);
@@ -464,6 +464,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     /// @inheritdoc IAlchemistV3Actions
     function poke(address owner) external {
+        _earmark();
+
         _sync(owner);
     }
 
@@ -681,18 +683,18 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         Account storage account = _accounts[owner];
 
         uint256 amount;
-        uint256 earmarkWeightCopy;
+        uint256 earmarkWeightCopy = _earmarkWeight;
 
         if (block.number > lastEarmarkBlock) {
             amount = ITransmuter(transmuter).queryGraph(lastEarmarkBlock + 1, block.number);
-            earmarkWeightCopy = _earmarkWeight + (amount * FIXED_POINT_SCALAR / totalDebt);
+            earmarkWeightCopy += (amount * FIXED_POINT_SCALAR / totalDebt);
         }
 
         uint256 debtToEarmark = account.debt * (earmarkWeightCopy - account.lastAccruedEarmarkWeight) / FIXED_POINT_SCALAR;
         uint256 earmarkedCopy = account.earmarked + debtToEarmark;
         uint256 earmarkToRedeem = earmarkedCopy * (_redemptionWeight - account.lastAccruedRedemptionWeight) / FIXED_POINT_SCALAR;
 
-        return (account.debt - earmarkToRedeem, earmarkedCopy);
+        return (account.debt - earmarkToRedeem, earmarkedCopy - earmarkToRedeem);
     }
 
     /// @dev Checks that the account owned by `owner` is properly collateralized.

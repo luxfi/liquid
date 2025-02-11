@@ -12,3 +12,5 @@ error DepositZeroAmount();
 error PositionNotFound();
 
 error PrematureClaim();
+
+error DepositTooLarge();

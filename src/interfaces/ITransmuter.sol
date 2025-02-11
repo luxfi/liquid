@@ -22,8 +22,11 @@ interface ITransmuter {
         // Amount staked.
         uint256 amount;
 
+        // Block when the position was opened
+        uint256 startBlock;
+
         // Time when the transmutation will be complete/claimable.
-        uint256 positionMaturationBlock;
+        uint256 maturationBlock;
     }
 
     struct InitializationParams {
@@ -200,10 +203,12 @@ interface ITransmuter {
     /// @param claimer          The address that claimed the position.
     /// @param alchemist        The address of the alchemist which tokens were claimed from.
     /// @param amountClaimed    The amount of tokens claimed.
+    /// @param amountUnclaimed  The amount of tokens that were not transmuted.
     event PositionClaimed(
         address indexed claimer,
         address indexed alchemist,
-        uint256 amountClaimed
+        uint256 amountClaimed,
+        uint256 amountUnclaimed
     );
 
     /// @dev Emitted when the graph size is extended.
