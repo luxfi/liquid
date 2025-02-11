@@ -10,7 +10,9 @@ import {Transmuter} from "../Transmuter.sol";
 
 import "../interfaces/ITransmuter.sol";
 
-import "../interfaces/TransmuterErrors.sol";
+import "../base/TransmuterErrors.sol";
+
+import {console} from "../../lib/forge-std/src/console.sol";
 
 contract MockAlchemist {
     AlEth collateral;
@@ -132,6 +134,13 @@ contract TransmuterTest is Test {
 
         assertEq(positions[0].amount, 100e18);
         assertEq(transmuter.totalLocked(), 100e18);
+    }
+
+    function testCreateRedemptionTooLarge() public {
+        vm.startPrank(address(0xbeef));
+        vm.expectRevert(DepositTooLarge.selector);
+        transmuter.createRedemption(address(alchemist), address(collateralToken), uint256(type(int256).max) + 1);
+        vm.stopPrank();
     }
 
     function testFuzzCreateRedemption(uint256 amount) public {
@@ -284,6 +293,9 @@ contract TransmuterTest is Test {
         vm.prank(address(0xbeef));
         transmuter.createRedemption(address(alchemist), address(collateralToken), 100e18);
 
+        uint256 query = transmuter.queryGraph(block.number + 1, block.number + 5256000);
+        assertEq(query, 100e18);
+
         vm.roll(block.number + (5256000 / 2));
 
         vm.prank(address(0xbeef));
@@ -294,6 +306,11 @@ contract TransmuterTest is Test {
         assertEq(collateralToken.balanceOf(address(0xbeef)), alchemist.convertUnderlyingTokensToYield(50e18));
         assertEq(balanceBefore - balanceAfter, 50e18);
         assertEq(alETH.balanceOf(address(transmuter)), 0);
+
+        // Make sure remaining graph is cleared
+        query = transmuter.queryGraph(block.number + 1, block.number + (5256000 / 2));
+
+        assertApproxEqAbs(query, 0, 1);
     }
 
     function testFuzzClaimRedemptionPremature(uint256 time) public {
@@ -315,6 +332,11 @@ contract TransmuterTest is Test {
         assertApproxEqAbs(collateralToken.balanceOf(address(0xbeef)), alchemist.convertUnderlyingTokensToYield((100e18 * time) / 5256000), 1);
         assertApproxEqAbs(balanceBefore - balanceAfter, (100e18 * time) / 5256000, 1);
         assertEq(alETH.balanceOf(address(transmuter)), 0);
+
+        // Make sure remaining graph is cleared
+        uint256 query = transmuter.queryGraph(block.number + 1, block.number + (5256000 - time));
+
+        assertApproxEqAbs(query, 0, 1);
     }
 
     function testClaimRedemptionPrematureWithFee() public {
@@ -345,8 +367,19 @@ contract TransmuterTest is Test {
 
         vm.roll(block.number + 5256000);
 
-        uint256 treeQuery = transmuter.queryGraph(block.number - 5256000, block.number);
+        uint256 treeQuery = transmuter.queryGraph(block.number - 5256000 + 1, block.number);
 
-        // assertApproxEq(treeQuery, 100e18, 1);
+        assertApproxEqAbs(treeQuery, 100e18, 1);
     }
-} // TODO: More fenwick tree tests
+
+    function testQueryGraphPartial() external {
+        vm.prank(address(0xbeef));
+        transmuter.createRedemption(address(alchemist), address(collateralToken), 100e18);
+
+        vm.roll(block.number + (5256000 / 2));
+
+        uint256 treeQuery = transmuter.queryGraph(block.number - (5256000/2) + 1, block.number);
+
+        assertApproxEqAbs(treeQuery, 50e18, 1);
+    }
+}
