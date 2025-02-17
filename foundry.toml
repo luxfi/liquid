@@ -11,7 +11,22 @@ bytecode_hash="ipfs"
 rpc_storage_caching = { chains = "all", endpoints = "remote" }
 fuzz_runs = 5
 
+[profile.test]
+src = "src"
+out = "out"
+libs = ["lib"]
+optimizer = true
+optimizer_runs = 999999
+via_ir = false
+evm_version = "cancun"
+solc = "0.8.26"
+verbosity = 2
+ffi = true
 
+[profile.default.invariant]
+runs = 16
+depth = 256
+fail_on_revert = true
 
 [profile.default]
 src = "src"

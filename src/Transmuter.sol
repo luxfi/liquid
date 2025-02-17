@@ -173,6 +173,9 @@ contract Transmuter is ITransmuter, ERC1155 {
 
         if (totalLocked + syntheticDepositAmount > depositCap)
             revert DepositCapReached();
+        
+        // if (totalLocked + syntheticDepositAmount > IAlchemistV3(alchemist).totalDebt())
+        //     revert DepositCapReached();
 
         if (_alchemistEntries[alchemist].isActive == false)
             revert NotRegisteredAlchemist();
@@ -204,45 +207,45 @@ contract Transmuter is ITransmuter, ERC1155 {
             revert PositionNotFound();
 
         uint256 blocksLeft = position.maturationBlock > block.number ? position.maturationBlock - block.number: 0;
-        uint256 amountEarly = blocksLeft > 0 ? position.amount * blocksLeft / timeToTransmute : 0;
-        uint256 amountMatured = position.amount - amountEarly;
+        uint256 amountNottransmuted = blocksLeft > 0 ? position.amount * blocksLeft / timeToTransmute : 0;
+        uint256 amountTransmuted = position.amount - amountNottransmuted;
 
         // Burn position NFT
         _burn(msg.sender, id, position.amount);
 
         // If the contract has a balance of yield tokens from alchemist repayments then we only need to redeem partial or none from Alchemist earmarked
         uint256 yieldTokenBalance = TokenUtils.safeBalanceOf(position.yieldToken, address(this));
-        uint256 underlyingValue = IAlchemistV3(position.alchemist).convertYieldTokensToUnderlying(yieldTokenBalance);
-        uint256 amountToRedeem = amountMatured > underlyingValue ? amountMatured - underlyingValue : 0;
-
+        uint256 debtValue = IAlchemistV3(position.alchemist).convertYieldTokensToDebt(yieldTokenBalance);
+        uint256 amountToRedeem = amountTransmuted > debtValue ? amountTransmuted - debtValue : 0;
         if (amountToRedeem > 0) IAlchemistV3(position.alchemist).redeem(amountToRedeem);
 
-        uint256 feeAmount = amountMatured * transmutationFee / BPS;
-        uint256 claimAmount = amountMatured - feeAmount;
+        uint256 feeAmount = amountTransmuted * transmutationFee / BPS;
+        uint256 claimAmount = amountTransmuted - feeAmount;
 
-        uint256 syntheticFee = amountEarly * exitFee / BPS;
-        uint256 syntheticReturned = amountEarly - syntheticFee;
+        uint256 syntheticFee = amountNottransmuted * exitFee / BPS;
+        uint256 syntheticReturned = amountNottransmuted - syntheticFee;
 
+        // Remove untransmuted amount from the staking graph
         uint256 transmutationTime = position.maturationBlock - position.startBlock;
-        if (amountEarly > 0) _updateStakingGraph(-position.amount.toInt256() * BLOCK_SCALING_FACTOR / transmutationTime.toInt256(), blocksLeft);
+        if (amountNottransmuted > 0) _updateStakingGraph(-position.amount.toInt256() * BLOCK_SCALING_FACTOR / transmutationTime.toInt256(), blocksLeft);
 
         TokenUtils.safeTransfer(
             position.yieldToken,
             msg.sender,
-            IAlchemistV3(position.alchemist).convertUnderlyingTokensToYield(claimAmount)
+            IAlchemistV3(position.alchemist).convertDebtTokensToYield(claimAmount)
         );
 
         TokenUtils.safeTransfer(
             position.yieldToken,
             protocolFeeReceiver,
-            IAlchemistV3(position.alchemist).convertUnderlyingTokensToYield(feeAmount)
+            IAlchemistV3(position.alchemist).convertDebtTokensToYield(feeAmount)
         );
 
         TokenUtils.safeTransfer(syntheticToken, msg.sender, syntheticReturned);
         TokenUtils.safeTransfer(syntheticToken, protocolFeeReceiver, syntheticFee);
 
         // Burn remaining synths that were not returned
-        TokenUtils.safeBurn(syntheticToken, position.amount - amountEarly);
+        TokenUtils.safeBurn(syntheticToken, amountTransmuted);
 
         totalLocked -= position.amount;
 
@@ -255,6 +258,7 @@ contract Transmuter is ITransmuter, ERC1155 {
     function queryGraph(uint256 startBlock, uint256 endBlock) external view returns (uint256) {
         int256 queried = ((endBlock.toInt256() * _graph1.query(endBlock)) - _graph2.query(endBlock)) - (((startBlock - 1).toInt256() * _graph1.query(startBlock - 1)) - _graph2.query(startBlock - 1));
 
+        if (queried == 0) return 0;
         // + 1 for rounding error
         return (queried / BLOCK_SCALING_FACTOR).toUint256() + 1;
     }
