@@ -149,10 +149,12 @@ contract AlchemistV3Test is Test {
             debtToken: address(alToken),
             underlyingToken: address(fakeUnderlyingToken),
             yieldToken: address(fakeYieldToken),
+            depositCap: type(uint256).max,
             blocksPerYear:  2600000,
             minimumCollateralization: minimumCollateralization,
             collateralizationLowerBound: 1_052_631_578_950_000_000, // 1.05 collateralization
             globalMinimumCollateralization: 1_111_111_111_111_111_111, // 1.1
+            tokenAdapter: address(fakeYieldToken),
             transmuter: address(transmuterLogic),
             protocolFee: 0,
             protocolFeeReceiver: address(10),
@@ -520,6 +522,16 @@ contract AlchemistV3Test is Test {
         alchemist.mint(amount / 2, address(0xbeef));
         vm.expectRevert();
         alchemist.withdraw(amount, address(0xbeef));
+        vm.stopPrank();
+    }
+
+    function testWithdrawMoreThanPosition() external {
+        uint256 amount = 100e18;
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
+        alchemist.deposit(amount, address(0xbeef));
+        vm.expectRevert();
+        alchemist.withdraw(amount * 2, address(0xbeef));
         vm.stopPrank();
     }
 

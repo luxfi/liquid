@@ -11,6 +11,8 @@ struct InitializationParams {
     address underlyingToken;
     // The address(es) of the yield token(s) being deposited.
     address yieldToken;
+    // The global maximum amount of deposited collateral.
+    uint256 depositCap;
     // Chain specific number of blocks within 1 year.
     uint256 blocksPerYear;
     // The minimum collateralization between 0 and 1 exclusive
@@ -19,6 +21,8 @@ struct InitializationParams {
     uint256 globalMinimumCollateralization;
     // The minimum collateralization for liquidation eligibility. between 1 and minimumCollateralization inclusive.
     uint256 collateralizationLowerBound;
+    // Token adapter used to get price for yiel tokens.
+    address tokenAdapter;
     // The initial transmuter or transmuter buffer.
     address transmuter;
     // TODO Need to discuss how fees will be accumulated since harvests will no longer be done.
@@ -52,6 +56,14 @@ struct Account {
 
     /// @notice allowances for minting alAssets
     mapping(address => uint256) mintAllowances;
+}
+
+/// @notice Information associated with a redemption.
+/// @notice This redemption struct is included in the main contract, AlchemistV3.sol, to aid in calculating user debt from historic redemptions. 
+struct RedemptionInfo {
+    uint256 currentEarmarked;
+    uint256 currentDebt;
+    uint256 redemptionAmount;
 }
 
 interface IAlchemistV3Actions {
@@ -286,6 +298,24 @@ interface IAlchemistV3AdminActions {
     /// @notice Emits a {PendingAdminUpdated} event.
     function acceptAdmin() external;
 
+    /// @notice Set a new alchemist deposit cap.
+    ///
+    /// @notice `msg.sender` must be the admin or this call will revert with an {Unauthorized} error.
+    ///
+    /// @notice Emits a {DepositCapUpdated} event.
+    ///
+    /// @param value The value of the new deposit cap.
+    function setDepositCap(uint256 value) external;
+
+    /// @notice Sets the token adapter for the yield token.
+    ///
+    /// @notice `msg.sender` must be the admin or this call will will revert with an {Unauthorized} error.
+    ///
+    /// @notice Emits a {TokenAdapterSet} event.
+    ///
+    /// @param value The address of token adapter.
+    function setTokenAdapter(address value) external;
+
     /// @notice Set the minimum collateralization ratio.
     ///
     /// @notice `msg.sender` must be the admin or this call will revert with an {Unauthorized} error.
@@ -379,11 +409,21 @@ interface IAlchemistV3Events {
     /// @param admin The address of the administrator.
     event AdminUpdated(address admin);
 
+    /// @notice Emitted when the deposit cap is updated.
+    ///
+    /// @param value The value of the new deposit cap.
+    event DepositCapUpdated(uint256 value);
+
     /// @notice Emitted when a gaurdian is added or removed from the alchemist.
     ///
     /// @param gaurdian The addres of the new gaurdian.
     /// @param state    The active state of the gaurdian.
     event GaurdianSet(address gaurdian, bool state);
+
+    /// @notice Emitted when a new token adapter is set in the alchemist.
+    ///
+    /// @param adapter The addres of the new adapter.
+    event TokenAdapterUpdated(address adapter);
 
     /// @notice Emitted when the transmuter is updated.
     ///
@@ -524,6 +564,8 @@ interface IAlchemistV3State {
     /// @return admin The admin address.
     function admin() external view returns (address admin);
 
+    function depositCap() external view returns (uint256 cap);
+
     function gaurdians(address gaurdian) external view returns (bool isActive);
 
     function blocksPerYear() external view returns (uint256 blocks);
@@ -540,7 +582,7 @@ interface IAlchemistV3State {
 
     function underlyingDecimals() external view returns (uint8 decimals);
 
-    function underlyingConversionFactor() external view returns (uint8 factor);
+    function underlyingConversionFactor() external view returns (uint256 factor);
 
     function protocolFeeReceiver() external view returns (address receiver);
 
@@ -556,6 +598,12 @@ interface IAlchemistV3State {
     ///
     /// @return pendingAdmin The pending administrator address.
     function pendingAdmin() external view returns (address pendingAdmin);
+
+   
+    /// @notice Gets the address of the current yield token adapter.
+    ///
+    /// @return adapter The token adapter address. 
+    function tokenAdapter() external returns (address adapter);
 
     /// @notice Gets the address of the transmuter.
     ///
@@ -630,15 +678,6 @@ interface IAlchemistV3State {
     ///
     /// @return value   Underlying value of the account.
     function totalValue(address owner) external view returns (uint256 value);
-
-    // /// @dev Gets total value of `owner` in units of underlying tokens.
-    // ///
-    // /// @param user     Owner of the account to query.
-    // ///
-    // /// @return LTV   Current loan to value.
-    // /// @return liquidationRatio   Current loan to value.
-    // /// @return redemptionFee   Current loan to value.
-    // function getLoanTerms(address user) external view returns (uint256 LTV, uint256 liquidationRatio, uint256 redemptionFee);
 
     /// @dev Gets total value deposited in the alchemist
     ///
