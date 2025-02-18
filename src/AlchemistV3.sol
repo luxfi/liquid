@@ -396,6 +396,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         _checkForValidAccountId(tokenId);
         _checkArgument(recipient != address(0));
         _checkState(loansPaused == false);
+        _checkArgument(tokenId > 0);
 
         // Preemptively try and decrease the minting allowance. This will save gas when the allowance is not sufficient.
         _decreaseMintAllowance(tokenId, msg.sender, amount);
