@@ -1133,8 +1133,7 @@ contract AlchemistV3Test is Test {
         assertEq(fakeYieldToken.balanceOf(address(0xbeef)), preRepayBalance - repaidAmount);
     }
 
-    ///////////////////
-    /*function testRepayWithEarmarkedDebt() external {
+    function testRepayWithEarmarkedDebt() external {
         uint256 amount = 100e18;
         vm.startPrank(address(0xbeef));
         SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
@@ -1190,8 +1189,7 @@ contract AlchemistV3Test is Test {
         // Half of all debt was earmarked which is 25
         // Repay of 25 will pay off all earmarked debt
         assertEq(earmarked, 0);
-    }*/
-    ///////////////////
+    }
 
     function testRepayZeroAmount() external {
         uint256 amount = 100e18;
@@ -1342,8 +1340,7 @@ contract AlchemistV3Test is Test {
         vm.stopPrank();
     }
 
-    ///
-    /*function testBurnWithEarmarkedDebt() external {
+    function testBurnWithEarmarkedDebt() external {
         uint256 amount = 100e18;
 
         vm.startPrank(address(0xbeef));
@@ -1373,8 +1370,7 @@ contract AlchemistV3Test is Test {
 
         // Burn doesn't repay earmarked debt.
         assertEq(earmarked, (amount / 4));
-    }*/
-    //////
+    }
 
     function testLiquidate_Revert_If_Invalid_Token_Id(uint256 amount, uint256 tokenId) external {
         vm.assume(tokenId > 1);
