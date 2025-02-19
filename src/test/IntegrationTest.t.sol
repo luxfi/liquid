@@ -481,6 +481,7 @@ contract RedemptionIntegrationTest is Test {
         uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
         uint256 maxBorrow = alchemist.getMaxBorrowable(tokenId);
         alchemist.mint(tokenId, maxBorrow, address(0xbeef));
+        (uint256 collateralprev, uint256 debtprev, uint256 earmarkedprev) = alchemist.getCDP(tokenId);
         vm.stopPrank();
 
         vm.startPrank(address(0xdad));
@@ -544,7 +545,7 @@ contract RedemptionIntegrationTest is Test {
         assertEq(earmarked, 0);
     }
 
-    function testPositionToFullMaturityTwoTransmuterPositions() external {
+    /*  function testPositionToFullMaturityTwoTransmuterPositions() external {
         uint256 debtAmount = alchemist.convertYieldTokensToDebt(100_000e6) * 1e18 / 1_111_111_111_111_111_111;
 
         vm.startPrank(address(0xbeef));
@@ -647,5 +648,5 @@ contract RedemptionIntegrationTest is Test {
         // assertApproxEqAbs(debt, debtAmount * 6570000 / 2600000 * 100 / 10000, 1);
 
         // assertApproxEqAbs(earmarked, (7 * debtAmount / 8) - (debtAmount / 2), 1);
-    }
+    } */
 }

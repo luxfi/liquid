@@ -415,7 +415,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         _checkArgument(amount > 0);
         _checkForValidAccountId(recipientId);
         _checkArgument(alchemistPositionNFT != address(0));
-
         // Query transmuter and earmark global debt
         _earmark();
 
@@ -534,7 +533,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     /// @inheritdoc IAlchemistV3Actions
     function poke(uint256 tokenId) external {
-        _checkArgument(tokenId > 0);
+        _checkForValidAccountId(tokenId);
         _earmark();
         _sync(tokenId);
     }
@@ -765,7 +764,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         account.earmarked += debtToEarmark;
 
         // Calculate how much of the users debt
-        uint256 debtFee = account.debt * (_feeWeight - account.lastAccruedFeeWeight) / FIXED_POINT_SCALAR;
+        uint256 debtFee = account.debt * (_feeWeight - account.lastAccruedFeeWeight) / WEIGHT_SCALING_FACTOR;
         account.debt += debtFee;
         account.lastAccruedFeeWeight = _feeWeight;
 
@@ -825,7 +824,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         uint256 earmarkedCopy = account.earmarked + debtToEarmark;
         uint256 debtFee = account.debt * (feeWeightCopy - account.lastAccruedFeeWeight) / WEIGHT_SCALING_FACTOR;
         uint256 earmarkToRedeem = earmarkedCopy * (_redemptionWeight - account.lastAccruedRedemptionWeight) / WEIGHT_SCALING_FACTOR;
-
         return
             (account.debt - earmarkToRedeem + debtFee, earmarkedCopy - earmarkToRedeem, account.collateralBalance - convertDebtTokensToYield(earmarkToRedeem));
     }
