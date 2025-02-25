@@ -12,7 +12,8 @@ contract FullSystemInvariantsTest is InvariantBaseTest {
         selectors.push(this.repayDebt.selector);
         selectors.push(this.repayDebtViaBurn.selector);
         selectors.push(this.transmuterStake.selector);
-        // selectors.push(this.transmuterClaim.selector);
+        selectors.push(this.transmuterClaim.selector);
+
         selectors.push(this.mine.selector);
 
         super.setUp();

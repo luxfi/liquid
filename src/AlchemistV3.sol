@@ -12,6 +12,8 @@ import {Initializable} from "../lib/openzeppelin-contracts-upgradeable/contracts
 
 import {Unauthorized, IllegalArgument, IllegalState, MissingInputData} from "./base/Errors.sol";
 
+import {console} from "../../lib/forge-std/src/console.sol";
+
 /// @title  AlchemistV3
 /// @author Alchemix Finance
 contract AlchemistV3 is IAlchemistV3, Initializable {
@@ -51,6 +53,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @inheritdoc IAlchemistV3State
     uint256 public lastEarmarkBlock;
 
+    /// @inheritdoc IAlchemistV3State
     uint256 public lastRedemptionBlock;
 
     /// @inheritdoc IAlchemistV3State
@@ -498,6 +501,13 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         lastRedemptionBlock = block.number;
 
+        _redemptions[block.number] = RedemptionInfo(
+                cumulativeEarmarked,
+                totalDebt,
+                _earmarkWeight,
+                _feeWeight
+            );
+
         uint256 collateralToRedeem = convertDebtTokensToYield(amount);
         TokenUtils.safeTransfer(yieldToken, transmuter, collateralToRedeem);
 
@@ -690,19 +700,32 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @dev Update the user's earmarked and redeemed debt amounts.
     function _sync(address owner) internal {
         Account storage account = _accounts[owner];
+        RedemptionInfo memory previousRedemption = _redemptions[lastRedemptionBlock];
 
-        // Earmark User Debt
-        uint256 debtToEarmark = account.debt * (_earmarkWeight - account.lastAccruedEarmarkWeight) / WEIGHT_SCALING_FACTOR;
+        // Calculate fee and debt to earmark
+        uint256 debtFee = account.debt * (_feeWeight - account.lastAccruedFeeWeight) / WEIGHT_SCALING_FACTOR;
+        uint256 debtToEarmark = (account.debt + debtFee) * (_earmarkWeight - account.lastAccruedEarmarkWeight) / WEIGHT_SCALING_FACTOR;
+
         account.lastAccruedEarmarkWeight = _earmarkWeight;
         account.earmarked += debtToEarmark;
 
-        // Calculate how much of the users debt 
-        uint256 debtFee = account.debt * (_feeWeight - account.lastAccruedFeeWeight) / WEIGHT_SCALING_FACTOR;
         account.debt += debtFee;
         account.lastAccruedFeeWeight = _feeWeight;
 
-        // Calculate how much of user earmarked amount has been redeemed and subtract it
         uint256 earmarkToRedeem = account.earmarked * (_redemptionWeight - account.lastAccruedRedemptionWeight) / WEIGHT_SCALING_FACTOR;
+
+        uint256 earmarkedCopyCopy;
+        if (block.number > lastRedemptionBlock && _redemptionWeight != 0) {
+            if (previousRedemption.debt != 0) {
+                uint256 oldDebtFee = account.debt * (previousRedemption.feeWeight - account.lastAccruedFeeWeight) / WEIGHT_SCALING_FACTOR;
+                uint256 debtToEarmarkCopy = (account.debt + oldDebtFee) * (previousRedemption.earmarkWeight - account.lastAccruedEarmarkWeight) / WEIGHT_SCALING_FACTOR;
+                earmarkedCopyCopy = account.earmarked + debtToEarmarkCopy;
+            }
+            
+            earmarkToRedeem = earmarkedCopyCopy * (_redemptionWeight - account.lastAccruedRedemptionWeight) / WEIGHT_SCALING_FACTOR;   
+        }
+
+        // Calculate how much of user earmarked amount has been redeemed and subtract it
         account.debt -= earmarkToRedeem;
         account.earmarked -= earmarkToRedeem;
         account.lastAccruedRedemptionWeight = _redemptionWeight;
@@ -717,13 +740,12 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         if (block.number > lastEarmarkBlock) {
             uint256 amount = ITransmuter(transmuter).queryGraph(lastEarmarkBlock + 1, block.number);
             cumulativeEarmarked += amount;
-
+            
             uint256 debtForFee = (protocolFee * totalDebt / BPS) * (block.number - lastEarmarkBlock) / blocksPerYear;
+            _feeWeight += debtForFee * WEIGHT_SCALING_FACTOR / totalDebt;
+            totalDebt += debtForFee;
 
             _earmarkWeight += amount * WEIGHT_SCALING_FACTOR / totalDebt;
-            _feeWeight += debtForFee * WEIGHT_SCALING_FACTOR / totalDebt;
-
-            totalDebt += debtForFee;
 
             lastEarmarkBlock = block.number;
         }
@@ -738,6 +760,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @return The amount of collateral that has yet to be redeemed.
     function _calculateUnrealizedDebt(address owner) internal view returns (uint256, uint256, uint256) {
         Account storage account = _accounts[owner];
+        RedemptionInfo memory previousRedemption = _redemptions[lastRedemptionBlock];
 
         uint256 amount;
         uint256 earmarkWeightCopy = _earmarkWeight;
@@ -746,17 +769,29 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         if (block.number > lastEarmarkBlock) {
             amount = ITransmuter(transmuter).queryGraph(lastEarmarkBlock + 1, block.number);
             if (totalDebt != 0) {
-                earmarkWeightCopy += amount * WEIGHT_SCALING_FACTOR / totalDebt;
-
                 uint256 debtForFee = (protocolFee * totalDebt / BPS) * (block.number - lastEarmarkBlock) / blocksPerYear;
-                feeWeightCopy += debtForFee * WEIGHT_SCALING_FACTOR / totalDebt;
+                feeWeightCopy += debtForFee * WEIGHT_SCALING_FACTOR / (totalDebt);
+                earmarkWeightCopy += amount * WEIGHT_SCALING_FACTOR / (totalDebt + debtForFee);
             }
         }
-        
-        uint256 debtToEarmark = account.debt * (earmarkWeightCopy - account.lastAccruedEarmarkWeight) / WEIGHT_SCALING_FACTOR;
-        uint256 earmarkedCopy = account.earmarked + debtToEarmark;
+
         uint256 debtFee = account.debt * (feeWeightCopy - account.lastAccruedFeeWeight) / WEIGHT_SCALING_FACTOR;
-        uint256 earmarkToRedeem = earmarkedCopy * (_redemptionWeight - account.lastAccruedRedemptionWeight) / WEIGHT_SCALING_FACTOR;   
+        uint256 debtToEarmark = (account.debt + debtFee) * (earmarkWeightCopy - account.lastAccruedEarmarkWeight) / WEIGHT_SCALING_FACTOR;
+        uint256 earmarkedCopy = account.earmarked + debtToEarmark;
+        uint256 earmarkToRedeem = earmarkedCopy * (_redemptionWeight - account.lastAccruedRedemptionWeight) / WEIGHT_SCALING_FACTOR;
+
+        // Recreate account state at last redemption block
+        uint256 earmarkedCopyCopy;
+        if (block.number > lastRedemptionBlock && _redemptionWeight != 0) {
+            if (previousRedemption.debt != 0) {
+                uint256 oldDebtFee = account.debt * (previousRedemption.feeWeight - account.lastAccruedFeeWeight) / WEIGHT_SCALING_FACTOR;
+                uint256 debtToEarmarkCopy = (account.debt + oldDebtFee) * (previousRedemption.earmarkWeight - account.lastAccruedEarmarkWeight) / WEIGHT_SCALING_FACTOR;
+                earmarkedCopyCopy = account.earmarked + debtToEarmarkCopy;
+            }
+            
+            earmarkToRedeem = earmarkedCopyCopy * (_redemptionWeight - account.lastAccruedRedemptionWeight) / WEIGHT_SCALING_FACTOR;   
+        }
+
 
         return (account.debt - earmarkToRedeem + debtFee, earmarkedCopy - earmarkToRedeem, account.collateralBalance - convertDebtTokensToYield(earmarkToRedeem));
     }
@@ -773,6 +808,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         if (collateralization < minimumCollateralization) {
             return true;
         }
+
         return false;
     }
 

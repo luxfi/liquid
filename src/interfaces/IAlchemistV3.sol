@@ -61,9 +61,10 @@ struct Account {
 /// @notice Information associated with a redemption.
 /// @notice This redemption struct is included in the main contract, AlchemistV3.sol, to aid in calculating user debt from historic redemptions. 
 struct RedemptionInfo {
-    uint256 currentEarmarked;
-    uint256 currentDebt;
-    uint256 redemptionAmount;
+    uint256 earmarked;
+    uint256 debt;
+    uint256 earmarkWeight;
+    uint256 feeWeight;
 }
 
 interface IAlchemistV3Actions {
@@ -574,6 +575,8 @@ interface IAlchemistV3State {
 
     function lastEarmarkBlock() external view returns (uint256 block);
     
+    function lastRedemptionBlock() external view returns (uint256 block);
+
     function totalDebt() external view returns (uint256 debt);
 
     function protocolFee() external view returns (uint256 fee);
