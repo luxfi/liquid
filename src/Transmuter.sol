@@ -14,6 +14,9 @@ import {StakingGraph} from "./libraries/StakingGraph.sol";
 
 import {Unauthorized, IllegalArgument, IllegalState, InsufficientAllowance} from "./base/Errors.sol";
 
+import {console} from "../../lib/forge-std/src/console.sol";
+
+
 /// @title AlchemixV3 Transmuter
 ///
 /// @notice A contract which facilitates the exchange of alAssets to yield bearing assets.
@@ -173,12 +176,12 @@ contract Transmuter is ITransmuter, ERC1155 {
 
         if (totalLocked + syntheticDepositAmount > depositCap)
             revert DepositCapReached();
-        
-        // if (totalLocked + syntheticDepositAmount > IAlchemistV3(alchemist).totalDebt())
-        //     revert DepositCapReached();
 
         if (_alchemistEntries[alchemist].isActive == false)
             revert NotRegisteredAlchemist();
+
+        if (totalLocked + syntheticDepositAmount > IAlchemistV3(alchemist).totalDebt())
+            revert DepositCapReached();
 
         TokenUtils.safeTransferFrom(
             syntheticToken,
@@ -191,7 +194,6 @@ contract Transmuter is ITransmuter, ERC1155 {
 
         // Update Fenwick Tree
         _updateStakingGraph(syntheticDepositAmount.toInt256() * BLOCK_SCALING_FACTOR / timeToTransmute.toInt256(), timeToTransmute);
-
         totalLocked += syntheticDepositAmount;
 
         _mint(msg.sender, _nonce, syntheticDepositAmount, "");
@@ -265,7 +267,6 @@ contract Transmuter is ITransmuter, ERC1155 {
 
     /// @dev Updates staking graphs 
     function _updateStakingGraph(int256 amount, uint256 blocks) private {
-        //TODO: Optimize this to reduce amount of reads and writes. Currently gas heavy.
         // Start at block number + 1 in order to correctly log when funds are needed
         uint256 startBlock = block.number + 1;
         uint256 expirationBlock = block.number + blocks;

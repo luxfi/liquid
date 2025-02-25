@@ -81,10 +81,9 @@ contract FullSystemInvariantsTest is InvariantBaseTest {
         assertGe(alToken.totalSupply(), alchemist.totalDebt());
     }
 
-    // // Currently broken due to burns. Awaiting team decision
-    // // Amount stakes in the transmuter cannot exceed the total debt in the alchemist plus the debt value of yield tokens in the transmuter
-    // function invariantTransmuterStakeLessThanTotalDebt() public {
-    //     uint256 totalLocked = transmuterLogic.totalLocked() > alchemist.convertYieldTokensToDebt(fakeYieldToken.balanceOf(address(transmuterLogic))) ? transmuterLogic.totalLocked() - alchemist.convertYieldTokensToDebt(fakeYieldToken.balanceOf(address(transmuterLogic))) : 0;
-    //     assertLe(totalLocked, alchemist.totalDebt());
-    // }
+    // Amount stakes in the transmuter cannot exceed the total debt in the alchemist plus the debt value of yield tokens in the transmuter
+    function invariantTransmuterStakeLessThanTotalDebt() public {
+        uint256 totalLocked = transmuterLogic.totalLocked() > alchemist.convertYieldTokensToDebt(fakeYieldToken.balanceOf(address(transmuterLogic))) ? transmuterLogic.totalLocked() - alchemist.convertYieldTokensToDebt(fakeYieldToken.balanceOf(address(transmuterLogic))) : 0;
+        assertLe(totalLocked, alchemist.totalDebt());
+    }
 }

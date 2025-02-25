@@ -40,6 +40,10 @@ contract MockAlchemist {
     function redeem(uint256 underlying) external {
         collateral.transfer(msg.sender, convertUnderlyingTokensToYield(underlying));
     }
+
+    function totalDebt() external returns (uint256) {
+        return type(uint256).max;
+    }
 }
 
 contract TransmuterTest is Test {
@@ -330,8 +334,8 @@ contract TransmuterTest is Test {
         vm.prank(address(0xbeef));
         transmuter.createRedemption(address(alchemist), address(collateralToken), 100e18);
 
-        // uint256 query = transmuter.queryGraph(block.number + 1, block.number + 5256000);
-        // assertEq(query, 100e18);
+        uint256 query = transmuter.queryGraph(block.number + 1, block.number + 5256000);
+        assertEq(query, 100e18);
 
         vm.roll(block.number + time);
 
