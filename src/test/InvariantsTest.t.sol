@@ -22,14 +22,17 @@ import {ITestYieldToken} from "../interfaces/test/ITestYieldToken.sol";
 import {InsufficientAllowance} from "../base/Errors.sol";
 import {Unauthorized, IllegalArgument, IllegalState, MissingInputData} from "../base/Errors.sol";
 import "../interfaces/IYearnVaultV2.sol";
+import {AlchemistNFTHelper} from "./libraries/AlchemistNFTHelper.sol";
+import {AlchemistV3Position} from "../AlchemistV3Position.sol";
 
 contract InvariantsTest is Test {
     bytes4[] internal selectors;
-        
+
     // Callable contract variables
     AlchemistV3 alchemist;
     Transmuter transmuter;
     TransmuterBuffer transmuterBuffer;
+    AlchemistV3Position alchemistNFT;
 
     // // Proxy variables
     TransparentUpgradeableProxy proxyAlchemist;
@@ -114,13 +117,13 @@ contract InvariantsTest is Test {
 
         alToken = new AlchemicTokenV3(_name, _symbol, _flashFee);
 
-        ITransmuter.InitializationParams memory transParams =  ITransmuter.InitializationParams({
+        ITransmuter.InitializationParams memory transParams = ITransmuter.InitializationParams({
             syntheticToken: address(alToken),
             feeReceiver: address(this),
-            timeToTransmute: 5256000,
+            timeToTransmute: 5_256_000,
             transmutationFee: 10,
             exitFee: 20,
-            graphSize: 52560000
+            graphSize: 52_560_000
         });
 
         // Contracts and logic contracts
@@ -151,7 +154,7 @@ contract InvariantsTest is Test {
             underlyingToken: address(fakeUnderlyingToken),
             yieldToken: address(fakeYieldToken),
             depositCap: type(uint256).max,
-            blocksPerYear:  2600000,
+            blocksPerYear: 2_600_000,
             minimumCollateralization: minimumCollateralization,
             collateralizationLowerBound: 1_052_631_578_950_000_000, // 1.05 collateralization
             globalMinimumCollateralization: 1_111_111_111_111_111_111, // 1.1
@@ -175,6 +178,8 @@ contract InvariantsTest is Test {
 
         transmuterLogic.addAlchemist(address(alchemist));
         transmuterLogic.setDepositCap(uint256(type(int256).max));
+        alchemistNFT = new AlchemistV3Position(address(alchemist));
+        alchemist.setAlchemistPositionNFT(address(alchemistNFT));
 
         vm.stopPrank();
 
@@ -216,7 +221,7 @@ contract InvariantsTest is Test {
     /* HANDLERS */
 
     function mine(uint256 blocks) external {
-        blocks = bound(blocks, 1, 72000);
+        blocks = bound(blocks, 1, 72_000);
 
         console2.log("block number ->", block.number + blocks);
 
@@ -225,25 +230,22 @@ contract InvariantsTest is Test {
 
     /* UTILS */
 
-    function _randomDepositor(address[] memory users, uint256 seed)
-        internal
-        view
-        returns (address)
-    {
+    function _randomDepositor(address[] memory users, uint256 seed) internal view returns (address) {
         return _randomNonZero(users, seed);
     }
 
-    function _randomWithdrawer(address[] memory users, uint256 seed)
-        internal
-        view
-        returns (address)
-    {
+    function _randomWithdrawer(address[] memory users, uint256 seed) internal view returns (address) {
         address[] memory candidates = new address[](users.length);
 
         for (uint256 i; i < users.length; ++i) {
             address user = users[i];
 
-            uint256 borrowable = alchemist.getMaxBorrowable(user);
+            // a single position nft would have been minted to address(0xbeef)
+            uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(user, address(alchemistNFT));
+
+            uint256 borrowable;
+            
+            if (tokenId != 0) borrowable = alchemist.getMaxBorrowable(tokenId);
 
             if (borrowable > 0) {
                 candidates[i] = user;
@@ -253,17 +255,17 @@ contract InvariantsTest is Test {
         return _randomNonZero(users, seed);
     }
 
-    function _randomMinter(address[] memory users, uint256 seed)
-        internal
-        view
-        returns (address)
-    {
+    function _randomMinter(address[] memory users, uint256 seed) internal view returns (address) {
         address[] memory candidates = new address[](users.length);
 
         for (uint256 i; i < users.length; ++i) {
             address user = users[i];
+            // a single position nft would have been minted to address(0xbeef)
+            uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(user, address(alchemistNFT));
 
-            uint256 borrowable = alchemist.getMaxBorrowable(user);
+            uint256 borrowable;
+            
+            if (tokenId != 0) alchemist.getMaxBorrowable(tokenId);
 
             if (borrowable > 0) {
                 candidates[i] = user;
@@ -273,17 +275,17 @@ contract InvariantsTest is Test {
         return _randomNonZero(candidates, seed);
     }
 
-    function _randomRepayer(address[] memory users, uint256 seed)
-        internal
-        view
-        returns (address)
-    {
+    function _randomRepayer(address[] memory users, uint256 seed) internal view returns (address) {
         address[] memory candidates = new address[](users.length);
 
         for (uint256 i; i < users.length; ++i) {
             address user = users[i];
+            // a single position nft would have been minted to address(0xbeef)
+            uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(user, address(alchemistNFT));
+            uint256 collateral; 
+            uint256 debt;
 
-            (uint256 collateral, uint256 debt, uint256 earmarked) = alchemist.getCDP(user);
+            if (tokenId != 0) (collateral, debt, ) = alchemist.getCDP(tokenId);            
 
             if (debt > 0) {
                 candidates[i] = user;
@@ -293,17 +295,19 @@ contract InvariantsTest is Test {
         return _randomNonZero(candidates, seed);
     }
 
-    function _randomBurner(address[] memory users, uint256 seed)
-        internal
-        view
-        returns (address)
-    {
+    function _randomBurner(address[] memory users, uint256 seed) internal view returns (address) {
         address[] memory candidates = new address[](users.length);
 
         for (uint256 i; i < users.length; ++i) {
             address user = users[i];
-
-            (uint256 collateral, uint256 debt, uint256 earmarked) = alchemist.getCDP(user);
+            // a single position nft would have been minted to address(0xbeef)
+            uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(user, address(alchemistNFT));
+            
+            uint256 collateral; 
+            uint256 debt;
+            uint256 earmarked;
+            
+            if (tokenId != 0) (collateral, debt, earmarked) = alchemist.getCDP(tokenId);            
 
             if (debt > 0 && debt > earmarked) {
                 candidates[i] = user;
@@ -313,11 +317,7 @@ contract InvariantsTest is Test {
         return _randomNonZero(candidates, seed);
     }
 
-    function _randomStaker(address[] memory users, uint256 seed)
-        internal
-        view
-        returns (address)
-    {
+    function _randomStaker(address[] memory users, uint256 seed) internal view returns (address) {
         return _randomNonZero(users, seed);
     }
 

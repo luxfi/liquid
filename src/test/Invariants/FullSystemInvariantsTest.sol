@@ -4,7 +4,6 @@ pragma solidity ^0.8.0;
 import "./InvariantBaseTest.t.sol";
 
 contract FullSystemInvariantsTest is InvariantBaseTest {
-
     function setUp() public virtual override {
         selectors.push(this.depositCollateral.selector);
         selectors.push(this.withdrawCollateral.selector);
@@ -29,7 +28,9 @@ contract FullSystemInvariantsTest is InvariantBaseTest {
         uint256 totalDeposited;
 
         for (uint256 i; i < users.length; ++i) {
-            (uint256 collateral , ,) = alchemist.getCDP(users[i]);
+            // a single position nft would have been minted to address(0xbeef)
+            uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(users[i], address(alchemistNFT));
+            (uint256 collateral,,) = alchemist.getCDP(tokenId);
 
             totalDeposited += collateral;
         }
@@ -38,16 +39,21 @@ contract FullSystemInvariantsTest is InvariantBaseTest {
     }
 
     // Underlying value of collateral equals sum of all user accounts
-    // This test uses poke() to perform an actual storage update to the user account 
+    // This test uses poke() to perform an actual storage update to the user account
     function invariantConsistentCollateralwithPoke() public {
         address[] memory users = targetSenders();
 
         uint256 totalDeposited;
 
         for (uint256 i; i < users.length; ++i) {
-            alchemist.poke(users[i]);
+            // a single position nft would have been minted to address(0xbeef)
+            uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(users[i], address(alchemistNFT));
 
-            totalDeposited += alchemist.totalValue(users[i]);
+            if (tokenId != 0) {
+                alchemist.poke(tokenId);
+
+                totalDeposited += alchemist.totalValue(tokenId);
+            }
         }
 
         assertEq(totalDeposited, alchemist.convertYieldTokensToDebt(alchemist.getTotalDeposited()));
@@ -60,7 +66,9 @@ contract FullSystemInvariantsTest is InvariantBaseTest {
         uint256 totalDebt;
 
         for (uint256 i; i < users.length; ++i) {
-            (uint256 collateral, uint256 debt,) = alchemist.getCDP(users[i]);
+            // a single position nft would have been minted to address(0xbeef)
+            uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(users[i], address(alchemistNFT));
+            (uint256 collateral, uint256 debt,) = alchemist.getCDP(tokenId);
 
             totalDebt += debt;
         }
@@ -71,7 +79,7 @@ contract FullSystemInvariantsTest is InvariantBaseTest {
     // Supply of debt tokens must be greater or equal to debt in the system
     function invariantDebtTokenSupply() public {
         assertGe(alToken.totalSupply(), alchemist.totalDebt());
-    }   
+    }
 
     // // Currently broken due to burns. Awaiting team decision
     // // Amount stakes in the transmuter cannot exceed the total debt in the alchemist plus the debt value of yield tokens in the transmuter
