@@ -452,7 +452,7 @@ interface IAlchemistV3Events {
     ///
     /// @param amount       The amount of yield tokens that were deposited.
     /// @param recipientId    The id of the account that received the deposited funds.
-    event Deposit(uint256 amount, uint256 recipientId);
+    event Deposit(uint256 amount, uint256 indexed recipientId);
 
     /// @notice Emitted when yieldToken is withdrawn from the account owned.
     ///         by `owner` to `recipient`.
@@ -461,21 +461,22 @@ interface IAlchemistV3Events {
     ///         were unwrapped.
     ///
     /// @param amount     Amount of tokens withdrawn.
+    /// @param tokenId The id of the account that the funds are withdrawn from.
     /// @param recipient  The address that received the withdrawn funds.
-    event Withdraw(uint256 amount, address recipient);
+    event Withdraw(uint256 amount, uint256 indexed tokenId, address recipient);
 
     /// @notice Emitted when `amount` debt tokens are minted to `recipient` using the account owned by `owner`.
     ///
     /// @param tokenId     The tokenId of the account owner.
     /// @param amount    The amount of tokens that were minted.
     /// @param recipient The recipient of the minted tokens.
-    event Mint(uint256 tokenId, uint256 amount, address recipient);
+    event Mint(uint256 indexed tokenId, uint256 amount, address recipient);
 
     /// @notice Emitted when `sender` burns `amount` debt tokens to grant credit to  account owner `recipientId`.
     ///
     /// @param amount    The amount of tokens that were burned.
     /// @param recipientId The token id of account owned by recipientId that received credit for the burned tokens.
-    event Burn(address indexed sender, uint256 amount, uint256 recipientId);
+    event Burn(address indexed sender, uint256 amount, uint256 indexed recipientId);
 
     /// @notice Emitted when `amount` of `underlyingToken` are repaid to grant credit to account owned by `recipientId`.
     ///
@@ -483,13 +484,7 @@ interface IAlchemistV3Events {
     /// @param amount          The amount of the underlying token that was used to repay debt.
     /// @param recipientId     The id of account that received credit for the repaid tokens.
     /// @param credit          The amount of debt that was paid-off to the account owned by owner.
-    event Repay(address indexed sender, uint256 amount, uint256 recipientId, uint256 credit);
-
-    /// @notice Emitted when `sender` liquidates `share` shares of `yieldToken`.
-    ///
-    /// @param owner           The address of the account owner liquidating shares.
-    /// @param credit          The amount of debt that was paid-off to the account owned by owner.
-    event Liquidate(address indexed owner, uint256 credit);
+    event Repay(address indexed sender, uint256 amount, uint256 indexed recipientId, uint256 credit);
 
     /// @notice Emitted when the transmuter triggers a redemption.
     ///
@@ -555,7 +550,7 @@ interface IAlchemistV3State {
     function cumulativeEarmarked() external view returns (uint256 earmarked);
 
     function lastEarmarkBlock() external view returns (uint256 block);
-    
+
     function lastRedemptionBlock() external view returns (uint256 block);
 
     function totalDebt() external view returns (uint256 debt);
