@@ -862,11 +862,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         if (debt == 0) return false;
 
         uint256 collateralization = totalValue(tokenId) * FIXED_POINT_SCALAR / debt;
-        if (collateralization < minimumCollateralization) {
-            return true;
-        }
-
-        return false;
+        return collateralization < minimumCollateralization;
     }
 
     /// @dev Calculates the amount required to reduce an accounts debt and collateral by to achieve the target `minimumCollateralization` ratio.
