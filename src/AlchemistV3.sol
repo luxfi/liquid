@@ -345,7 +345,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     /// @inheritdoc IAlchemistV3Actions
     function withdraw(uint256 amount, address recipient, uint256 tokenId) external returns (uint256) {
-        _checkArgument(msg.sender != address(0));
+        _checkArgument(recipient != address(0));
         _checkForValidAccountId(tokenId);
         _checkArgument(amount > 0);
         _checkAccountOwnership(IAlchemistV3Position(alchemistPositionNFT).ownerOf(tokenId), msg.sender);
@@ -370,7 +370,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     /// @inheritdoc IAlchemistV3Actions
     function mint(uint256 tokenId, uint256 amount, address recipient) external {
-        _checkArgument(msg.sender != address(0));
+        _checkArgument(recipient != address(0));
         _checkForValidAccountId(tokenId);
         _checkArgument(amount > 0);
         _checkState(loansPaused == false);
