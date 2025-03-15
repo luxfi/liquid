@@ -339,7 +339,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         // Transfer tokens from msg.sender now that the internal storage updates have been committed.
         TokenUtils.safeTransferFrom(yieldToken, msg.sender, address(this), amount);
 
-        emit Deposit(amount, recipientId);
+        emit Deposit(amount, tokenId);
 
         return convertYieldTokensToDebt(amount);
     }
