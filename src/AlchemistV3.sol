@@ -330,9 +330,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         if (tokenId == 0) {
             tokenId = IAlchemistV3Position(alchemistPositionNFT).mint(recipient);
             emit AlchemistV3PositionNFTMinted(recipient, tokenId);
+        } else {
+            _checkForValidAccountId(tokenId);
         }
-        _checkForValidAccountId(tokenId);
-
         _accounts[tokenId].collateralBalance += amount;
 
         // Transfer tokens from msg.sender now that the internal storage updates have been committed.
