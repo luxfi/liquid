@@ -315,17 +315,17 @@ contract AlchemistV3Test is Test {
         assertEq(alchemist.pendingAdmin(), address(0));
     }
 
-    function testSetGaurdianAndRemove() external {
-        assertEq(alchemist.gaurdians(address(0xbad)), false);
+    function testSetGuardianAndRemove() external {
+        assertEq(alchemist.guardians(address(0xbad)), false);
         vm.prank(alOwner);
-        alchemist.setGaurdian(address(0xbad), true);
+        alchemist.setGuardian(address(0xbad), true);
 
-        assertEq(alchemist.gaurdians(address(0xbad)), true);
+        assertEq(alchemist.guardians(address(0xbad)), true);
 
         vm.prank(alOwner);
-        alchemist.setGaurdian(address(0xbad), false);
+        alchemist.setGuardian(address(0xbad), false);
 
-        assertEq(alchemist.gaurdians(address(0xbad)), false);
+        assertEq(alchemist.guardians(address(0xbad)), false);
     }
 
     function testSetProtocolFeeReceiver() external {
@@ -403,14 +403,14 @@ contract AlchemistV3Test is Test {
         assertEq(alchemist.depositsPaused(), true);
 
         vm.prank(alOwner);
-        alchemist.setGaurdian(address(0xbad), true);
+        alchemist.setGuardian(address(0xbad), true);
 
         vm.prank(address(0xbad));
         alchemist.pauseDeposits(false);
 
         assertEq(alchemist.depositsPaused(), false);
 
-        // Test for onlyAdminOrGaurdian modifier
+        // Test for onlyAdminOrGuardian modifier
         vm.expectRevert();
         alchemist.pauseDeposits(true);
 
@@ -426,14 +426,14 @@ contract AlchemistV3Test is Test {
         assertEq(alchemist.loansPaused(), true);
 
         vm.prank(alOwner);
-        alchemist.setGaurdian(address(0xbad), true);
+        alchemist.setGuardian(address(0xbad), true);
 
         vm.prank(address(0xbad));
         alchemist.pauseLoans(false);
 
         assertEq(alchemist.loansPaused(), false);
 
-        // Test for onlyAdminOrGaurdian modifier
+        // Test for onlyAdminOrGuardian modifier
         vm.expectRevert();
         alchemist.pauseLoans(true);
 
