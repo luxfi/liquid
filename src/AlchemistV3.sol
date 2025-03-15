@@ -324,16 +324,15 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         _checkArgument(amount > 0);
         _checkState(depositsPaused == false);
         _checkState(IERC20(yieldToken).balanceOf(address(this)) + amount <= depositCap);
-        _checkArgument(alchemistPositionNFT != address(0));
         uint256 tokenId = recipientId;
 
         // Only mint a new position if the id is 0
         if (tokenId == 0) {
             tokenId = IAlchemistV3Position(alchemistPositionNFT).mint(recipient);
             emit AlchemistV3PositionNFTMinted(recipient, tokenId);
+        } else {
+            _checkForValidAccountId(tokenId);
         }
-        _checkForValidAccountId(tokenId);
-
         _accounts[tokenId].collateralBalance += amount;
 
         // Transfer tokens from msg.sender now that the internal storage updates have been committed.
@@ -346,10 +345,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     /// @inheritdoc IAlchemistV3Actions
     function withdraw(uint256 amount, address recipient, uint256 tokenId) external returns (uint256) {
-        _checkArgument(msg.sender != address(0));
+        _checkArgument(recipient != address(0));
         _checkForValidAccountId(tokenId);
         _checkArgument(amount > 0);
-        _checkArgument(alchemistPositionNFT != address(0));
         _checkAccountOwnership(IAlchemistV3Position(alchemistPositionNFT).ownerOf(tokenId), msg.sender);
         _earmark();
 
@@ -372,11 +370,10 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     /// @inheritdoc IAlchemistV3Actions
     function mint(uint256 tokenId, uint256 amount, address recipient) external {
-        _checkArgument(msg.sender != address(0));
+        _checkArgument(recipient != address(0));
         _checkForValidAccountId(tokenId);
         _checkArgument(amount > 0);
         _checkState(loansPaused == false);
-        _checkArgument(alchemistPositionNFT != address(0));
         _checkAccountOwnership(IAlchemistV3Position(alchemistPositionNFT).ownerOf(tokenId), msg.sender);
 
         // Query transmuter and earmark global debt
@@ -413,7 +410,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     function burn(uint256 amount, uint256 recipientId) external returns (uint256) {
         _checkArgument(amount > 0);
         _checkForValidAccountId(recipientId);
-        _checkArgument(alchemistPositionNFT != address(0));
 
         // Query transmuter and earmark global debt
         _earmark();
