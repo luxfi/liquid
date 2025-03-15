@@ -365,7 +365,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         // Transfer the yield tokens to msg.sender
         TokenUtils.safeTransfer(yieldToken, recipient, amount);
 
-        emit Withdraw(amount, recipient);
+        emit Withdraw(amount, tokenId, recipient);
 
         return amount;
     }
@@ -511,7 +511,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         }
 
         if (totalAmountLiquidated > 0) {
-            emit BatchLiquidated(accountIds, msg.sender, totalAmountLiquidated, totalFees);
             return (totalAmountLiquidated, totalFees);
         } else {
             // no total liquidation amount returned, so no liquidations happened
@@ -530,12 +529,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         lastRedemptionBlock = block.number;
 
-        _redemptions[block.number] = RedemptionInfo(
-                cumulativeEarmarked,
-                totalDebt,
-                _earmarkWeight,
-                _feeWeight
-            );
+        _redemptions[block.number] = RedemptionInfo(cumulativeEarmarked, totalDebt, _earmarkWeight, _feeWeight);
 
         uint256 collateralToRedeem = convertDebtTokensToYield(amount);
         TokenUtils.safeTransfer(yieldToken, transmuter, collateralToRedeem);
@@ -787,11 +781,12 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         if (block.number > lastRedemptionBlock && _redemptionWeight != 0) {
             if (previousRedemption.debt != 0) {
                 uint256 oldDebtFee = account.debt * (previousRedemption.feeWeight - account.lastAccruedFeeWeight) / WEIGHT_SCALING_FACTOR;
-                uint256 debtToEarmarkCopy = (account.debt + oldDebtFee) * (previousRedemption.earmarkWeight - account.lastAccruedEarmarkWeight) / WEIGHT_SCALING_FACTOR;
+                uint256 debtToEarmarkCopy =
+                    (account.debt + oldDebtFee) * (previousRedemption.earmarkWeight - account.lastAccruedEarmarkWeight) / WEIGHT_SCALING_FACTOR;
                 earmarkedCopyCopy = account.earmarked + debtToEarmarkCopy;
             }
-            
-            earmarkToRedeem = earmarkedCopyCopy * (_redemptionWeight - account.lastAccruedRedemptionWeight) / WEIGHT_SCALING_FACTOR;   
+
+            earmarkToRedeem = earmarkedCopyCopy * (_redemptionWeight - account.lastAccruedRedemptionWeight) / WEIGHT_SCALING_FACTOR;
         }
 
         // Calculate how much of user earmarked amount has been redeemed and subtract it
@@ -809,7 +804,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         if (block.number > lastEarmarkBlock) {
             uint256 amount = ITransmuter(transmuter).queryGraph(lastEarmarkBlock + 1, block.number);
             cumulativeEarmarked += amount;
-            
+
             uint256 debtForFee = (protocolFee * totalDebt / BPS) * (block.number - lastEarmarkBlock) / blocksPerYear;
             _feeWeight += debtForFee * WEIGHT_SCALING_FACTOR / totalDebt;
             totalDebt += debtForFee;
@@ -854,15 +849,16 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         if (block.number > lastRedemptionBlock && _redemptionWeight != 0) {
             if (previousRedemption.debt != 0) {
                 uint256 oldDebtFee = account.debt * (previousRedemption.feeWeight - account.lastAccruedFeeWeight) / WEIGHT_SCALING_FACTOR;
-                uint256 debtToEarmarkCopy = (account.debt + oldDebtFee) * (previousRedemption.earmarkWeight - account.lastAccruedEarmarkWeight) / WEIGHT_SCALING_FACTOR;
+                uint256 debtToEarmarkCopy =
+                    (account.debt + oldDebtFee) * (previousRedemption.earmarkWeight - account.lastAccruedEarmarkWeight) / WEIGHT_SCALING_FACTOR;
                 earmarkedCopyCopy = account.earmarked + debtToEarmarkCopy;
             }
-            
-            earmarkToRedeem = earmarkedCopyCopy * (_redemptionWeight - account.lastAccruedRedemptionWeight) / WEIGHT_SCALING_FACTOR;   
+
+            earmarkToRedeem = earmarkedCopyCopy * (_redemptionWeight - account.lastAccruedRedemptionWeight) / WEIGHT_SCALING_FACTOR;
         }
 
-
-        return (account.debt - earmarkToRedeem + debtFee, earmarkedCopy - earmarkToRedeem, account.collateralBalance - convertDebtTokensToYield(earmarkToRedeem));
+        return
+            (account.debt - earmarkToRedeem + debtFee, earmarkedCopy - earmarkToRedeem, account.collateralBalance - convertDebtTokensToYield(earmarkToRedeem));
     }
 
     /// @dev Checks that the account owned by `tokenId` is properly collateralized.
