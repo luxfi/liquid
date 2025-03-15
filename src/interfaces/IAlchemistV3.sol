@@ -25,7 +25,7 @@ struct InitializationParams {
     address tokenAdapter;
     // The initial transmuter or transmuter buffer.
     address transmuter;
-    // TODO Need to discuss how fees will be accumulated since harvests will no longer be done.
+    // The fee on user debt paid to the protocol.
     uint256 protocolFee;
     // The address that receives protocol fees.
     address protocolFeeReceiver;
@@ -558,8 +558,6 @@ interface IAlchemistV3State {
     function protocolFee() external view returns (uint256 fee);
 
     function liquidatorFee() external view returns (uint256 fee);
-
-    function underlyingDecimals() external view returns (uint8 decimals);
 
     function underlyingConversionFactor() external view returns (uint256 factor);
 
