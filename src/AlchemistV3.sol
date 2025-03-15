@@ -324,7 +324,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         _checkArgument(amount > 0);
         _checkState(depositsPaused == false);
         _checkState(IERC20(yieldToken).balanceOf(address(this)) + amount <= depositCap);
-        _checkArgument(alchemistPositionNFT != address(0));
         uint256 tokenId = recipientId;
 
         // Only mint a new position if the id is 0
@@ -349,7 +348,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         _checkArgument(msg.sender != address(0));
         _checkForValidAccountId(tokenId);
         _checkArgument(amount > 0);
-        _checkArgument(alchemistPositionNFT != address(0));
         _checkAccountOwnership(IAlchemistV3Position(alchemistPositionNFT).ownerOf(tokenId), msg.sender);
         _earmark();
 
@@ -376,7 +374,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         _checkForValidAccountId(tokenId);
         _checkArgument(amount > 0);
         _checkState(loansPaused == false);
-        _checkArgument(alchemistPositionNFT != address(0));
         _checkAccountOwnership(IAlchemistV3Position(alchemistPositionNFT).ownerOf(tokenId), msg.sender);
 
         // Query transmuter and earmark global debt
@@ -413,7 +410,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     function burn(uint256 amount, uint256 recipientId) external returns (uint256) {
         _checkArgument(amount > 0);
         _checkForValidAccountId(recipientId);
-        _checkArgument(alchemistPositionNFT != address(0));
 
         // Query transmuter and earmark global debt
         _earmark();
