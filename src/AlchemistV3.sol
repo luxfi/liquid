@@ -98,7 +98,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     bool public loansPaused;
 
     /// @inheritdoc IAlchemistV3State
-    mapping(address => bool) public gaurdians;
+    mapping(address => bool) public guardians;
 
     uint256 private _feeWeight;
 
@@ -117,8 +117,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         _;
     }
 
-    modifier onlyAdminOrGaurdian() {
-        if (msg.sender != admin && !gaurdians[msg.sender]) {
+    modifier onlyAdminOrGuardian() {
+        if (msg.sender != admin && !guardians[msg.sender]) {
             revert Unauthorized();
         }
         _;
@@ -235,11 +235,11 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     }
 
     /// @inheritdoc IAlchemistV3AdminActions
-    function setGaurdian(address gaurdian, bool isActive) external onlyAdmin {
-        _checkArgument(gaurdian != address(0));
+    function setGuardian(address guardian, bool isActive) external onlyAdmin {
+        _checkArgument(guardian != address(0));
 
-        gaurdians[gaurdian] = isActive;
-        emit GaurdianSet(gaurdian, isActive);
+        guardians[guardian] = isActive;
+        emit GuardianSet(guardian, isActive);
     }
 
     /// @inheritdoc IAlchemistV3AdminActions
@@ -266,13 +266,13 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     }
 
     /// @inheritdoc IAlchemistV3AdminActions
-    function pauseDeposits(bool isPaused) external onlyAdminOrGaurdian {
+    function pauseDeposits(bool isPaused) external onlyAdminOrGuardian {
         depositsPaused = isPaused;
         emit DepositsPaused(isPaused);
     }
 
     /// @inheritdoc IAlchemistV3AdminActions
-    function pauseLoans(bool isPaused) external onlyAdminOrGaurdian {
+    function pauseLoans(bool isPaused) external onlyAdminOrGuardian {
         loansPaused = isPaused;
         emit LoansPaused(isPaused);
     }
