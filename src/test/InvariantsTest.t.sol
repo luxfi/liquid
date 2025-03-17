@@ -176,7 +176,7 @@ contract InvariantsTest is Test {
         whitelist.add(externalUser);
         whitelist.add(anotherExternalUser);
 
-        transmuterLogic.addAlchemist(address(alchemist));
+        transmuterLogic.setAlchemist(address(alchemist));
         transmuterLogic.setDepositCap(uint256(type(int256).max));
         alchemistNFT = new AlchemistV3Position(address(alchemist));
         alchemist.setAlchemistPositionNFT(address(alchemistNFT));
