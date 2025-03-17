@@ -783,6 +783,58 @@ contract AlchemistV3Test is Test {
         vm.stopPrank();
     }
 
+    function testResetMintAllowances_UnauthorizedRevert() external {
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), 100e18);
+        alchemist.deposit(100e18, address(0xbeef), 0);
+        // a single position nft would have been minted to address(0xbeef)
+        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
+        vm.stopPrank();
+
+        // Caller that isnt the owner of the token id
+        vm.startPrank(externalUser);
+        vm.expectRevert();
+        alchemist.resetMintAllowances(tokenId);
+        vm.stopPrank();
+    }
+
+    function testResetMintAllowancesOnUserCall() external {
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), 100e18);
+        alchemist.deposit(100e18, address(0xbeef), 0);
+        // a single position nft would have been minted to address(0xbeef)
+        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
+        alchemist.approveMint(tokenId, externalUser, 50e18);
+        vm.stopPrank();
+
+        uint256 allowanceBeforeReset = alchemist.mintAllowance(tokenId, externalUser);
+
+        vm.startPrank(address(0xbeef));
+        alchemist.resetMintAllowances(tokenId);
+        vm.stopPrank();
+
+        uint256 allowanceAfterReset = alchemist.mintAllowance(tokenId, externalUser);
+
+        assertEq(allowanceBeforeReset, 50e18);
+        assertEq(allowanceAfterReset, 0);
+    }
+
+    function testResetMintAllowancesOnTransfer() external {
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), 100e18);
+        alchemist.deposit(100e18, address(0xbeef), 0);
+        // a single position nft would have been minted to address(0xbeef)
+        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
+        alchemist.approveMint(tokenId, externalUser, 50e18);
+        uint256 allowanceBeforeTransfer = alchemist.mintAllowance(tokenId, externalUser);
+        IERC721(address(alchemistNFT)).safeTransferFrom(address(0xbeef), anotherExternalUser, tokenId);
+        vm.stopPrank();
+
+        uint256 allowanceAfterTransfer = alchemist.mintAllowance(tokenId, externalUser);
+        assertEq(allowanceBeforeTransfer, 50e18);
+        assertEq(allowanceAfterTransfer, 0);
+    }
+
     function testMint_Variable_Amount(uint256 amount) external {
         amount = bound(amount, 1e18, accountFunds);
         uint256 ltv = 2e17;

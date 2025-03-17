@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
+import {ERC721Enumerable} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {IAlchemistV3Position} from "./interfaces/IAlchemistV3Position.sol";
+import {IAlchemistV3} from "./interfaces/IAlchemistV3.sol";
 
 /**
  * @title AlchemistV3Position
@@ -55,5 +56,19 @@ contract AlchemistV3Position is ERC721Enumerable {
      */
     function supportsInterface(bytes4 interfaceId) public view virtual override(ERC721Enumerable) returns (bool) {
         return super.supportsInterface(interfaceId);
+    }
+
+    /**
+     * @notice Hook that is called before any token transfer
+     */
+    function _update(address to, uint256 tokenId, address auth) internal virtual override returns (address) {
+        address from = _ownerOf(tokenId);
+        // Reset mint allowances before the transfer completes
+        if (from != address(0)) {
+            // Skip during minting
+            IAlchemistV3(alchemist).resetMintAllowances(tokenId);
+        }
+        // Call parent implementation first
+        return super._update(to, tokenId, auth);
     }
 }
