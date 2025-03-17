@@ -236,7 +236,7 @@ contract Transmuter is ITransmuter, ERC1155 {
         uint256 syntheticReturned = amountNottransmuted - syntheticFee;
 
         // Remove untransmuted amount from the staking graph
-        if (amountNottransmuted > 0) _updateStakingGraph(-position.amount.toInt256() * BLOCK_SCALING_FACTOR / transmutationTime.toInt256(), blocksLeft);
+        if (blocksLeft > 0) _updateStakingGraph(-position.amount.toInt256() * BLOCK_SCALING_FACTOR / transmutationTime.toInt256(), blocksLeft);
 
         TokenUtils.safeTransfer(
             alchemist.yieldToken(),
