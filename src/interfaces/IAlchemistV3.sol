@@ -25,7 +25,7 @@ struct InitializationParams {
     address tokenAdapter;
     // The initial transmuter or transmuter buffer.
     address transmuter;
-    // TODO Need to discuss how fees will be accumulated since harvests will no longer be done.
+    // The fee on user debt paid to the protocol.
     uint256 protocolFee;
     // The address that receives protocol fees.
     address protocolFeeReceiver;
@@ -271,15 +271,15 @@ interface IAlchemistV3AdminActions {
     /// @param value The address to set the pending admin to.
     function setPendingAdmin(address value) external;
 
-    /// @notice Sets the active state of a gaurdian.
+    /// @notice Sets the active state of a guardian.
     ///
     /// @notice `msg.sender` must be the admin or this call will will revert with an {Unauthorized} error.
     ///
-    /// @notice Emits a {GaurdianSet} event.
+    /// @notice Emits a {GuardianSet} event.
     ///
-    /// @param gaurdian The address of the target gaurdian.
-    /// @param isActive The active state to set for the gaurdian.
-    function setGaurdian(address gaurdian, bool isActive) external;
+    /// @param guardian The address of the target guardian.
+    /// @param isActive The active state to set for the guardian.
+    function setGuardian(address guardian, bool isActive) external;
 
     /// @notice Allows for `msg.sender` to accepts the role of administrator.
     ///
@@ -375,7 +375,7 @@ interface IAlchemistV3AdminActions {
 
     /// @notice Pause all future deposits in the Alchemist.
     ///
-    /// @notice `msg.sender` must be the admin or gaurdian or this call will revert with an {Unauthorized} error.
+    /// @notice `msg.sender` must be the admin or guardian or this call will revert with an {Unauthorized} error.
     ///
     /// @notice Emits a {DepositsPaused} event.
     ///
@@ -384,7 +384,7 @@ interface IAlchemistV3AdminActions {
 
     /// @notice Pause all future loans in the Alchemist.
     ///
-    /// @notice `msg.sender` must be the admin or gaurdian or this call will revert with an {Unauthorized} error.
+    /// @notice `msg.sender` must be the admin or guardian or this call will revert with an {Unauthorized} error.
     ///
     /// @notice Emits a {LoansPaused} event.
     ///
@@ -408,11 +408,11 @@ interface IAlchemistV3Events {
     /// @param value The value of the new deposit cap.
     event DepositCapUpdated(uint256 value);
 
-    /// @notice Emitted when a gaurdian is added or removed from the alchemist.
+    /// @notice Emitted when a guardian is added or removed from the alchemist.
     ///
-    /// @param gaurdian The addres of the new gaurdian.
-    /// @param state    The active state of the gaurdian.
-    event GaurdianSet(address gaurdian, bool state);
+    /// @param guardian The addres of the new guardian.
+    /// @param state    The active state of the guardian.
+    event GuardianSet(address guardian, bool state);
 
     /// @notice Emitted when a new token adapter is set in the alchemist.
     ///
@@ -559,7 +559,7 @@ interface IAlchemistV3State {
 
     function depositCap() external view returns (uint256 cap);
 
-    function gaurdians(address gaurdian) external view returns (bool isActive);
+    function guardians(address guardian) external view returns (bool isActive);
 
     function blocksPerYear() external view returns (uint256 blocks);
 
@@ -574,8 +574,6 @@ interface IAlchemistV3State {
     function protocolFee() external view returns (uint256 fee);
 
     function liquidatorFee() external view returns (uint256 fee);
-
-    function underlyingDecimals() external view returns (uint8 decimals);
 
     function underlyingConversionFactor() external view returns (uint256 factor);
 

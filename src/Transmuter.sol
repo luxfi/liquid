@@ -131,7 +131,7 @@ contract Transmuter is ITransmuter, ERC1155 {
 
         depositCap = cap;
         emit DepositCapUpdated(cap);
-    } 
+    }
 
     /// @inheritdoc ITransmuter
     function setTransmutationFee(uint256 fee) external onlyAdmin {
@@ -171,7 +171,7 @@ contract Transmuter is ITransmuter, ERC1155 {
     }
 
     /// @inheritdoc ITransmuter
-    function getPositions(address account, uint256[] calldata ids) external view returns(StakingPosition[] memory) {
+    function getPositions(address account, uint256[] calldata ids) external view returns (StakingPosition[] memory) {
         StakingPosition[] memory userPositions = new StakingPosition[](ids.length);
 
         for (uint256 i = 0; i < ids.length; i++) {
@@ -183,21 +183,19 @@ contract Transmuter is ITransmuter, ERC1155 {
 
     /// @inheritdoc ITransmuter
     function createRedemption(uint256 syntheticDepositAmount) external {
-        if (syntheticDepositAmount == 0)
+        if (syntheticDepositAmount == 0) {
             revert DepositZeroAmount();
+        }
 
-        if (totalLocked + syntheticDepositAmount > depositCap)
+        if (totalLocked + syntheticDepositAmount > depositCap) {
             revert DepositCapReached();
+        }
 
-        if (totalLocked + syntheticDepositAmount > alchemist.totalDebt())
+        if (totalLocked + syntheticDepositAmount > alchemist.totalDebt()) {
             revert DepositCapReached();
+        }
 
-        TokenUtils.safeTransferFrom(
-            syntheticToken,
-            msg.sender,
-            address(this),
-            syntheticDepositAmount
-        );
+        TokenUtils.safeTransferFrom(syntheticToken, msg.sender, address(this), syntheticDepositAmount);
 
         _positions[msg.sender][++_nonce] = StakingPosition(syntheticDepositAmount, block.number, block.number + timeToTransmute);
 
@@ -206,7 +204,7 @@ contract Transmuter is ITransmuter, ERC1155 {
         totalLocked += syntheticDepositAmount;
 
         _mint(msg.sender, _nonce, syntheticDepositAmount, "");
-        
+
         emit PositionCreated(msg.sender, syntheticDepositAmount, _nonce);
     }
 
@@ -214,11 +212,12 @@ contract Transmuter is ITransmuter, ERC1155 {
     function claimRedemption(uint256 id) external {
         StakingPosition storage position = _positions[msg.sender][id];
 
-        if (position.maturationBlock == 0)
+        if (position.maturationBlock == 0) {
             revert PositionNotFound();
+        }
 
         uint256 transmutationTime = position.maturationBlock - position.startBlock;
-        uint256 blocksLeft = position.maturationBlock > block.number ? position.maturationBlock - block.number: 0;
+        uint256 blocksLeft = position.maturationBlock > block.number ? position.maturationBlock - block.number : 0;
         uint256 amountNottransmuted = blocksLeft > 0 ? position.amount * blocksLeft / transmutationTime : 0;
         uint256 amountTransmuted = position.amount - amountNottransmuted;
 
@@ -240,17 +239,9 @@ contract Transmuter is ITransmuter, ERC1155 {
         // Remove untransmuted amount from the staking graph
         if (blocksLeft > 0) _updateStakingGraph(-position.amount.toInt256() * BLOCK_SCALING_FACTOR / transmutationTime.toInt256(), blocksLeft);
 
-        TokenUtils.safeTransfer(
-            alchemist.yieldToken(),
-            msg.sender,
-            alchemist.convertDebtTokensToYield(claimAmount)
-        );
+        TokenUtils.safeTransfer(alchemist.yieldToken(), msg.sender, alchemist.convertDebtTokensToYield(claimAmount));
 
-        TokenUtils.safeTransfer(
-            alchemist.yieldToken(),
-            protocolFeeReceiver,
-            alchemist.convertDebtTokensToYield(feeAmount)
-        );
+        TokenUtils.safeTransfer(alchemist.yieldToken(), protocolFeeReceiver, alchemist.convertDebtTokensToYield(feeAmount));
 
         TokenUtils.safeTransfer(syntheticToken, msg.sender, syntheticReturned);
         TokenUtils.safeTransfer(syntheticToken, protocolFeeReceiver, syntheticFee);
@@ -267,14 +258,15 @@ contract Transmuter is ITransmuter, ERC1155 {
 
     /// @inheritdoc ITransmuter
     function queryGraph(uint256 startBlock, uint256 endBlock) external view returns (uint256) {
-        int256 queried = ((endBlock.toInt256() * _graph1.query(endBlock)) - _graph2.query(endBlock)) - (((startBlock - 1).toInt256() * _graph1.query(startBlock - 1)) - _graph2.query(startBlock - 1));
+        int256 queried = ((endBlock.toInt256() * _graph1.query(endBlock)) - _graph2.query(endBlock))
+            - (((startBlock - 1).toInt256() * _graph1.query(startBlock - 1)) - _graph2.query(startBlock - 1));
 
         if (queried == 0) return 0;
         // + 1 for rounding error
         return (queried / BLOCK_SCALING_FACTOR).toUint256() + 1;
     }
 
-    /// @dev Updates staking graphs 
+    /// @dev Updates staking graphs
     function _updateStakingGraph(int256 amount, uint256 blocks) private {
         // Start at block number + 1 in order to correctly log when funds are needed
         uint256 startBlock = block.number + 1;
