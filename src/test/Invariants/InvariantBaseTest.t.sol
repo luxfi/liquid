@@ -75,7 +75,7 @@ contract InvariantBaseTest is InvariantsTest {
         vm.startPrank(onBehalf);
         alToken.mint(onBehalf, amount);
         alToken.approve(address(transmuterLogic), amount);
-        transmuterLogic.createRedemption(address(alchemist), address(fakeYieldToken), amount);
+        transmuterLogic.createRedemption(amount);
         vm.stopPrank();
     }
 

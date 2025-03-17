@@ -14,9 +14,6 @@ import {StakingGraph} from "./libraries/StakingGraph.sol";
 
 import {Unauthorized, IllegalArgument, IllegalState, InsufficientAllowance} from "./base/Errors.sol";
 
-import {console} from "../../lib/forge-std/src/console.sol";
-
-
 /// @title AlchemixV3 Transmuter
 ///
 /// @notice A contract which facilitates the exchange of alAssets to yield bearing assets.
@@ -54,10 +51,16 @@ contract Transmuter is ITransmuter, ERC1155 {
     address public admin;
 
     /// @inheritdoc ITransmuter
+    address public pendingAdmin;
+
+    /// @inheritdoc ITransmuter
     address public protocolFeeReceiver;
 
     /// @inheritdoc ITransmuter
     address public syntheticToken;
+
+    /// @inheritdoc ITransmuter
+    IAlchemistV3 public alchemist;
 
     /// @dev Array of registered alchemists.
     address[] public alchemists;
@@ -94,22 +97,32 @@ contract Transmuter is ITransmuter, ERC1155 {
     }
 
     /// @inheritdoc ITransmuter
-    function addAlchemist(address alchemist) external onlyAdmin {
-        if (_alchemistEntries[alchemist].isActive == true) 
-            revert AlchemistDuplicateEntry();
+    function setPendingAdmin(address value) external onlyAdmin {
+        pendingAdmin = value;
 
-        alchemists.push(alchemist);
-        _alchemistEntries[alchemist] = AlchemistEntry(alchemists.length-1, true);
+        emit PendingAdminUpdated(value);
     }
 
     /// @inheritdoc ITransmuter
-    function removeAlchemist(address alchemist) external onlyAdmin {
-        if (_alchemistEntries[alchemist].isActive == false) 
-            revert NotRegisteredAlchemist();
+    function acceptAdmin() external {
+        _checkState(pendingAdmin != address(0));
 
-        alchemists[_alchemistEntries[alchemist].index] = alchemists[alchemists.length-1];
-        alchemists.pop();
-        delete _alchemistEntries[alchemist];
+        if (msg.sender != pendingAdmin) {
+            revert Unauthorized();
+        }
+
+        admin = pendingAdmin;
+        pendingAdmin = address(0);
+
+        emit AdminUpdated(admin);
+        emit PendingAdminUpdated(address(0));
+    }
+
+    /// @inheritdoc ITransmuter
+    function setAlchemist(address value) external onlyAdmin {
+        alchemist = IAlchemistV3(value);
+
+        emit AlchemistUpdated(value);
     }
 
     /// @inheritdoc ITransmuter
@@ -167,7 +180,7 @@ contract Transmuter is ITransmuter, ERC1155 {
     }
 
     /// @inheritdoc ITransmuter
-    function createRedemption(address alchemist, address yieldToken, uint256 syntheticDepositAmount) external {
+    function createRedemption(uint256 syntheticDepositAmount) external {
         if (syntheticDepositAmount == 0)
             revert DepositZeroAmount();
 
@@ -177,10 +190,7 @@ contract Transmuter is ITransmuter, ERC1155 {
         if (totalLocked + syntheticDepositAmount > depositCap)
             revert DepositCapReached();
 
-        if (_alchemistEntries[alchemist].isActive == false)
-            revert NotRegisteredAlchemist();
-
-        if (totalLocked + syntheticDepositAmount > IAlchemistV3(alchemist).totalDebt())
+        if (totalLocked + syntheticDepositAmount > alchemist.totalDebt())
             revert DepositCapReached();
 
         TokenUtils.safeTransferFrom(
@@ -190,7 +200,7 @@ contract Transmuter is ITransmuter, ERC1155 {
             syntheticDepositAmount
         );
 
-        _positions[msg.sender][++_nonce] = StakingPosition(alchemist, yieldToken, syntheticDepositAmount, block.number, block.number + timeToTransmute);
+        _positions[msg.sender][++_nonce] = StakingPosition(syntheticDepositAmount, block.number, block.number + timeToTransmute);
 
         // Update Fenwick Tree
         _updateStakingGraph(syntheticDepositAmount.toInt256() * BLOCK_SCALING_FACTOR / timeToTransmute.toInt256(), timeToTransmute);
@@ -198,7 +208,7 @@ contract Transmuter is ITransmuter, ERC1155 {
 
         _mint(msg.sender, _nonce, syntheticDepositAmount, "");
         
-        emit PositionCreated(msg.sender, alchemist, syntheticDepositAmount, _nonce);
+        emit PositionCreated(msg.sender, syntheticDepositAmount, _nonce);
     }
 
     /// @inheritdoc ITransmuter
@@ -216,10 +226,10 @@ contract Transmuter is ITransmuter, ERC1155 {
         _burn(msg.sender, id, position.amount);
 
         // If the contract has a balance of yield tokens from alchemist repayments then we only need to redeem partial or none from Alchemist earmarked
-        uint256 yieldTokenBalance = TokenUtils.safeBalanceOf(position.yieldToken, address(this));
-        uint256 debtValue = IAlchemistV3(position.alchemist).convertYieldTokensToDebt(yieldTokenBalance);
+        uint256 yieldTokenBalance = TokenUtils.safeBalanceOf(alchemist.yieldToken(), address(this));
+        uint256 debtValue = alchemist.convertYieldTokensToDebt(yieldTokenBalance);
         uint256 amountToRedeem = amountTransmuted > debtValue ? amountTransmuted - debtValue : 0;
-        if (amountToRedeem > 0) IAlchemistV3(position.alchemist).redeem(amountToRedeem);
+        if (amountToRedeem > 0) alchemist.redeem(amountToRedeem);
 
         uint256 feeAmount = amountTransmuted * transmutationFee / BPS;
         uint256 claimAmount = amountTransmuted - feeAmount;
@@ -232,15 +242,15 @@ contract Transmuter is ITransmuter, ERC1155 {
         if (amountNottransmuted > 0) _updateStakingGraph(-position.amount.toInt256() * BLOCK_SCALING_FACTOR / transmutationTime.toInt256(), blocksLeft);
 
         TokenUtils.safeTransfer(
-            position.yieldToken,
+            alchemist.yieldToken(),
             msg.sender,
-            IAlchemistV3(position.alchemist).convertDebtTokensToYield(claimAmount)
+            alchemist.convertDebtTokensToYield(claimAmount)
         );
 
         TokenUtils.safeTransfer(
-            position.yieldToken,
+            alchemist.yieldToken(),
             protocolFeeReceiver,
-            IAlchemistV3(position.alchemist).convertDebtTokensToYield(feeAmount)
+            alchemist.convertDebtTokensToYield(feeAmount)
         );
 
         TokenUtils.safeTransfer(syntheticToken, msg.sender, syntheticReturned);
@@ -251,7 +261,7 @@ contract Transmuter is ITransmuter, ERC1155 {
 
         totalLocked -= position.amount;
 
-        emit PositionClaimed(msg.sender, position.alchemist, claimAmount, syntheticReturned);
+        emit PositionClaimed(msg.sender, claimAmount, syntheticReturned);
 
         delete _positions[msg.sender][id];
     }
@@ -284,6 +294,15 @@ contract Transmuter is ITransmuter, ERC1155 {
     function _checkArgument(bool expression) internal pure {
         if (!expression) {
             revert IllegalArgument();
+        }
+    }
+
+    /// @dev Checks an expression and reverts with an {IllegalState} error if the expression is {false}.
+    ///
+    /// @param expression The expression to check.
+    function _checkState(bool expression) internal pure {
+        if (!expression) {
+            revert IllegalState();
         }
     }
 }
