@@ -164,7 +164,7 @@ contract AlchemistV3Test is Test {
         whitelist.add(externalUser);
         whitelist.add(anotherExternalUser);
 
-        transmuterLogic.addAlchemist(address(alchemist));
+        transmuterLogic.setAlchemist(address(alchemist));
         transmuterLogic.setDepositCap(uint256(type(int256).max));
 
         alchemistNFT = new AlchemistV3Position(address(alchemist));
@@ -1146,7 +1146,7 @@ contract AlchemistV3Test is Test {
 
         vm.startPrank(address(0xdad));
         SafeERC20.safeApprove(address(alToken), address(transmuterLogic), 50e18);
-        transmuterLogic.createRedemption(address(alchemist), address(fakeYieldToken), 50e18);
+        transmuterLogic.createRedemption(50e18);
         vm.stopPrank();
 
         vm.roll(block.number + 5_256_000);
@@ -1174,7 +1174,7 @@ contract AlchemistV3Test is Test {
 
         vm.startPrank(address(0xdad));
         SafeERC20.safeApprove(address(alToken), address(transmuterLogic), 50e18);
-        transmuterLogic.createRedemption(address(alchemist), address(fakeYieldToken), 50e18);
+        transmuterLogic.createRedemption(50e18);
         vm.stopPrank();
 
         vm.roll(block.number + 5_256_000 / 2);
@@ -1328,7 +1328,7 @@ contract AlchemistV3Test is Test {
 
         vm.startPrank(address(0xdad));
         SafeERC20.safeApprove(address(alToken), address(transmuterLogic), 50e18);
-        transmuterLogic.createRedemption(address(alchemist), address(fakeYieldToken), 50e18);
+        transmuterLogic.createRedemption(50e18);
         vm.stopPrank();
 
         vm.roll(block.number + (5_256_000));
@@ -1363,7 +1363,7 @@ contract AlchemistV3Test is Test {
 
         vm.startPrank(address(0xdad));
         SafeERC20.safeApprove(address(alToken), address(transmuterLogic), 50e18);
-        transmuterLogic.createRedemption(address(alchemist), address(fakeYieldToken), 50e18);
+        transmuterLogic.createRedemption(50e18);
         vm.stopPrank();
 
         vm.roll(block.number + (5_256_000 / 2));
@@ -1395,7 +1395,7 @@ contract AlchemistV3Test is Test {
 
         vm.startPrank(address(0xdad));
         SafeERC20.safeApprove(address(alToken), address(transmuterLogic), 50e18);
-        transmuterLogic.createRedemption(address(alchemist), address(fakeYieldToken), 50e18);
+        transmuterLogic.createRedemption(50e18);
         vm.stopPrank();
 
         vm.roll(block.number + (5_256_000 / 2));
@@ -1989,7 +1989,7 @@ contract AlchemistV3Test is Test {
 
         vm.startPrank(address(0xdad));
         SafeERC20.safeApprove(address(alToken), address(transmuterLogic), 50e18);
-        transmuterLogic.createRedemption(address(alchemist), address(fakeYieldToken), 50e18);
+        transmuterLogic.createRedemption(50e18);
         vm.stopPrank();
 
         vm.roll(block.number + 5_256_000);
@@ -2035,7 +2035,7 @@ contract AlchemistV3Test is Test {
 
         vm.startPrank(address(0xdad));
         SafeERC20.safeApprove(address(alToken), address(transmuterLogic), 50e18);
-        transmuterLogic.createRedemption(address(alchemist), address(fakeYieldToken), 50e18);
+        transmuterLogic.createRedemption(50e18);
         vm.stopPrank();
 
         vm.roll(block.number + (5_256_000 / 2));

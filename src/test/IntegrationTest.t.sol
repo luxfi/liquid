@@ -180,7 +180,7 @@ contract RedemptionIntegrationTest is Test {
 
         transmuterLogic.setDepositCap(uint256(type(int256).max));
 
-        transmuterLogic.addAlchemist(address(alchemist));
+        transmuterLogic.setAlchemist(address(alchemist));
 
         alchemistNFT = new AlchemistV3Position(address(alchemist));
         alchemist.setAlchemistPositionNFT(address(alchemistNFT));
@@ -264,7 +264,7 @@ contract RedemptionIntegrationTest is Test {
 
         vm.startPrank(address(0xdad));
         IERC20(alUSD).approve(address(transmuterLogic), debtAmount);
-        transmuterLogic.createRedemption(address(alchemist), EULER_USDC, debtAmount);
+        transmuterLogic.createRedemption(debtAmount);
         vm.stopPrank();
 
         vm.roll(block.number + 5_256_000);
@@ -304,7 +304,7 @@ contract RedemptionIntegrationTest is Test {
 
         vm.startPrank(address(0xdad));
         IERC20(alUSD).approve(address(transmuterLogic), debtAmount);
-        transmuterLogic.createRedemption(address(alchemist), EULER_USDC, debtAmount);
+        transmuterLogic.createRedemption(debtAmount);
         vm.stopPrank();
 
         vm.roll(block.number + 5_256_000 / 2);
@@ -344,7 +344,7 @@ contract RedemptionIntegrationTest is Test {
 
         vm.startPrank(address(0xdad));
         IERC20(alUSD).approve(address(transmuterLogic), debtAmount);
-        transmuterLogic.createRedemption(address(alchemist), EULER_USDC, debtAmount);
+        transmuterLogic.createRedemption(debtAmount);
         vm.stopPrank();
 
         vm.roll(block.number + 5_256_000 / 2);
@@ -384,7 +384,7 @@ contract RedemptionIntegrationTest is Test {
 
         vm.startPrank(address(0xdad));
         IERC20(alUSD).approve(address(transmuterLogic), debtAmount);
-        transmuterLogic.createRedemption(address(alchemist), EULER_USDC, debtAmount);
+        transmuterLogic.createRedemption(debtAmount);
         vm.stopPrank();
 
         vm.roll(block.number + 5_256_000 / 2);
@@ -460,7 +460,7 @@ contract RedemptionIntegrationTest is Test {
 
         vm.startPrank(address(0xdad));
         IERC20(alUSD).approve(address(transmuterLogic), debtAmount);
-        transmuterLogic.createRedemption(address(alchemist), EULER_USDC, debtAmount);
+        transmuterLogic.createRedemption(debtAmount);
         vm.stopPrank();
 
         vm.roll(block.number + 5_256_000 / 2);
@@ -496,7 +496,7 @@ contract RedemptionIntegrationTest is Test {
 
         vm.startPrank(address(0xdad));
         IERC20(alUSD).approve(address(transmuterLogic), debtAmount);
-        transmuterLogic.createRedemption(address(alchemist), EULER_USDC, debtAmount);
+        transmuterLogic.createRedemption(debtAmount);
         vm.stopPrank();
 
         vm.roll(block.number + 5_256_000);
@@ -530,7 +530,7 @@ contract RedemptionIntegrationTest is Test {
 
         vm.startPrank(address(0xdad));
         IERC20(alUSD).approve(address(transmuterLogic), debtAmount);
-        transmuterLogic.createRedemption(address(alchemist), EULER_USDC, debtAmount);
+        transmuterLogic.createRedemption(debtAmount);
         vm.stopPrank();
 
         (uint256 collateral, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
@@ -566,7 +566,7 @@ contract RedemptionIntegrationTest is Test {
 
         vm.startPrank(address(0xdad));
         IERC20(alUSD).approve(address(transmuterLogic), debtAmount);
-        transmuterLogic.createRedemption(address(alchemist), EULER_USDC, debtAmount / 2);
+        transmuterLogic.createRedemption(debtAmount / 2);
         vm.stopPrank();
 
         // Go 1/4 through the first transmuter position and create a new one
@@ -574,7 +574,7 @@ contract RedemptionIntegrationTest is Test {
 
         vm.startPrank(address(0xdead));
         IERC20(alUSD).approve(address(transmuterLogic), debtAmount);
-        transmuterLogic.createRedemption(address(alchemist), EULER_USDC, debtAmount / 2);
+        transmuterLogic.createRedemption(debtAmount / 2);
         vm.stopPrank();
 
         // Collateral unchanged but debt has accrued some fee amount
