@@ -44,6 +44,10 @@ contract MockAlchemist {
     function totalDebt() external returns (uint256) {
         return type(uint256).max;
     }
+
+    function yieldToken() external returns (address) {
+        return address(collateral);
+    }
 }
 
 contract TransmuterTest is Test {
