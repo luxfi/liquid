@@ -235,6 +235,11 @@ interface ITransmuter {
     /// @param cap  The new transmuter deposit cap.
     event DepositCapUpdated(uint256 cap);
 
+    /// @dev Emitted when the transmutaiton time is updated.
+    ///
+    /// @param time  The new transmutation time in blocks.
+    event TransmutationTimeUpdated(uint256 time);
+
     /// @dev Emitted when the transmutaiton fee is updated.
     ///
     /// @param fee  The new transmutation fee.
