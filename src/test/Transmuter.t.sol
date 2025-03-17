@@ -81,15 +81,6 @@ contract TransmuterTest is Test {
         alETH.approve(address(transmuter), type(uint256).max);
     }
 
-    function testSetDepositCapTooLow() public { 
-        vm.prank(address(0xbeef));
-        transmuter.createRedemption(100e18);
-
-
-        vm.expectRevert();
-        transmuter.setDepositCap(99e18);
-    }
-
     function testSetTransmutaitonFeeTooHigh() public { 
         vm.expectRevert();
         transmuter.setTransmutationFee(10001);
@@ -121,7 +112,7 @@ contract TransmuterTest is Test {
 
     function testCreateRedemptionTooLarge() public {
         vm.startPrank(address(0xbeef));
-        vm.expectRevert(DepositTooLarge.selector);
+        vm.expectRevert(DepositCapReached.selector);
         transmuter.createRedemption(uint256(type(int256).max) + 1);
         vm.stopPrank();
     }

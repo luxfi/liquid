@@ -234,6 +234,10 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @inheritdoc IAlchemistV3AdminActions
     function setTransmuter(address value) external onlyAdmin {
         _checkArgument(value != address(0));
+
+        // Check that old transmuter has enough funds to cover all future transmutations before allowing a swap
+        require(convertYieldTokensToDebt(TokenUtils.safeBalanceOf(yieldToken, transmuter)) >= ITransmuter(transmuter).totalLocked());
+
         transmuter = value;
         emit TransmuterUpdated(value);
     }
