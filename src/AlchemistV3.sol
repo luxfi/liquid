@@ -6,7 +6,6 @@ import "./interfaces/ITokenAdapter.sol";
 import "./interfaces/ITransmuter.sol";
 import "./interfaces/IAlchemistV3Position.sol";
 import "./libraries/TokenUtils.sol";
-import "./libraries/Limiters.sol";
 import "./libraries/SafeCast.sol";
 
 import {Initializable} from "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
@@ -16,8 +15,6 @@ import {Unauthorized, IllegalArgument, IllegalState, MissingInputData} from "./b
 /// @title  AlchemistV3
 /// @author Alchemix Finance
 contract AlchemistV3 is IAlchemistV3, Initializable {
-    using Limiters for Limiters.LinearGrowthLimiter;
-
     /// @inheritdoc IAlchemistV3Immutables
     string public constant version = "3.0.0";
 
