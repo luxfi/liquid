@@ -152,6 +152,8 @@ contract Transmuter is ITransmuter, ERC1155 {
     /// @inheritdoc ITransmuter
     function setTransmutationTime(uint256 time) external onlyAdmin {
         timeToTransmute = time;
+
+        emit TransmutationTimeUpdated(time);
     }
 
     /// @inheritdoc ITransmuter
