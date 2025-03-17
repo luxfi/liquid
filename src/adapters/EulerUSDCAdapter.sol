@@ -20,6 +20,6 @@ contract EulerUSDCAdapter is ITokenAdapter {
     }
 
     function price() external view returns (uint256) {
-        return IERC4626(token).convertToAssets(1e6);
+        return IERC4626(token).convertToAssets(10**TokenUtils.expectDecimals(token));
     }
 }
