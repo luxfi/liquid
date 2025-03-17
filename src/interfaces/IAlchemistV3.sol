@@ -48,8 +48,10 @@ struct Account {
     uint256 lastAccruedFeeWeight;
     /// @notice Last weight of debt from most recent account sync.
     uint256 lastAccruedRedemptionWeight;
-    /// @notice allowances for minting alAssets
-    mapping(address => uint256) mintAllowances;
+    /// @notice allowances for minting alAssets, per version.
+    mapping(uint256 => mapping(address => uint256)) mintAllowances;
+    /// @notice id used in the mintAllowances map which is incremented on reset.
+    uint256 allowancesVersion;
 }
 
 /// @notice Information associated with a redemption.
@@ -246,6 +248,15 @@ interface IAlchemistV3Actions {
     ///
     /// @param amount The amount of tokens to redeem.
     function redeem(uint256 amount) external;
+
+    /// @notice Resets all mint allowances by account managed by `tokenId`.
+    ///
+    /// @notice This function is only callable by the owner of the token id or the AlchemistV3Position contract.
+    ///
+    /// @notice Emits a {MintAllowancesReset} event.
+    ///
+    /// @param tokenId The token id of the account.
+    function resetMintAllowances(uint256 tokenId) external;
 }
 
 interface IAlchemistV3AdminActions {
@@ -521,6 +532,11 @@ interface IAlchemistV3Events {
     /// @param amount       The amount liquidated
     /// @param fee          The liquidation fee sent to 'liquidator'
     event BatchLiquidated(uint256[] indexed accounts, address liquidator, uint256 amount, uint256 fee);
+
+    /// @notice Emitted when all mint allowances for account managed by `tokenId` are reset.
+    ///
+    /// @param tokenId       The tokenId of the account.
+    event MintAllowancesReset(uint256 indexed tokenId);
 }
 
 interface IAlchemistV3Immutables {

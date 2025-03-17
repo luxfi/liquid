@@ -299,7 +299,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @inheritdoc IAlchemistV3State
     function mintAllowance(uint256 ownerTokenId, address spender) external view returns (uint256) {
         Account storage account = _accounts[ownerTokenId];
-        return account.mintAllowances[spender];
+        return account.mintAllowances[account.allowancesVersion][spender];
     }
 
     /// @inheritdoc IAlchemistV3State
@@ -543,6 +543,22 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         _approveMint(tokenId, spender, amount);
     }
 
+    /// @inheritdoc IAlchemistV3Actions
+    function resetMintAllowances(uint256 tokenId) external {
+        // Allow calls from either the token owner or the NFT contract
+        if (msg.sender != address(alchemistPositionNFT)) {
+            // Direct call - verify caller is current owner
+            address tokenOwner = IERC721(alchemistPositionNFT).ownerOf(tokenId);
+            if (msg.sender != tokenOwner) {
+                revert Unauthorized();
+            }
+        }
+        // increment version to start the mapping from a fresh state
+        _accounts[tokenId].allowancesVersion += 1;
+        // Emit event to notify allowance clearing
+        emit MintAllowancesReset(tokenId);
+    }
+
     /// @inheritdoc IAlchemistV3State
     function convertYieldTokensToDebt(uint256 amount) public view returns (uint256) {
         return normalizeUnderlyingTokensToDebt(convertYieldTokensToUnderlying(amount));
@@ -674,7 +690,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @param amount  The amount of debt tokens to set the mint allowance to.
     function _approveMint(uint256 ownerTokenId, address spender, uint256 amount) internal {
         Account storage account = _accounts[ownerTokenId];
-        account.mintAllowances[spender] = amount;
+        account.mintAllowances[account.allowancesVersion][spender] = amount;
         emit ApproveMint(ownerTokenId, spender, amount);
     }
 
@@ -685,7 +701,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @param amount  The amount of debt tokens to decrease the mint allowance by.
     function _decreaseMintAllowance(uint256 ownerTokenId, address spender, uint256 amount) internal {
         Account storage account = _accounts[ownerTokenId];
-        account.mintAllowances[spender] -= amount;
+        account.mintAllowances[account.allowancesVersion][spender] -= amount;
     }
 
     /// @dev Checks an expression and reverts with an {IllegalArgument} error if the expression is {false}.
