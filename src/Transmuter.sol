@@ -127,7 +127,7 @@ contract Transmuter is ITransmuter, ERC1155 {
 
     /// @inheritdoc ITransmuter
     function setDepositCap(uint256 cap) external onlyAdmin {
-        _checkArgument(cap >= totalLocked);
+        _checkArgument(cap <= type(int256).max.toUint256());
 
         depositCap = cap;
         emit DepositCapUpdated(cap);
@@ -183,9 +183,6 @@ contract Transmuter is ITransmuter, ERC1155 {
     function createRedemption(uint256 syntheticDepositAmount) external {
         if (syntheticDepositAmount == 0)
             revert DepositZeroAmount();
-
-        if ( syntheticDepositAmount > type(int256).max.toUint256())
-            revert DepositTooLarge();
 
         if (totalLocked + syntheticDepositAmount > depositCap)
             revert DepositCapReached();
