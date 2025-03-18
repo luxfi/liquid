@@ -201,6 +201,13 @@ contract AlchemistV3Test is Test {
         vm.stopPrank();
     }
 
+    function testSetV3PositionNFTAlreadySetRevert() public {
+        vm.startPrank(alOwner);
+        vm.expectRevert();
+        alchemist.setAlchemistPositionNFT(address(0xdBdb4d16EdA451D0503b854CF79D55697F90c8DF));
+        vm.stopPrank();
+    }
+
     function testSetProtocolFeeTooHigh() public {
         vm.startPrank(alOwner);
         vm.expectRevert();
@@ -315,17 +322,17 @@ contract AlchemistV3Test is Test {
         assertEq(alchemist.pendingAdmin(), address(0));
     }
 
-    function testSetGaurdianAndRemove() external {
-        assertEq(alchemist.gaurdians(address(0xbad)), false);
+    function testSetGuardianAndRemove() external {
+        assertEq(alchemist.guardians(address(0xbad)), false);
         vm.prank(alOwner);
-        alchemist.setGaurdian(address(0xbad), true);
+        alchemist.setGuardian(address(0xbad), true);
 
-        assertEq(alchemist.gaurdians(address(0xbad)), true);
+        assertEq(alchemist.guardians(address(0xbad)), true);
 
         vm.prank(alOwner);
-        alchemist.setGaurdian(address(0xbad), false);
+        alchemist.setGuardian(address(0xbad), false);
 
-        assertEq(alchemist.gaurdians(address(0xbad)), false);
+        assertEq(alchemist.guardians(address(0xbad)), false);
     }
 
     function testSetProtocolFeeReceiver() external {
@@ -403,14 +410,14 @@ contract AlchemistV3Test is Test {
         assertEq(alchemist.depositsPaused(), true);
 
         vm.prank(alOwner);
-        alchemist.setGaurdian(address(0xbad), true);
+        alchemist.setGuardian(address(0xbad), true);
 
         vm.prank(address(0xbad));
         alchemist.pauseDeposits(false);
 
         assertEq(alchemist.depositsPaused(), false);
 
-        // Test for onlyAdminOrGaurdian modifier
+        // Test for onlyAdminOrGuardian modifier
         vm.expectRevert();
         alchemist.pauseDeposits(true);
 
@@ -426,14 +433,14 @@ contract AlchemistV3Test is Test {
         assertEq(alchemist.loansPaused(), true);
 
         vm.prank(alOwner);
-        alchemist.setGaurdian(address(0xbad), true);
+        alchemist.setGuardian(address(0xbad), true);
 
         vm.prank(address(0xbad));
         alchemist.pauseLoans(false);
 
         assertEq(alchemist.loansPaused(), false);
 
-        // Test for onlyAdminOrGaurdian modifier
+        // Test for onlyAdminOrGuardian modifier
         vm.expectRevert();
         alchemist.pauseLoans(true);
 
@@ -781,6 +788,58 @@ contract AlchemistV3Test is Test {
         vm.expectRevert();
         alchemist.approveMint(tokenId, yetAnotherExternalUser, 100e18);
         vm.stopPrank();
+    }
+
+    function testResetMintAllowances_UnauthorizedRevert() external {
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), 100e18);
+        alchemist.deposit(100e18, address(0xbeef), 0);
+        // a single position nft would have been minted to address(0xbeef)
+        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
+        vm.stopPrank();
+
+        // Caller that isnt the owner of the token id
+        vm.startPrank(externalUser);
+        vm.expectRevert();
+        alchemist.resetMintAllowances(tokenId);
+        vm.stopPrank();
+    }
+
+    function testResetMintAllowancesOnUserCall() external {
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), 100e18);
+        alchemist.deposit(100e18, address(0xbeef), 0);
+        // a single position nft would have been minted to address(0xbeef)
+        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
+        alchemist.approveMint(tokenId, externalUser, 50e18);
+        vm.stopPrank();
+
+        uint256 allowanceBeforeReset = alchemist.mintAllowance(tokenId, externalUser);
+
+        vm.startPrank(address(0xbeef));
+        alchemist.resetMintAllowances(tokenId);
+        vm.stopPrank();
+
+        uint256 allowanceAfterReset = alchemist.mintAllowance(tokenId, externalUser);
+
+        assertEq(allowanceBeforeReset, 50e18);
+        assertEq(allowanceAfterReset, 0);
+    }
+
+    function testResetMintAllowancesOnTransfer() external {
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), 100e18);
+        alchemist.deposit(100e18, address(0xbeef), 0);
+        // a single position nft would have been minted to address(0xbeef)
+        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
+        alchemist.approveMint(tokenId, externalUser, 50e18);
+        uint256 allowanceBeforeTransfer = alchemist.mintAllowance(tokenId, externalUser);
+        IERC721(address(alchemistNFT)).safeTransferFrom(address(0xbeef), anotherExternalUser, tokenId);
+        vm.stopPrank();
+
+        uint256 allowanceAfterTransfer = alchemist.mintAllowance(tokenId, externalUser);
+        assertEq(allowanceBeforeTransfer, 50e18);
+        assertEq(allowanceAfterTransfer, 0);
     }
 
     function testMint_Variable_Amount(uint256 amount) external {
