@@ -32,9 +32,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     address public debtToken;
 
     /// @inheritdoc IAlchemistV3State
-    uint8 public underlyingDecimals;
-
-    /// @inheritdoc IAlchemistV3State
     uint256 public underlyingConversionFactor;
 
     /// @inheritdoc IAlchemistV3State
@@ -98,7 +95,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     bool public loansPaused;
 
     /// @inheritdoc IAlchemistV3State
-    mapping(address => bool) public gaurdians;
+    mapping(address => bool) public guardians;
 
     uint256 private _feeWeight;
 
@@ -117,8 +114,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         _;
     }
 
-    modifier onlyAdminOrGaurdian() {
-        if (msg.sender != admin && !gaurdians[msg.sender]) {
+    modifier onlyAdminOrGuardian() {
+        if (msg.sender != admin && !guardians[msg.sender]) {
             revert Unauthorized();
         }
         _;
@@ -139,7 +136,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         debtToken = params.debtToken;
         underlyingToken = params.underlyingToken;
-        underlyingDecimals = TokenUtils.expectDecimals(params.underlyingToken);
         underlyingConversionFactor = 10 ** (TokenUtils.expectDecimals(params.debtToken) - TokenUtils.expectDecimals(params.underlyingToken));
         yieldToken = params.yieldToken;
         depositCap = params.depositCap;
@@ -162,7 +158,14 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     // Setter for the NFT position token, callable by admin.
     function setAlchemistPositionNFT(address nft) external onlyAdmin {
-        require(nft != address(0), "AlchemistV3: invalid NFT position contract address");
+        if (nft == address(0)) {
+            revert AlchemistV3NFTZeroAddressError();
+        }
+
+        if (alchemistPositionNFT != address(0)) {
+            revert AlchemistV3NFTAlreadySetError();
+        }
+
         alchemistPositionNFT = nft;
     }
 
@@ -240,16 +243,16 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     }
 
     /// @inheritdoc IAlchemistV3AdminActions
-    function setGaurdian(address gaurdian, bool isActive) external onlyAdmin {
-        _checkArgument(gaurdian != address(0));
+    function setGuardian(address guardian, bool isActive) external onlyAdmin {
+        _checkArgument(guardian != address(0));
 
-        gaurdians[gaurdian] = isActive;
-        emit GaurdianSet(gaurdian, isActive);
+        guardians[guardian] = isActive;
+        emit GuardianSet(guardian, isActive);
     }
 
     /// @inheritdoc IAlchemistV3AdminActions
     function setMinimumCollateralization(uint256 value) external onlyAdmin {
-        _checkArgument(value >= 1e18);
+        _checkArgument(value >= FIXED_POINT_SCALAR);
         minimumCollateralization = value;
 
         emit MinimumCollateralizationUpdated(value);
@@ -265,19 +268,19 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @inheritdoc IAlchemistV3AdminActions
     function setCollateralizationLowerBound(uint256 value) external onlyAdmin {
         _checkArgument(value <= minimumCollateralization);
-        _checkArgument(value >= 1e18);
+        _checkArgument(value >= FIXED_POINT_SCALAR);
         collateralizationLowerBound = value;
         emit CollateralizationLowerBoundUpdated(value);
     }
 
     /// @inheritdoc IAlchemistV3AdminActions
-    function pauseDeposits(bool isPaused) external onlyAdminOrGaurdian {
+    function pauseDeposits(bool isPaused) external onlyAdminOrGuardian {
         depositsPaused = isPaused;
         emit DepositsPaused(isPaused);
     }
 
     /// @inheritdoc IAlchemistV3AdminActions
-    function pauseLoans(bool isPaused) external onlyAdminOrGaurdian {
+    function pauseLoans(bool isPaused) external onlyAdminOrGuardian {
         loansPaused = isPaused;
         emit LoansPaused(isPaused);
     }
@@ -303,7 +306,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @inheritdoc IAlchemistV3State
     function mintAllowance(uint256 ownerTokenId, address spender) external view returns (uint256) {
         Account storage account = _accounts[ownerTokenId];
-        return account.mintAllowances[spender];
+        return account.mintAllowances[account.allowancesVersion][spender];
     }
 
     /// @inheritdoc IAlchemistV3State
@@ -323,7 +326,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     function deposit(uint256 amount, address recipient, uint256 recipientId) external returns (uint256) {
         _checkArgument(recipient != address(0));
         _checkArgument(amount > 0);
-        _checkState(depositsPaused == false);
+        _checkState(!depositsPaused);
         _checkState(IERC20(yieldToken).balanceOf(address(this)) + amount <= depositCap);
         uint256 tokenId = recipientId;
 
@@ -547,6 +550,22 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         _approveMint(tokenId, spender, amount);
     }
 
+    /// @inheritdoc IAlchemistV3Actions
+    function resetMintAllowances(uint256 tokenId) external {
+        // Allow calls from either the token owner or the NFT contract
+        if (msg.sender != address(alchemistPositionNFT)) {
+            // Direct call - verify caller is current owner
+            address tokenOwner = IERC721(alchemistPositionNFT).ownerOf(tokenId);
+            if (msg.sender != tokenOwner) {
+                revert Unauthorized();
+            }
+        }
+        // increment version to start the mapping from a fresh state
+        _accounts[tokenId].allowancesVersion += 1;
+        // Emit event to notify allowance clearing
+        emit MintAllowancesReset(tokenId);
+    }
+
     /// @inheritdoc IAlchemistV3State
     function convertYieldTokensToDebt(uint256 amount) public view returns (uint256) {
         return normalizeUnderlyingTokensToDebt(convertYieldTokensToUnderlying(amount));
@@ -678,7 +697,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @param amount  The amount of debt tokens to set the mint allowance to.
     function _approveMint(uint256 ownerTokenId, address spender, uint256 amount) internal {
         Account storage account = _accounts[ownerTokenId];
-        account.mintAllowances[spender] = amount;
+        account.mintAllowances[account.allowancesVersion][spender] = amount;
         emit ApproveMint(ownerTokenId, spender, amount);
     }
 
@@ -689,7 +708,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @param amount  The amount of debt tokens to decrease the mint allowance by.
     function _decreaseMintAllowance(uint256 ownerTokenId, address spender, uint256 amount) internal {
         Account storage account = _accounts[ownerTokenId];
-        account.mintAllowances[spender] -= amount;
+        account.mintAllowances[account.allowancesVersion][spender] -= amount;
     }
 
     /// @dev Checks an expression and reverts with an {IllegalArgument} error if the expression is {false}.
@@ -859,7 +878,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     }
 
     /// @dev Checks that the account owned by `tokenId` is properly collateralized.
-    /// @dev If the account is undercollateralized then this will revert with an {Undercollateralized} error.
+    /// @dev Returns true only if the account is undercollateralized
     ///
     /// @param tokenId The id of the account owner.
     function _isUnderCollateralized(uint256 tokenId) internal view returns (bool) {
@@ -867,11 +886,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         if (debt == 0) return false;
 
         uint256 collateralization = totalValue(tokenId) * FIXED_POINT_SCALAR / debt;
-        if (collateralization < minimumCollateralization) {
-            return true;
-        }
-
-        return false;
+        return collateralization < minimumCollateralization;
     }
 
     /// @dev Calculates the amount required to reduce an accounts debt and collateral by to achieve the target `minimumCollateralization` ratio.
@@ -880,7 +895,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @param globalRatio  The global collaterilzation ratio for this alchemist.
     /// @return liquidationAmount amount to be liquidated.
     function _getLiquidationAmount(uint256 collateral, uint256 debt, uint256 globalRatio) internal view returns (uint256 liquidationAmount) {
-        _checkArgument(minimumCollateralization > 1e18);
+        _checkState(minimumCollateralization > FIXED_POINT_SCALAR);
         if (debt >= collateral) {
             // fully liquidate bad debt
             return debt;
@@ -891,9 +906,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
             return debt;
         }
         // otherwise, partially liquidate using formula : (collateral - amount)/(debt - amount) = globalMinimumCollateralization
-        uint256 expectedColltaeralForCurrentDebt = (debt * minimumCollateralization) / FIXED_POINT_SCALAR;
-        uint256 collateralDiff = expectedColltaeralForCurrentDebt - collateral;
-        uint256 ratioDiff = minimumCollateralization - 1e18;
+        uint256 expectedCollateralForCurrentDebt = (debt * minimumCollateralization) / FIXED_POINT_SCALAR;
+        uint256 collateralDiff = expectedCollateralForCurrentDebt - collateral;
+        uint256 ratioDiff = minimumCollateralization - FIXED_POINT_SCALAR;
         liquidationAmount = collateralDiff * FIXED_POINT_SCALAR / ratioDiff;
         return liquidationAmount;
     }

@@ -25,7 +25,7 @@ struct InitializationParams {
     address tokenAdapter;
     // The initial transmuter or transmuter buffer.
     address transmuter;
-    // TODO Need to discuss how fees will be accumulated since harvests will no longer be done.
+    // The fee on user debt paid to the protocol.
     uint256 protocolFee;
     // The address that receives protocol fees.
     address protocolFeeReceiver;
@@ -48,8 +48,10 @@ struct Account {
     uint256 lastAccruedFeeWeight;
     /// @notice Last weight of debt from most recent account sync.
     uint256 lastAccruedRedemptionWeight;
-    /// @notice allowances for minting alAssets
-    mapping(address => uint256) mintAllowances;
+    /// @notice allowances for minting alAssets, per version.
+    mapping(uint256 => mapping(address => uint256)) mintAllowances;
+    /// @notice id used in the mintAllowances map which is incremented on reset.
+    uint256 allowancesVersion;
 }
 
 /// @notice Information associated with a redemption.
@@ -76,6 +78,8 @@ interface IAlchemistV3Actions {
     function poke(uint256 tokenId) external;
 
     /// @notice Deposit a yield token into a user's account.
+    /// @notice Create a new position by using zero (0) for the `recipientId`.
+    /// @notice Users may create as much positions as they want.
     ///
     /// @notice An approval must be set for `yieldToken` which is greater than `amount`.
     ///
@@ -96,7 +100,7 @@ interface IAlchemistV3Actions {
     ///
     /// @param amount     The amount of yield tokens to deposit.
     /// @param recipient  The owner of the account that will receive the resulting shares.
-    /// @param recipientId The id of account
+    /// @param recipientId The id of account.
     /// @return debtValue The value of deposited tokens normalized to debt token value.
     function deposit(uint256 amount, address recipient, uint256 recipientId) external returns (uint256 debtValue);
 
@@ -246,6 +250,15 @@ interface IAlchemistV3Actions {
     ///
     /// @param amount The amount of tokens to redeem.
     function redeem(uint256 amount) external;
+
+    /// @notice Resets all mint allowances by account managed by `tokenId`.
+    ///
+    /// @notice This function is only callable by the owner of the token id or the AlchemistV3Position contract.
+    ///
+    /// @notice Emits a {MintAllowancesReset} event.
+    ///
+    /// @param tokenId The token id of the account.
+    function resetMintAllowances(uint256 tokenId) external;
 }
 
 interface IAlchemistV3AdminActions {
@@ -260,15 +273,15 @@ interface IAlchemistV3AdminActions {
     /// @param value The address to set the pending admin to.
     function setPendingAdmin(address value) external;
 
-    /// @notice Sets the active state of a gaurdian.
+    /// @notice Sets the active state of a guardian.
     ///
     /// @notice `msg.sender` must be the admin or this call will will revert with an {Unauthorized} error.
     ///
-    /// @notice Emits a {GaurdianSet} event.
+    /// @notice Emits a {GuardianSet} event.
     ///
-    /// @param gaurdian The address of the target gaurdian.
-    /// @param isActive The active state to set for the gaurdian.
-    function setGaurdian(address gaurdian, bool isActive) external;
+    /// @param guardian The address of the target guardian.
+    /// @param isActive The active state to set for the guardian.
+    function setGuardian(address guardian, bool isActive) external;
 
     /// @notice Allows for `msg.sender` to accepts the role of administrator.
     ///
@@ -364,7 +377,7 @@ interface IAlchemistV3AdminActions {
 
     /// @notice Pause all future deposits in the Alchemist.
     ///
-    /// @notice `msg.sender` must be the admin or gaurdian or this call will revert with an {Unauthorized} error.
+    /// @notice `msg.sender` must be the admin or guardian or this call will revert with an {Unauthorized} error.
     ///
     /// @notice Emits a {DepositsPaused} event.
     ///
@@ -373,7 +386,7 @@ interface IAlchemistV3AdminActions {
 
     /// @notice Pause all future loans in the Alchemist.
     ///
-    /// @notice `msg.sender` must be the admin or gaurdian or this call will revert with an {Unauthorized} error.
+    /// @notice `msg.sender` must be the admin or guardian or this call will revert with an {Unauthorized} error.
     ///
     /// @notice Emits a {LoansPaused} event.
     ///
@@ -397,11 +410,11 @@ interface IAlchemistV3Events {
     /// @param value The value of the new deposit cap.
     event DepositCapUpdated(uint256 value);
 
-    /// @notice Emitted when a gaurdian is added or removed from the alchemist.
+    /// @notice Emitted when a guardian is added or removed from the alchemist.
     ///
-    /// @param gaurdian The addres of the new gaurdian.
-    /// @param state    The active state of the gaurdian.
-    event GaurdianSet(address gaurdian, bool state);
+    /// @param guardian The addres of the new guardian.
+    /// @param state    The active state of the guardian.
+    event GuardianSet(address guardian, bool state);
 
     /// @notice Emitted when a new token adapter is set in the alchemist.
     ///
@@ -521,6 +534,11 @@ interface IAlchemistV3Events {
     /// @param amount       The amount liquidated
     /// @param fee          The liquidation fee sent to 'liquidator'
     event BatchLiquidated(uint256[] indexed accounts, address liquidator, uint256 amount, uint256 fee);
+
+    /// @notice Emitted when all mint allowances for account managed by `tokenId` are reset.
+    ///
+    /// @param tokenId       The tokenId of the account.
+    event MintAllowancesReset(uint256 indexed tokenId);
 }
 
 interface IAlchemistV3Immutables {
@@ -543,7 +561,7 @@ interface IAlchemistV3State {
 
     function depositCap() external view returns (uint256 cap);
 
-    function gaurdians(address gaurdian) external view returns (bool isActive);
+    function guardians(address guardian) external view returns (bool isActive);
 
     function blocksPerYear() external view returns (uint256 blocks);
 
@@ -558,8 +576,6 @@ interface IAlchemistV3State {
     function protocolFee() external view returns (uint256 fee);
 
     function liquidatorFee() external view returns (uint256 fee);
-
-    function underlyingDecimals() external view returns (uint8 decimals);
 
     function underlyingConversionFactor() external view returns (uint256 factor);
 
@@ -703,6 +719,12 @@ interface IAlchemistV3Errors {
 
     /// @notice An error which is used to indicate that the account id used is not linked to any owner
     error UnknownAccountOwnerIDError();
+
+    /// @notice An error which is used to indicate that the NFT address being set is the zero address
+    error AlchemistV3NFTZeroAddressError();
+
+    /// @notice An error which is used to indicate that the NFT address for the Alchemist has already been set
+    error AlchemistV3NFTAlreadySetError();
 }
 
 /// @title  IAlchemistV3
