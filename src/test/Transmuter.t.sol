@@ -101,12 +101,9 @@ contract TransmuterTest is Test {
         vm.prank(address(0xbeef));
         transmuter.createRedemption(100e18);
 
-        uint256[] memory ids = new uint256[](1);
-        ids[0] = 1;
+        Transmuter.StakingPosition memory position = transmuter.getPosition(1);
 
-        Transmuter.StakingPosition[] memory positions = transmuter.getPositions(address(0xbeef), ids);
-
-        assertEq(positions[0].amount, 100e18);
+        assertEq(position.amount, 100e18);
         assertEq(transmuter.totalLocked(), 100e18);
     }
 
@@ -124,12 +121,9 @@ contract TransmuterTest is Test {
         vm.prank(address(0xbeef));
         transmuter.createRedemption(amount);
 
-        uint256[] memory ids = new uint256[](1);
-        ids[0] = 1;
+        Transmuter.StakingPosition memory position = transmuter.getPosition(1);
 
-        Transmuter.StakingPosition[] memory positions = transmuter.getPositions(address(0xbeef), ids);
-
-        assertEq(positions[0].amount, amount);
+        assertEq(position.amount, amount);
         assertEq(transmuter.totalLocked(), amount);
     }
 
