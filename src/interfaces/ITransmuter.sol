@@ -153,13 +153,12 @@ interface ITransmuter {
     /// @return active  Status of `alchemist` activation.
     function alchemistEntries(address alchemist) external view returns (uint256 index, bool active);
 
-    /// @notice Gets position info for `account`.
+    /// @notice Gets position info for `id`.
     ///
-    /// @param account  Account address to query
-    /// @param ids      Array of position Ids to query
+    /// @param id      NFT ID,
     ///
-    /// @return positions   Array of position data.
-    function getPositions(address account, uint256[] calldata ids) external view returns(StakingPosition[] memory positions);
+    /// @return position   Position data.
+    function getPosition(uint256 id) external view returns(StakingPosition memory position);
 
     /// @notice Creates a new staking position in the transmuter.
     ///

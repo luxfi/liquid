@@ -7,8 +7,9 @@ import "./interfaces/ITransmuter.sol";
 import "./base/TransmuterErrors.sol";
 
 import "./libraries/TokenUtils.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ERC1155} from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {SafeCast} from "./libraries/SafeCast.sol";
 import {StakingGraph} from "./libraries/StakingGraph.sol";
 
@@ -17,7 +18,7 @@ import {Unauthorized, IllegalArgument, IllegalState, InsufficientAllowance} from
 /// @title AlchemixV3 Transmuter
 ///
 /// @notice A contract which facilitates the exchange of alAssets to yield bearing assets.
-contract Transmuter is ITransmuter, ERC1155 {
+contract Transmuter is ITransmuter, ERC721 {
     using StakingGraph for mapping(uint256 => int256);
     using SafeCast for int256;
     using SafeCast for uint256;
@@ -69,7 +70,7 @@ contract Transmuter is ITransmuter, ERC1155 {
     mapping(address => AlchemistEntry) internal _alchemistEntries;
 
     /// @dev Map of user positions data.
-    mapping(address => mapping(uint256 => StakingPosition)) internal _positions;
+    mapping(uint256 => StakingPosition) internal _positions;
 
     /// @dev Mapping used for staking graph.
     mapping(uint256 => int256) internal _graph1;
@@ -86,7 +87,7 @@ contract Transmuter is ITransmuter, ERC1155 {
     }
 
     // TODO: Replace with upgradeable initializer
-    constructor(InitializationParams memory params) ERC1155("https://alchemix.fi/transmuter/{id}.json") {
+    constructor(InitializationParams memory params) ERC721("Alchemix V3 Transmuter", "TRNSMTR") {
         syntheticToken = params.syntheticToken;
         timeToTransmute = params.timeToTransmute;
         transmutationFee = params.transmutationFee;
@@ -171,14 +172,8 @@ contract Transmuter is ITransmuter, ERC1155 {
     }
 
     /// @inheritdoc ITransmuter
-    function getPositions(address account, uint256[] calldata ids) external view returns(StakingPosition[] memory) {
-        StakingPosition[] memory userPositions = new StakingPosition[](ids.length);
-
-        for (uint256 i = 0; i < ids.length; i++) {
-            userPositions[i] = _positions[account][ids[i]];
-        }
-
-        return userPositions;
+    function getPosition(uint256 id) external view returns (StakingPosition memory) {
+        return _positions[id];
     }
 
     /// @inheritdoc ITransmuter
@@ -199,20 +194,20 @@ contract Transmuter is ITransmuter, ERC1155 {
             syntheticDepositAmount
         );
 
-        _positions[msg.sender][++_nonce] = StakingPosition(syntheticDepositAmount, block.number, block.number + timeToTransmute);
+        _positions[++_nonce] = StakingPosition(syntheticDepositAmount, block.number, block.number + timeToTransmute);
 
         // Update Fenwick Tree
         _updateStakingGraph(syntheticDepositAmount.toInt256() * BLOCK_SCALING_FACTOR / timeToTransmute.toInt256(), timeToTransmute);
         totalLocked += syntheticDepositAmount;
 
-        _mint(msg.sender, _nonce, syntheticDepositAmount, "");
+        _mint(msg.sender, _nonce);
         
         emit PositionCreated(msg.sender, syntheticDepositAmount, _nonce);
     }
 
     /// @inheritdoc ITransmuter
     function claimRedemption(uint256 id) external {
-        StakingPosition storage position = _positions[msg.sender][id];
+        StakingPosition storage position = _positions[id];
 
         if (position.maturationBlock == 0)
             revert PositionNotFound();
@@ -223,7 +218,7 @@ contract Transmuter is ITransmuter, ERC1155 {
         uint256 amountTransmuted = position.amount - amountNottransmuted;
 
         // Burn position NFT
-        _burn(msg.sender, id, position.amount);
+        _burn(id);
 
         // If the contract has a balance of yield tokens from alchemist repayments then we only need to redeem partial or none from Alchemist earmarked
         uint256 yieldTokenBalance = TokenUtils.safeBalanceOf(alchemist.yieldToken(), address(this));
@@ -262,7 +257,7 @@ contract Transmuter is ITransmuter, ERC1155 {
 
         emit PositionClaimed(msg.sender, claimAmount, syntheticReturned);
 
-        delete _positions[msg.sender][id];
+        delete _positions[id];
     }
 
     /// @inheritdoc ITransmuter
@@ -303,5 +298,17 @@ contract Transmuter is ITransmuter, ERC1155 {
         if (!expression) {
             revert IllegalState();
         }
+    }
+
+    function _baseURI() internal view virtual override returns (string memory) {
+        return string(
+            abi.encodePacked(
+                "https://alchemix.fi/", 
+                Strings.toHexString(uint160(address(this)), 20),                   
+                "/",
+                Strings.toString(block.chainid), 
+                "/"
+            )
+        );
     }
 }
