@@ -201,6 +201,13 @@ contract AlchemistV3Test is Test {
         vm.stopPrank();
     }
 
+    function testSetV3PositionNFTAlreadySetRevert() public {
+        vm.startPrank(alOwner);
+        vm.expectRevert();
+        alchemist.setAlchemistPositionNFT(address(0xdBdb4d16EdA451D0503b854CF79D55697F90c8DF));
+        vm.stopPrank();
+    }
+
     function testSetProtocolFeeTooHigh() public {
         vm.startPrank(alOwner);
         vm.expectRevert();

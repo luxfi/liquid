@@ -18,9 +18,21 @@ contract AlchemistV3Position is ERC721Enumerable {
     /// @notice Counter used for generating unique token ids.
     uint256 private _currentTokenId;
 
+    /// @notice An error which is used to indicate that the functioin call failed becasue the caller is not the alchemist
+    error CallerNotAlchemist();
+
+    /// @notice An error which is used to indicate that Alchemist set is the zero address
+    error AlchemistZeroAddressError();
+
+    /// @notice An error which is used to indicate that address minted to is the zero address
+    error MintToZeroAddressError();
+
     /// @dev Modifier to restrict calls to only the authorized AlchemistV3 contract.
     modifier onlyAlchemist() {
-        require(msg.sender == alchemist, "AlchemistV3Position: caller is not the alchemist");
+        if (msg.sender != alchemist) {
+            revert CallerNotAlchemist();
+        }
+
         _;
     }
 
@@ -29,7 +41,9 @@ contract AlchemistV3Position is ERC721Enumerable {
      * @param alchemist_ The address of the Alchemist contract.
      */
     constructor(address alchemist_) ERC721("AlchemistV3Position", "ALCV3") {
-        require(alchemist_ != address(0), "AlchemistV3Position: alchemist address is zero");
+        if (alchemist_ == address(0)) {
+            revert AlchemistZeroAddressError();
+        }
         alchemist = alchemist_;
     }
 
@@ -40,7 +54,9 @@ contract AlchemistV3Position is ERC721Enumerable {
      * @return tokenId The unique token id minted.
      */
     function mint(address to) external onlyAlchemist returns (uint256) {
-        require(to != address(0), "AlchemistV3Position: mint to the zero address");
+        if (to == address(0)) {
+            revert MintToZeroAddressError();
+        }
         _currentTokenId++;
         uint256 tokenId = _currentTokenId;
         _mint(to, tokenId);
