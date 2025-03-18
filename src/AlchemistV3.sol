@@ -750,11 +750,11 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
             // token ids start from 1
             return false;
         }
-        try IERC721(nft).ownerOf(tokenId) returns (address _owner) {
-            // If the call succeeds and _owner is not the zero address, the token exists.
-            exists = (_owner != address(0));
+        try IERC721(nft).ownerOf(tokenId) {
+            // If the call succeeds, the token exists.
+            exists = true;
         } catch {
-            // If the call fails (reverts), then the token does not exist.
+            // If the call fails, then the token does not exist.
             exists = false;
         }
     }
