@@ -717,6 +717,12 @@ interface IAlchemistV3Errors {
 
     /// @notice An error which is used to indicate that the account id used is not linked to any owner
     error UnknownAccountOwnerIDError();
+
+    /// @notice An error which is used to indicate that the NFT address being set is the zero address
+    error AlchemistV3NFTZeroAddressError();
+
+    /// @notice An error which is used to indicate that the NFT address for the Alchemist has already been set
+    error AlchemistV3NFTAlreadySetError();
 }
 
 /// @title  IAlchemistV3

@@ -158,7 +158,14 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     // Setter for the NFT position token, callable by admin.
     function setAlchemistPositionNFT(address nft) external onlyAdmin {
-        require(nft != address(0), "AlchemistV3: invalid NFT position contract address");
+        if (nft == address(0)) {
+            revert AlchemistV3NFTZeroAddressError();
+        }
+
+        if (alchemistPositionNFT != address(0)) {
+            revert AlchemistV3NFTAlreadySetError();
+        }
+
         alchemistPositionNFT = nft;
     }
 
