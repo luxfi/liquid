@@ -78,6 +78,8 @@ interface IAlchemistV3Actions {
     function poke(uint256 tokenId) external;
 
     /// @notice Deposit a yield token into a user's account.
+    /// @notice Create a new position by using zero (0) for the `recipientId`.
+    /// @notice Users may create as much positions as they want.
     ///
     /// @notice An approval must be set for `yieldToken` which is greater than `amount`.
     ///
@@ -98,7 +100,7 @@ interface IAlchemistV3Actions {
     ///
     /// @param amount     The amount of yield tokens to deposit.
     /// @param recipient  The owner of the account that will receive the resulting shares.
-    /// @param recipientId The id of account
+    /// @param recipientId The id of account.
     /// @return debtValue The value of deposited tokens normalized to debt token value.
     function deposit(uint256 amount, address recipient, uint256 recipientId) external returns (uint256 debtValue);
 
