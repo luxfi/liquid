@@ -8,10 +8,9 @@ import "../../lib/forge-std/src/Test.sol";
 import {SafeERC20} from "../libraries/SafeERC20.sol";
 import {console} from "../../lib/forge-std/src/console.sol";
 import {AlchemistV3} from "../AlchemistV3.sol";
-import {AlchemicTokenV3} from "../AlchemicTokenV3.sol";
+import {AlchemicTokenV3} from "../test/mocks/AlchemicTokenV3.sol";
 import {EulerUSDCAdapter} from "../adapters/EulerUSDCAdapter.sol";
 import {Transmuter} from "../Transmuter.sol";
-import {TransmuterBuffer} from "../TransmuterBuffer.sol";
 import {Whitelist} from "../utils/Whitelist.sol";
 import {TestERC20} from "./mocks/TestERC20.sol";
 import {TestYieldToken} from "./mocks/TestYieldToken.sol";
@@ -33,19 +32,16 @@ contract RedemptionIntegrationTest is Test {
     // Callable contract variables
     AlchemistV3 alchemist;
     Transmuter transmuter;
-    TransmuterBuffer transmuterBuffer;
     AlchemistV3Position alchemistNFT;
 
     // // Proxy variables
     TransparentUpgradeableProxy proxyAlchemist;
     TransparentUpgradeableProxy proxyTransmuter;
-    TransparentUpgradeableProxy proxyTransmuterBuffer;
 
     // // Contract variables
     // CheatCodes cheats = CheatCodes(HEVM_ADDRESS);
     AlchemistV3 alchemistLogic;
     Transmuter transmuterLogic;
-    TransmuterBuffer transmuterBufferLogic;
     AlchemicTokenV3 alToken;
     Whitelist whitelist;
     ETHUSDPriceFeedAdapter ethUsdAdapter;
@@ -71,9 +67,9 @@ contract RedemptionIntegrationTest is Test {
 
     mapping(address => bool) users;
 
-    uint256 public minimumCollateralization = uint256(1e18 * 1e18) / 9e17;
-
     uint256 public constant FIXED_POINT_SCALAR = 1e18;
+
+    uint256 public minimumCollateralization = uint256(FIXED_POINT_SCALAR * FIXED_POINT_SCALAR) / 9e17;
 
     // ----- Variables for deposits & withdrawals -----
 
@@ -90,7 +86,7 @@ contract RedemptionIntegrationTest is Test {
     uint256 minimumDeposit = 1000e18;
 
     // minimum amount of yield/underlying token to deposit
-    uint256 minimumDepositOrWithdrawalLoss = 1e18;
+    uint256 minimumDepositOrWithdrawalLoss = FIXED_POINT_SCALAR;
 
     // random EOA for testing
     address externalUser = address(0x69E8cE9bFc01AA33cD2d02Ed91c72224481Fa420);
@@ -130,7 +126,6 @@ contract RedemptionIntegrationTest is Test {
 
         // Contracts and logic contracts
         alOwner = caller;
-        transmuterBufferLogic = new TransmuterBuffer();
         transmuterLogic = new Transmuter(transParams);
         alchemistLogic = new AlchemistV3();
         whitelist = new Whitelist();
@@ -231,13 +226,13 @@ contract RedemptionIntegrationTest is Test {
         alchemist.mint(tokenId, alchemist.getMaxBorrowable(tokenId), address(0xbeef));
         (uint256 collateral, uint256 debt,) = alchemist.getCDP(tokenId);
         assertEq(collateral, 100_000e6);
-        assertEq(debt, alchemist.convertYieldTokensToDebt(100_000e6) * 1e18 / 1_111_111_111_111_111_111);
+        assertEq(debt, alchemist.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111);
 
         vm.stopPrank();
     }
 
     function testRepay() external {
-        uint256 debtAmount = alchemist.convertYieldTokensToDebt(100_000e6) * 1e18 / 1_111_111_111_111_111_111;
+        uint256 debtAmount = alchemist.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
 
         vm.startPrank(address(0xbeef));
         IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
@@ -257,7 +252,7 @@ contract RedemptionIntegrationTest is Test {
     }
 
     function testRepayEarmarkedFull() external {
-        uint256 debtAmount = alchemist.convertYieldTokensToDebt(100_000e6) * 1e18 / 1_111_111_111_111_111_111;
+        uint256 debtAmount = alchemist.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
 
         vm.startPrank(address(0xbeef));
         IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
@@ -297,7 +292,7 @@ contract RedemptionIntegrationTest is Test {
     }
 
     function testRepayEarmarkedPartialEarmarked() external {
-        uint256 debtAmount = alchemist.convertYieldTokensToDebt(100_000e6) * 1e18 / 1_111_111_111_111_111_111;
+        uint256 debtAmount = alchemist.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
 
         vm.startPrank(address(0xbeef));
         IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
@@ -337,7 +332,7 @@ contract RedemptionIntegrationTest is Test {
     }
 
     function testRepayEarmarkedPartialRepayment() external {
-        uint256 debtAmount = alchemist.convertYieldTokensToDebt(100_000e6) * 1e18 / 1_111_111_111_111_111_111;
+        uint256 debtAmount = alchemist.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
 
         vm.startPrank(address(0xbeef));
         IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
@@ -377,7 +372,7 @@ contract RedemptionIntegrationTest is Test {
     }
 
     function testRepayEarmarkedOverRepayment() external {
-        uint256 debtAmount = alchemist.convertYieldTokensToDebt(100_000e6) * 1e18 / 1_111_111_111_111_111_111;
+        uint256 debtAmount = alchemist.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
 
         vm.startPrank(address(0xbeef));
         IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
@@ -424,7 +419,7 @@ contract RedemptionIntegrationTest is Test {
     }
 
     function testBurn() external {
-        uint256 debtAmount = alchemist.convertYieldTokensToDebt(100_000e6) * 1e18 / 1_111_111_111_111_111_111;
+        uint256 debtAmount = alchemist.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
 
         vm.startPrank(address(0xbeef));
         IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
@@ -444,7 +439,7 @@ contract RedemptionIntegrationTest is Test {
     }
 
     function testBurnWithEarmarkPartial() external {
-        uint256 debtAmount = alchemist.convertYieldTokensToDebt(100_000e6) * 1e18 / 1_111_111_111_111_111_111;
+        uint256 debtAmount = alchemist.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
 
         vm.startPrank(address(0xbeef));
         IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
@@ -488,7 +483,7 @@ contract RedemptionIntegrationTest is Test {
     }
 
     function testBurnFullyEarmarked() external {
-        uint256 debtAmount = alchemist.convertYieldTokensToDebt(100_000e6) * 1e18 / 1_111_111_111_111_111_111;
+        uint256 debtAmount = alchemist.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
 
         vm.startPrank(address(0xbeef));
         IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
@@ -524,7 +519,7 @@ contract RedemptionIntegrationTest is Test {
     }
 
     function testPositionToFullMaturity() external {
-        uint256 debtAmount = alchemist.convertYieldTokensToDebt(100_000e6) * 1e18 / 1_111_111_111_111_111_111;
+        uint256 debtAmount = alchemist.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
 
         vm.startPrank(address(0xbeef));
         IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
