@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {StdCheats} from "forge-std/StdCheats.sol";
 
 import {AlchemistV3} from "../AlchemistV3.sol";
-import {AlEth} from "../external/Aleth.sol";
+import {AlEth} from "../external/AlEth.sol";
 import {Transmuter} from "../Transmuter.sol";
 
 import "../interfaces/ITransmuter.sol";
