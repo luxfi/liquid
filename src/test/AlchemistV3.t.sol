@@ -464,7 +464,8 @@ contract AlchemistV3Test is Test {
 
         assertEq(
             alchemist.getMaxBorrowable(tokenId),
-            alchemist.normalizeUnderlyingTokensToDebt(fakeYieldToken.price() * amount / FIXED_POINT_SCALAR) * FIXED_POINT_SCALAR / alchemist.minimumCollateralization()
+            alchemist.normalizeUnderlyingTokensToDebt(fakeYieldToken.price() * amount / FIXED_POINT_SCALAR) * FIXED_POINT_SCALAR
+                / alchemist.minimumCollateralization()
         );
 
         assertEq(alchemist.getTotalUnderlyingValue(), alchemist.convertYieldTokensToUnderlying(amount));
@@ -494,7 +495,9 @@ contract AlchemistV3Test is Test {
 
         assertEq(
             alchemist.getMaxBorrowable(tokenId),
-            alchemist.normalizeUnderlyingTokensToDebt((fakeYieldToken.price() * (amount * 2) / FIXED_POINT_SCALAR) * FIXED_POINT_SCALAR / alchemist.minimumCollateralization())
+            alchemist.normalizeUnderlyingTokensToDebt(
+                (fakeYieldToken.price() * (amount * 2) / FIXED_POINT_SCALAR) * FIXED_POINT_SCALAR / alchemist.minimumCollateralization()
+            )
         );
 
         assertEq(alchemist.getTotalUnderlyingValue(), alchemist.convertYieldTokensToUnderlying((amount * 2)));
@@ -572,7 +575,8 @@ contract AlchemistV3Test is Test {
 
         assertApproxEqAbs(
             alchemist.getMaxBorrowable(tokenId),
-            alchemist.normalizeUnderlyingTokensToDebt(fakeYieldToken.price() * amount / 2 / FIXED_POINT_SCALAR) * FIXED_POINT_SCALAR / alchemist.minimumCollateralization(),
+            alchemist.normalizeUnderlyingTokensToDebt(fakeYieldToken.price() * amount / 2 / FIXED_POINT_SCALAR) * FIXED_POINT_SCALAR
+                / alchemist.minimumCollateralization(),
             1
         );
         assertApproxEqAbs(alchemist.getTotalUnderlyingValue(), alchemist.convertYieldTokensToUnderlying(amount / 2), 1);
@@ -670,7 +674,8 @@ contract AlchemistV3Test is Test {
 
         assertApproxEqAbs(
             alchemist.getMaxBorrowable(tokenId),
-            alchemist.normalizeUnderlyingTokensToDebt(fakeYieldToken.price() * amount / 2 / FIXED_POINT_SCALAR) * FIXED_POINT_SCALAR / alchemist.minimumCollateralization(),
+            alchemist.normalizeUnderlyingTokensToDebt(fakeYieldToken.price() * amount / 2 / FIXED_POINT_SCALAR) * FIXED_POINT_SCALAR
+                / alchemist.minimumCollateralization(),
             1
         );
         assertApproxEqAbs(alchemist.getTotalUnderlyingValue(), alchemist.convertYieldTokensToUnderlying(amount / 2), 1);
@@ -746,8 +751,10 @@ contract AlchemistV3Test is Test {
 
         assertApproxEqAbs(
             alchemist.getMaxBorrowable(tokenId),
-            (alchemist.normalizeUnderlyingTokensToDebt(fakeYieldToken.price() * amount / FIXED_POINT_SCALAR) * FIXED_POINT_SCALAR / alchemist.minimumCollateralization())
-                - (amount * ltv) / FIXED_POINT_SCALAR,
+            (
+                alchemist.normalizeUnderlyingTokensToDebt(fakeYieldToken.price() * amount / FIXED_POINT_SCALAR) * FIXED_POINT_SCALAR
+                    / alchemist.minimumCollateralization()
+            ) - (amount * ltv) / FIXED_POINT_SCALAR,
             1
         );
 
@@ -857,8 +864,10 @@ contract AlchemistV3Test is Test {
 
         assertApproxEqAbs(
             alchemist.getMaxBorrowable(tokenId),
-            (alchemist.normalizeUnderlyingTokensToDebt(fakeYieldToken.price() * amount / FIXED_POINT_SCALAR) * FIXED_POINT_SCALAR / alchemist.minimumCollateralization())
-                - (amount * ltv) / FIXED_POINT_SCALAR,
+            (
+                alchemist.normalizeUnderlyingTokensToDebt(fakeYieldToken.price() * amount / FIXED_POINT_SCALAR) * FIXED_POINT_SCALAR
+                    / alchemist.minimumCollateralization()
+            ) - (amount * ltv) / FIXED_POINT_SCALAR,
             1
         );
 
@@ -2165,5 +2174,35 @@ contract AlchemistV3Test is Test {
 
         // Optional: Assert size is under EIP-170 limit (24576 bytes)
         assertTrue(size <= 24_576, "Contract too large");
+    }
+
+    function testAlchemistV3TokenUri() public {
+        uint256 amount = 100e18;
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
+        alchemist.deposit(amount, address(0xbeef), 0);
+        // a single position nft would have been minted to 0xbeef
+        uint256 tokenIdFor0xBeef = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
+
+        vm.stopPrank();
+
+        // Get the token URI
+        string memory uri = alchemistNFT.tokenURI(tokenIdFor0xBeef);
+
+        // Verify it starts with the data URI prefix
+        assertEq(AlchemistNFTHelper.slice(uri, 0, 29), "data:application/json;base64,", "URI should start with data:application/json;base64,");
+
+        // Extract and decode the base64 content
+        string memory base64Content = AlchemistNFTHelper.base64Content(uri);
+        string memory jsonContent = AlchemistNFTHelper.jsonContent(uri);
+
+        // Verify JSON contains expected fields
+        assertTrue(AlchemistNFTHelper.contains(jsonContent, '"name": "AlchemistV3 Position #1"'), "JSON should contain the name field");
+        assertTrue(AlchemistNFTHelper.contains(jsonContent, '"description": "Position token for Alchemist V3"'), "JSON should contain the description field");
+        assertTrue(AlchemistNFTHelper.contains(jsonContent, '"image": "data:image/svg+xml;base64,'), "JSON should contain the image data URI");
+
+        // revert if the token does not exist
+        vm.expectRevert();
+        alchemistNFT.tokenURI(2);
     }
 }
