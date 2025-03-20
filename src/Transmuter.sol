@@ -186,7 +186,7 @@ contract Transmuter is ITransmuter, ERC721 {
             revert DepositCapReached();
         }
 
-        if (totalLocked + syntheticDepositAmount > alchemist.totalDebt()) {
+        if (totalLocked + syntheticDepositAmount > alchemist.totalSyntheticsIssued()) {
             revert DepositCapReached();
         }
 
@@ -196,6 +196,7 @@ contract Transmuter is ITransmuter, ERC721 {
 
         // Update Fenwick Tree
         _updateStakingGraph(syntheticDepositAmount.toInt256() * BLOCK_SCALING_FACTOR / timeToTransmute.toInt256(), timeToTransmute);
+
         totalLocked += syntheticDepositAmount;
 
         _mint(msg.sender, _nonce);
@@ -245,6 +246,8 @@ contract Transmuter is ITransmuter, ERC721 {
         TokenUtils.safeBurn(syntheticToken, amountTransmuted);
 
         totalLocked -= position.amount;
+
+        alchemist.adjustTotalSyntheticsIssued(amountTransmuted);
 
         emit PositionClaimed(msg.sender, claimAmount, syntheticReturned);
 
