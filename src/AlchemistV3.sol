@@ -2,15 +2,18 @@
 pragma solidity 0.8.26;
 
 import "./interfaces/IAlchemistV3.sol";
-import "./interfaces/ITokenAdapter.sol";
-import "./interfaces/ITransmuter.sol";
-import "./interfaces/IAlchemistV3Position.sol";
-import "./libraries/TokenUtils.sol";
-import "./libraries/SafeCast.sol";
 
+import {ITokenAdapter} from "./interfaces/ITokenAdapter.sol";
+import {ITransmuter} from "./interfaces/ITransmuter.sol";
+import {IAlchemistV3Position} from "./interfaces/IAlchemistV3Position.sol";
+import {TokenUtils} from "./libraries/TokenUtils.sol";
+import {SafeCast} from "./libraries/SafeCast.sol";
+import {IAlchemistETHVault} from "./interfaces/IAlchemistETHVault.sol";
 import {Initializable} from "../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {Unauthorized, IllegalArgument, IllegalState, MissingInputData} from "./base/Errors.sol";
+import {IERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {IPriceFeedAdapter} from "./adapters/ETHUSDPriceFeedAdapter.sol";
 
 /// @title  AlchemistV3
 /// @author Alchemix Finance
@@ -27,6 +30,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     /// @inheritdoc IAlchemistV3State
     address public admin;
+
+    /// @inheritdoc IAlchemistV3State
+    address public alchemistETHVault;
 
     /// @inheritdoc IAlchemistV3Immutables
     address public debtToken;
@@ -81,6 +87,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     /// @inheritdoc IAlchemistV3State
     address public tokenAdapter;
+
+    /// @inheritdoc IAlchemistV3State
+    address public ethUsdAdapter;
 
     /// @inheritdoc IAlchemistV3State
     address public transmuter;
@@ -145,6 +154,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         collateralizationLowerBound = params.collateralizationLowerBound;
         admin = params.admin;
         tokenAdapter = params.tokenAdapter;
+        ethUsdAdapter = params.ethUsdAdapter;
         transmuter = params.transmuter;
         protocolFee = params.protocolFee;
         protocolFeeReceiver = params.protocolFeeReceiver;
@@ -167,6 +177,12 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         }
 
         alchemistPositionNFT = nft;
+    }
+
+    /// @inheritdoc IAlchemistV3AdminActions
+    function setAlchemistETHVault(address value) external onlyAdmin {
+        alchemistETHVault = value;
+        emit AlchemistETHVaultUpdated(value);
     }
 
     /// @inheritdoc IAlchemistV3AdminActions
@@ -229,6 +245,14 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         tokenAdapter = value;
         emit TokenAdapterUpdated(value);
+    }
+
+    /// @inheritdoc IAlchemistV3AdminActions
+    function setEthUsdAdapter(address value) external onlyAdmin {
+        _checkArgument(value != address(0));
+
+        ethUsdAdapter = value;
+        emit EthUsdAdapterUpdated(value);
     }
 
     /// @inheritdoc IAlchemistV3AdminActions
@@ -478,14 +502,14 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     }
 
     /// @inheritdoc IAlchemistV3Actions
-    function liquidate(uint256 accountId) external override returns (uint256 underlyingAmount, uint256 fee) {
+    function liquidate(uint256 accountId) external override returns (uint256 underlyingAmount, uint256 feeInYield, uint256 feeInETH) {
         _checkForValidAccountId(accountId);
         _earmark();
 
-        (underlyingAmount, fee) = _liquidate(accountId);
+        (underlyingAmount, feeInYield, feeInETH) = _liquidate(accountId);
         if (underlyingAmount > 0) {
-            emit Liquidated(accountId, msg.sender, underlyingAmount, fee);
-            return (underlyingAmount, fee);
+            emit Liquidated(accountId, msg.sender, underlyingAmount, feeInYield, feeInETH);
+            return (underlyingAmount, feeInYield, feeInETH);
         } else {
             // no liquidation amount returned, so no liquidation happened
             revert LiquidationError();
@@ -493,7 +517,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     }
 
     /// @inheritdoc IAlchemistV3Actions
-    function batchLiquidate(uint256[] memory accountIds) external returns (uint256 totalAmountLiquidated, uint256 totalFees) {
+    function batchLiquidate(uint256[] memory accountIds) external returns (uint256 totalAmountLiquidated, uint256 totalFeesInYield, uint256 totalFeesInETH) {
         _earmark();
 
         if (accountIds.length == 0) {
@@ -505,13 +529,14 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
             if (accountId == 0 || !_tokenExists(alchemistPositionNFT, accountId)) {
                 continue;
             }
-            (uint256 underlyingAmount, uint256 fee) = _liquidate(accountId);
+            (uint256 underlyingAmount, uint256 feeInYield, uint256 feeInETH) = _liquidate(accountId);
             totalAmountLiquidated += underlyingAmount;
-            totalFees += fee;
+            totalFeesInYield += feeInYield;
+            totalFeesInETH += feeInETH;
         }
 
         if (totalAmountLiquidated > 0) {
-            return (totalAmountLiquidated, totalFees);
+            return (totalAmountLiquidated, totalFeesInYield, totalFeesInETH);
         } else {
             // no total liquidation amount returned, so no liquidations happened
             revert LiquidationError();
@@ -617,8 +642,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @dev Fetches and applies the liquidation amount to account `tokenId` if the account collateral ratio touches `collateralizationLowerBound`.
     /// @param accountId  The tokenId of the account to to liquidate.
     /// @return debtAmount  The liquidation amount removed from the account `tokenId`.
-    /// @return fee The additional fee as a % of the liquidation amount to be sent to the liquidator
-    function _liquidate(uint256 accountId) internal returns (uint256 debtAmount, uint256 fee) {
+    /// @return feeInYield The additional fee as a % of the liquidation amount to be sent to the liquidator
+    /// @return feeInETH The additional fee as a % of the liquidation amount, denominated in ETH, to be sent to the liquidator
+    function _liquidate(uint256 accountId) internal returns (uint256 debtAmount, uint256 feeInYield, uint256 feeInETH) {
         // Get updated earmarking data and sync current user debt before liquidation
         // If a redemption gets triggered before this liquidation call in the block then the users account may fall back into the healthy range
         _sync(accountId);
@@ -627,7 +653,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         uint256 debt = account.debt;
         if (debt == 0) {
-            return (0, 0);
+            return (0, 0, 0);
         }
 
         // tokenId collateral denominated in underlying value
@@ -641,16 +667,18 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
             uint256 liquidationAmount = _getLiquidationAmount(collateralInDebt, debt, globalCollateralizationRatio);
             uint256 feeInDebt = liquidationAmount * liquidatorFee / BPS;
             uint256 remainingCollateral = collateralInDebt >= liquidationAmount ? collateralInDebt - liquidationAmount : 0;
-
+            // if remaining collateral is less than feeInDebt, then we need to source funds from the eth vault
+            uint256 excessFee;
             if (feeInDebt >= remainingCollateral) {
+                // source funds from eth vault
+                excessFee = feeInDebt - remainingCollateral;
+                // fully drain user account collateral
                 feeInDebt = remainingCollateral;
             }
-
             collateralInDebt = collateralInDebt >= liquidationAmount ? collateralInDebt - (liquidationAmount + feeInDebt) : 0;
             debtAmount = liquidationAmount + feeInDebt;
             uint256 adjustedLiquidationAmount = convertDebtTokensToYield(liquidationAmount);
-            fee = convertDebtTokensToYield(feeInDebt);
-
+            feeInYield = convertDebtTokensToYield(feeInDebt);
             // send liquidation amount - any fee to the transmuter. the transmuter only accepts yield tokens
             TokenUtils.safeTransfer(yieldToken, transmuter, adjustedLiquidationAmount);
 
@@ -663,12 +691,25 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
             // update user balance
             account.collateralBalance = convertDebtTokensToYield(collateralInDebt);
 
-            if (fee > 0) {
-                TokenUtils.safeTransfer(yieldToken, msg.sender, fee);
+            if (feeInYield > 0) {
+                // send fee in yield tokens to liquidator
+                TokenUtils.safeTransfer(yieldToken, msg.sender, feeInYield);
+            }
+
+            if (excessFee > 0) {
+                // need to convert excess fee to eth
+                uint256 excessFeeInUSD = IPriceFeedAdapter(ethUsdAdapter).underlyingTokenToUSD(excessFee);
+                uint256 excessFeeInETH = IPriceFeedAdapter(ethUsdAdapter).usdToETH(excessFeeInUSD);
+                uint256 ethBalance = address(alchemistETHVault).balance;
+                if (ethBalance > 0) {
+                    feeInETH = ethBalance > excessFeeInETH ? excessFeeInETH : ethBalance;
+                    // send fee in eth to liquidator
+                    IAlchemistETHVault(alchemistETHVault).withdraw(msg.sender, feeInETH);
+                }
             }
         }
 
-        return (debtAmount, fee);
+        return (debtAmount, feeInYield, feeInETH);
     }
 
     /// @dev Increases the debt by `amount` for the account owned by `tokenId`.
