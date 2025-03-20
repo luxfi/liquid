@@ -10,11 +10,10 @@ import "../../lib/forge-std/src/Test.sol";
 import {SafeERC20} from "../libraries/SafeERC20.sol";
 import {console} from "../../lib/forge-std/src/console.sol";
 import {AlchemistV3} from "../AlchemistV3.sol";
-import {AlchemicTokenV3} from "../AlchemicTokenV3.sol";
+import {AlchemicTokenV3} from "../test/mocks/AlchemicTokenV3.sol";
 import {Transmuter} from "../Transmuter.sol";
 import {AlchemistV3Position} from "../AlchemistV3Position.sol";
 
-import {TransmuterBuffer} from "../TransmuterBuffer.sol";
 import {Whitelist} from "../utils/Whitelist.sol";
 import {TestERC20} from "./mocks/TestERC20.sol";
 import {TestYieldToken} from "./mocks/TestYieldToken.sol";
@@ -33,19 +32,16 @@ contract AlchemistV3Test is Test {
     // Callable contract variables
     AlchemistV3 alchemist;
     Transmuter transmuter;
-    TransmuterBuffer transmuterBuffer;
     AlchemistV3Position alchemistNFT;
 
     // // Proxy variables
     TransparentUpgradeableProxy proxyAlchemist;
     TransparentUpgradeableProxy proxyTransmuter;
-    TransparentUpgradeableProxy proxyTransmuterBuffer;
 
     // // Contract variables
     // CheatCodes cheats = CheatCodes(HEVM_ADDRESS);
     AlchemistV3 alchemistLogic;
     Transmuter transmuterLogic;
-    TransmuterBuffer transmuterBufferLogic;
     AlchemicTokenV3 alToken;
     Whitelist whitelist;
 
@@ -130,7 +126,6 @@ contract AlchemistV3Test is Test {
 
         // Contracts and logic contracts
         alOwner = caller;
-        transmuterBufferLogic = new TransmuterBuffer();
         transmuterLogic = new Transmuter(transParams);
         alchemistLogic = new AlchemistV3();
         whitelist = new Whitelist();
@@ -2136,6 +2131,28 @@ contract AlchemistV3Test is Test {
         vm.startPrank(address(0xbeef));
         vm.expectRevert();
         IAlchemistV3Position(address(alchemistNFT)).mint(address(0xbeef));
+        vm.stopPrank();
+    }
+
+    function testCreateRedemptionAfterRepay() external {
+        uint256 amount = 100e18;
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
+        alchemist.deposit(amount, address(0xbeef), 0);
+        // a single position nft would have been minted to 0xbeef
+        uint256 tokenIdFor0xBeef = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
+
+        alchemist.mint(tokenIdFor0xBeef, (amount / 2), address(0xbeef));
+        alchemist.repay(alchemist.convertDebtTokensToYield(amount / 2), tokenIdFor0xBeef);
+        vm.stopPrank();
+
+        assertEq(alchemist.totalSyntheticsIssued(), amount / 2);
+        assertEq(alchemist.totalDebt(), 0);
+
+        // Test that even though there is no active debt, that we can still create a position with the collateral sent to the transmuter.
+        vm.startPrank(address(0xdad));
+        SafeERC20.safeApprove(address(alToken), address(transmuterLogic), 50e18);
+        transmuterLogic.createRedemption(50e18);
         vm.stopPrank();
     }
 
