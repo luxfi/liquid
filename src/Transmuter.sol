@@ -2,7 +2,6 @@
 pragma solidity ^0.8.26;
 
 import "./interfaces/IAlchemistV3.sol";
-import "./interfaces/IERC20Minimal.sol";
 import "./interfaces/ITransmuter.sol";
 import "./base/TransmuterErrors.sol";
 
@@ -65,9 +64,6 @@ contract Transmuter is ITransmuter, ERC721 {
 
     /// @dev Array of registered alchemists.
     address[] public alchemists;
-
-    /// @dev Map of alchemist addresses to corresponding entry data.
-    mapping(address => AlchemistEntry) internal _alchemistEntries;
 
     /// @dev Map of user positions data.
     mapping(uint256 => StakingPosition) internal _positions;
@@ -165,13 +161,6 @@ contract Transmuter is ITransmuter, ERC721 {
     }
 
     /// @inheritdoc ITransmuter
-    function alchemistEntries(address alchemist) external view returns (uint256, bool) {
-        AlchemistEntry storage entry = _alchemistEntries[alchemist];
-
-        return (entry.index, entry.isActive);
-    }
-
-    /// @inheritdoc ITransmuter
     function getPosition(uint256 id) external view returns (StakingPosition memory) {
         return _positions[id];
     }
@@ -186,7 +175,7 @@ contract Transmuter is ITransmuter, ERC721 {
             revert DepositCapReached();
         }
 
-        if (totalLocked + syntheticDepositAmount > alchemist.totalDebt()) {
+        if (totalLocked + syntheticDepositAmount > alchemist.totalSyntheticsIssued()) {
             revert DepositCapReached();
         }
 
@@ -196,6 +185,7 @@ contract Transmuter is ITransmuter, ERC721 {
 
         // Update Fenwick Tree
         _updateStakingGraph(syntheticDepositAmount.toInt256() * BLOCK_SCALING_FACTOR / timeToTransmute.toInt256(), timeToTransmute);
+
         totalLocked += syntheticDepositAmount;
 
         _mint(msg.sender, _nonce);
@@ -215,6 +205,10 @@ contract Transmuter is ITransmuter, ERC721 {
         uint256 blocksLeft = position.maturationBlock > block.number ? position.maturationBlock - block.number : 0;
         uint256 amountNottransmuted = blocksLeft > 0 ? position.amount * blocksLeft / transmutationTime : 0;
         uint256 amountTransmuted = position.amount - amountNottransmuted;
+
+        if (_requireOwned(id) != msg.sender) {
+            revert CallerNotOwner();
+        }
 
         // Burn position NFT
         _burn(id);
@@ -245,6 +239,8 @@ contract Transmuter is ITransmuter, ERC721 {
         TokenUtils.safeBurn(syntheticToken, amountTransmuted);
 
         totalLocked -= position.amount;
+
+        alchemist.adjustTotalSyntheticsIssued(amountTransmuted);
 
         emit PositionClaimed(msg.sender, claimAmount, syntheticReturned);
 

@@ -257,6 +257,13 @@ interface IAlchemistV3Actions {
     /// @param amount The amount of tokens to redeem.
     function redeem(uint256 amount) external;
 
+    /// @notice Subtracts `amount` synthetics from total minted from the alchemist.
+    ///
+    /// @notice This function is only callable by the transmuter.
+    ///
+    /// @param amount The amount of synthetic tokens to adjust.
+    function adjustTotalSyntheticsIssued(uint256 amount) external;
+
     /// @notice Resets all mint allowances by account managed by `tokenId`.
     ///
     /// @notice This function is only callable by the owner of the token id or the AlchemistV3Position contract.
@@ -608,6 +615,8 @@ interface IAlchemistV3State {
     function lastRedemptionBlock() external view returns (uint256 block);
 
     function totalDebt() external view returns (uint256 debt);
+
+    function totalSyntheticsIssued() external view returns (uint256 syntheticAmount);
 
     function protocolFee() external view returns (uint256 fee);
 

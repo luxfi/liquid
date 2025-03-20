@@ -68,6 +68,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     uint256 public totalDebt;
 
     /// @inheritdoc IAlchemistV3State
+    uint256 public totalSyntheticsIssued;
+
+    /// @inheritdoc IAlchemistV3State
     uint256 public protocolFee;
 
     /// @inheritdoc IAlchemistV3State
@@ -462,6 +465,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         // Update the recipient's debt.
         _subDebt(recipientId, credit);
 
+        totalSyntheticsIssued -= credit;
+
         emit Burn(msg.sender, credit, recipientId);
 
         return credit;
@@ -563,6 +568,11 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     }
 
     /// @inheritdoc IAlchemistV3Actions
+    function adjustTotalSyntheticsIssued(uint256 amount) external onlyTransmuter {
+        totalSyntheticsIssued -= amount;
+    }
+
+    /// @inheritdoc IAlchemistV3Actions
     function poke(uint256 tokenId) external {
         _checkForValidAccountId(tokenId);
         _earmark();
@@ -629,6 +639,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @param recipient The recipient of the minted debt tokens.
     function _mint(uint256 tokenId, uint256 amount, address recipient) internal {
         _addDebt(tokenId, amount);
+
+        totalSyntheticsIssued += amount;
 
         // Validate the tokenId's account to assure that the collateralization invariant is still held.
         _validate(tokenId);

@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {StdCheats} from "forge-std/StdCheats.sol";
 
 import {AlchemistV3} from "../AlchemistV3.sol";
-import {AlEth} from "../external/Aleth.sol";
+import {AlEth} from "../external/AlEth.sol";
 import {Transmuter} from "../Transmuter.sol";
 
 import "../interfaces/ITransmuter.sol";
@@ -17,24 +17,26 @@ import {console} from "../../lib/forge-std/src/console.sol";
 contract MockAlchemist {
     AlEth collateral;
 
+    uint256 public constant FIXED_POINT_SCALAR = 1e18;
+
     constructor(AlEth _collateral) {
         collateral = _collateral;
     }
     
     function convertYieldTokensToUnderlying(uint256 amount) external view returns (uint256) {
-        return (amount * 2e18) / 1e18;
+        return (amount * 2 * FIXED_POINT_SCALAR) / FIXED_POINT_SCALAR;
     }
 
     function convertUnderlyingTokensToYield(uint256 amount) public view returns (uint256) {
-        return amount * 1e18 / 2e18;
+        return amount * FIXED_POINT_SCALAR / (2 * FIXED_POINT_SCALAR);
     }
 
     function convertYieldTokensToDebt(uint256 amount) public view returns (uint256) {
-        return (amount * 2e18 / 1e18);
+        return (amount * 2 * FIXED_POINT_SCALAR) / FIXED_POINT_SCALAR;
     }
 
     function convertDebtTokensToYield(uint256 amount) public view returns (uint256) {
-        return amount * 1e18 / 2e18;
+        return amount * FIXED_POINT_SCALAR / (2 * FIXED_POINT_SCALAR);
     }
 
     function redeem(uint256 underlying) external {
@@ -43,6 +45,14 @@ contract MockAlchemist {
 
     function totalDebt() external returns (uint256) {
         return type(uint256).max;
+    }
+
+    function totalSyntheticsIssued() external returns (uint256) {
+        return type(uint256).max;
+    }
+
+    function adjustTotalSyntheticsIssued(uint256 amount) external {
+
     }
 
     function yieldToken() external returns (address) {
@@ -161,6 +171,24 @@ contract TransmuterTest is Test {
 
         assertEq(collateralToken.balanceOf(address(0xbeef)), alchemist.convertUnderlyingTokensToYield(100e18));
         assertEq(alETH.balanceOf(address(transmuter)), 0);
+    }
+
+    function testClaimRedemptionNotOwner() public {
+        deal(address(collateralToken), address(transmuter), uint256(type(int256).max)/1e20);
+
+        vm.prank(address(0xbeef));
+        transmuter.createRedemption(100e18);
+
+        vm.roll(block.number + 5256000);
+
+        assertEq(collateralToken.balanceOf(address(0xbeef)), 0);
+        assertEq(alETH.balanceOf(address(transmuter)), 100e18);
+
+        vm.startPrank(address(0xbeef123));
+        vm.expectRevert(CallerNotOwner.selector);
+        transmuter.claimRedemption(1);
+
+        vm.stopPrank();
     }
 
     function testClaimRedemptionFromAlchemist() public {

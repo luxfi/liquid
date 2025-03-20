@@ -9,9 +9,8 @@ import "../../lib/forge-std/src/Test.sol";
 import {SafeERC20} from "../libraries/SafeERC20.sol";
 import {console} from "../../lib/forge-std/src/console.sol";
 import {AlchemistV3} from "../AlchemistV3.sol";
-import {AlchemicTokenV3} from "../AlchemicTokenV3.sol";
+import {AlchemicTokenV3} from "../test/mocks/AlchemicTokenV3.sol";
 import {Transmuter} from "../Transmuter.sol";
-import {TransmuterBuffer} from "../TransmuterBuffer.sol";
 import {Whitelist} from "../utils/Whitelist.sol";
 import {TestERC20} from "./mocks/TestERC20.sol";
 import {TestYieldToken} from "./mocks/TestYieldToken.sol";
@@ -32,7 +31,6 @@ contract InvariantsTest is Test {
     // Callable contract variables
     AlchemistV3 alchemist;
     Transmuter transmuter;
-    TransmuterBuffer transmuterBuffer;
     AlchemistV3Position alchemistNFT;
     AlchemistETHVault ethVault;
     ETHUSDPriceFeedAdapter ethUsdAdapter;
@@ -40,13 +38,11 @@ contract InvariantsTest is Test {
     // // Proxy variables
     TransparentUpgradeableProxy proxyAlchemist;
     TransparentUpgradeableProxy proxyTransmuter;
-    TransparentUpgradeableProxy proxyTransmuterBuffer;
 
     // // Contract variables
     // CheatCodes cheats = CheatCodes(HEVM_ADDRESS);
     AlchemistV3 alchemistLogic;
     Transmuter transmuterLogic;
-    TransmuterBuffer transmuterBufferLogic;
     AlchemicTokenV3 alToken;
     Whitelist whitelist;
 
@@ -71,10 +67,10 @@ contract InvariantsTest is Test {
 
     mapping(address => bool) users;
 
-    uint256 public minimumCollateralization = uint256(1e18 * 1e18) / 9e17;
-
     uint256 public constant FIXED_POINT_SCALAR = 1e18;
     address ETH_USD_PRICE_FEED_MAINNET = 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419;
+
+    uint256 public minimumCollateralization = uint256(FIXED_POINT_SCALAR * FIXED_POINT_SCALAR) / 9e17;
 
     // ----- Variables for deposits & withdrawals -----
 
@@ -91,7 +87,7 @@ contract InvariantsTest is Test {
     uint256 minimumDeposit = 1000e18;
 
     // minimum amount of yield/underlying token to deposit
-    uint256 minimumDepositOrWithdrawalLoss = 1e18;
+    uint256 minimumDepositOrWithdrawalLoss = FIXED_POINT_SCALAR;
 
     // random EOA for testing
     address externalUser = address(0x69E8cE9bFc01AA33cD2d02Ed91c72224481Fa420);
@@ -133,7 +129,6 @@ contract InvariantsTest is Test {
 
         // Contracts and logic contracts
         alOwner = caller;
-        transmuterBufferLogic = new TransmuterBuffer();
         transmuterLogic = new Transmuter(transParams);
         alchemistLogic = new AlchemistV3();
         whitelist = new Whitelist();

@@ -4,13 +4,6 @@ pragma solidity ^0.8.26;
 import "./IAlchemistV3.sol";
 
 interface ITransmuter {
-    struct AlchemistEntry {
-        // TODO: Add other necessary alchemist data here
-        uint256 index;
-        bool isActive;
-    }
-
-    // TODO: Potentially replace this with NFT respresented position
     struct StakingPosition {
         // Amount staked.
         uint256 amount;
@@ -144,14 +137,6 @@ interface ITransmuter {
     ///
     /// @param receiver The address of the new fee receiver.
     function setProtocolFeeReceiver(address receiver) external;
-
-    /// @notice Gets entry data for `alchemist`.
-    ///
-    /// @param alchemist    Address of the alchemist to query.
-    ///
-    /// @return index   Index of `alchemist` in the list of alchemists.
-    /// @return active  Status of `alchemist` activation.
-    function alchemistEntries(address alchemist) external view returns (uint256 index, bool active);
 
     /// @notice Gets position info for `id`.
     ///
