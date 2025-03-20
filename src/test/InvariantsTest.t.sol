@@ -21,9 +21,10 @@ import {ITransmuter} from "../interfaces/ITransmuter.sol";
 import {ITestYieldToken} from "../interfaces/test/ITestYieldToken.sol";
 import {InsufficientAllowance} from "../base/Errors.sol";
 import {Unauthorized, IllegalArgument, IllegalState, MissingInputData} from "../base/Errors.sol";
-import "../interfaces/IYearnVaultV2.sol";
 import {AlchemistNFTHelper} from "./libraries/AlchemistNFTHelper.sol";
 import {AlchemistV3Position} from "../AlchemistV3Position.sol";
+import {AlchemistETHVault} from "../AlchemistETHVault.sol";
+import {ETHUSDPriceFeedAdapter} from "../adapters/ETHUSDPriceFeedAdapter.sol";
 
 contract InvariantsTest is Test {
     bytes4[] internal selectors;
@@ -33,6 +34,8 @@ contract InvariantsTest is Test {
     Transmuter transmuter;
     TransmuterBuffer transmuterBuffer;
     AlchemistV3Position alchemistNFT;
+    AlchemistETHVault ethVault;
+    ETHUSDPriceFeedAdapter ethUsdAdapter;
 
     // // Proxy variables
     TransparentUpgradeableProxy proxyAlchemist;
@@ -71,6 +74,7 @@ contract InvariantsTest is Test {
     uint256 public minimumCollateralization = uint256(1e18 * 1e18) / 9e17;
 
     uint256 public constant FIXED_POINT_SCALAR = 1e18;
+    address ETH_USD_PRICE_FEED_MAINNET = 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419;
 
     // ----- Variables for deposits & withdrawals -----
 
@@ -114,6 +118,7 @@ contract InvariantsTest is Test {
 
         fakeUnderlyingToken = new TestERC20(100e18, uint8(18));
         fakeYieldToken = new TestYieldToken(address(fakeUnderlyingToken));
+        ethUsdAdapter = new ETHUSDPriceFeedAdapter(ETH_USD_PRICE_FEED_MAINNET);
 
         alToken = new AlchemicTokenV3(_name, _symbol, _flashFee);
 
@@ -159,6 +164,7 @@ contract InvariantsTest is Test {
             collateralizationLowerBound: 1_052_631_578_950_000_000, // 1.05 collateralization
             globalMinimumCollateralization: 1_111_111_111_111_111_111, // 1.1
             tokenAdapter: address(fakeYieldToken),
+            ethUsdAdapter: address(ethUsdAdapter),
             transmuter: address(transmuterLogic),
             protocolFee: 0,
             protocolFeeReceiver: address(10),
@@ -244,7 +250,7 @@ contract InvariantsTest is Test {
             uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(user, address(alchemistNFT));
 
             uint256 borrowable;
-            
+
             if (tokenId != 0) borrowable = alchemist.getMaxBorrowable(tokenId);
 
             if (borrowable > 0) {
@@ -264,7 +270,7 @@ contract InvariantsTest is Test {
             uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(user, address(alchemistNFT));
 
             uint256 borrowable;
-            
+
             if (tokenId != 0) alchemist.getMaxBorrowable(tokenId);
 
             if (borrowable > 0) {
@@ -282,10 +288,10 @@ contract InvariantsTest is Test {
             address user = users[i];
             // a single position nft would have been minted to address(0xbeef)
             uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(user, address(alchemistNFT));
-            uint256 collateral; 
+            uint256 collateral;
             uint256 debt;
 
-            if (tokenId != 0) (collateral, debt, ) = alchemist.getCDP(tokenId);            
+            if (tokenId != 0) (collateral, debt,) = alchemist.getCDP(tokenId);
 
             if (debt > 0) {
                 candidates[i] = user;
@@ -302,12 +308,12 @@ contract InvariantsTest is Test {
             address user = users[i];
             // a single position nft would have been minted to address(0xbeef)
             uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(user, address(alchemistNFT));
-            
-            uint256 collateral; 
+
+            uint256 collateral;
             uint256 debt;
             uint256 earmarked;
-            
-            if (tokenId != 0) (collateral, debt, earmarked) = alchemist.getCDP(tokenId);            
+
+            if (tokenId != 0) (collateral, debt, earmarked) = alchemist.getCDP(tokenId);
 
             if (debt > 0 && debt > earmarked) {
                 candidates[i] = user;
