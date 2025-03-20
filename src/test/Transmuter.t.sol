@@ -17,24 +17,26 @@ import {console} from "../../lib/forge-std/src/console.sol";
 contract MockAlchemist {
     AlEth collateral;
 
+    uint256 public constant FIXED_POINT_SCALAR = 1e18;
+
     constructor(AlEth _collateral) {
         collateral = _collateral;
     }
     
     function convertYieldTokensToUnderlying(uint256 amount) external view returns (uint256) {
-        return (amount * 2e18) / 1e18;
+        return (amount * 2 * FIXED_POINT_SCALAR) / FIXED_POINT_SCALAR;
     }
 
     function convertUnderlyingTokensToYield(uint256 amount) public view returns (uint256) {
-        return amount * 1e18 / 2e18;
+        return amount * FIXED_POINT_SCALAR / (2 * FIXED_POINT_SCALAR);
     }
 
     function convertYieldTokensToDebt(uint256 amount) public view returns (uint256) {
-        return (amount * 2e18 / 1e18);
+        return (amount * 2 * FIXED_POINT_SCALAR) / FIXED_POINT_SCALAR;
     }
 
     function convertDebtTokensToYield(uint256 amount) public view returns (uint256) {
-        return amount * 1e18 / 2e18;
+        return amount * FIXED_POINT_SCALAR / (2 * FIXED_POINT_SCALAR);
     }
 
     function redeem(uint256 underlying) external {

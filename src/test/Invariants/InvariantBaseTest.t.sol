@@ -114,8 +114,8 @@ contract InvariantBaseTest is InvariantsTest {
 
         (uint256 collat, uint256 debt,) = alchemist.getCDP(tokenId);
         uint256 debtToCollateral = alchemist.convertDebtTokensToYield(debt);
-        uint256 maxWithdraw = (collat * 1e18 / alchemist.minimumCollateralization()) > debtToCollateral
-            ? (collat * 1e18 / alchemist.minimumCollateralization()) - debtToCollateral
+        uint256 maxWithdraw = (collat * FIXED_POINT_SCALAR / alchemist.minimumCollateralization()) > debtToCollateral
+            ? (collat * FIXED_POINT_SCALAR / alchemist.minimumCollateralization()) - debtToCollateral
             : 0;
 
         amount = bound(amount, 0, maxWithdraw);

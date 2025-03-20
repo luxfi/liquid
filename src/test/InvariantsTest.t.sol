@@ -68,9 +68,9 @@ contract InvariantsTest is Test {
 
     mapping(address => bool) users;
 
-    uint256 public minimumCollateralization = uint256(1e18 * 1e18) / 9e17;
-
     uint256 public constant FIXED_POINT_SCALAR = 1e18;
+    
+    uint256 public minimumCollateralization = uint256(FIXED_POINT_SCALAR * FIXED_POINT_SCALAR) / 9e17;
 
     // ----- Variables for deposits & withdrawals -----
 
@@ -87,7 +87,7 @@ contract InvariantsTest is Test {
     uint256 minimumDeposit = 1000e18;
 
     // minimum amount of yield/underlying token to deposit
-    uint256 minimumDepositOrWithdrawalLoss = 1e18;
+    uint256 minimumDepositOrWithdrawalLoss = FIXED_POINT_SCALAR;
 
     // random EOA for testing
     address externalUser = address(0x69E8cE9bFc01AA33cD2d02Ed91c72224481Fa420);
