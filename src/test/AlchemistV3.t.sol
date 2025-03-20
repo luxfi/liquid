@@ -70,9 +70,9 @@ contract AlchemistV3Test is Test {
 
     mapping(address => bool) users;
 
-    uint256 public minimumCollateralization = uint256(1e18 * 1e18) / 9e17;
-
     uint256 public constant FIXED_POINT_SCALAR = 1e18;
+
+    uint256 public minimumCollateralization = uint256(FIXED_POINT_SCALAR * FIXED_POINT_SCALAR) / 9e17;
 
     // ----- Variables for deposits & withdrawals -----
 
@@ -89,7 +89,7 @@ contract AlchemistV3Test is Test {
     uint256 minimumDeposit = 1000e18;
 
     // minimum amount of yield/underlying token to deposit
-    uint256 minimumDepositOrWithdrawalLoss = 1e18;
+    uint256 minimumDepositOrWithdrawalLoss = FIXED_POINT_SCALAR;
 
     // random EOA for testing
     address externalUser = address(0x69E8cE9bFc01AA33cD2d02Ed91c72224481Fa420);
@@ -240,7 +240,7 @@ contract AlchemistV3Test is Test {
 
     function testSetMinimumCollaterization_Invalid_Ratio_Below_One(uint256 collateralizationRatio) external {
         // ~ all possible ratios below 1
-        vm.assume(collateralizationRatio < 1e18);
+        vm.assume(collateralizationRatio < FIXED_POINT_SCALAR);
         vm.startPrank(alOwner);
         vm.expectRevert(IllegalArgument.selector);
         alchemist.setMinimumCollateralization(collateralizationRatio);
@@ -248,7 +248,7 @@ contract AlchemistV3Test is Test {
     }
 
     function testSetCollateralizationLowerBound_Variable_Upper_Bound(uint256 collateralizationRatio) external {
-        collateralizationRatio = bound(collateralizationRatio, 1e18, minimumCollateralization);
+        collateralizationRatio = bound(collateralizationRatio, FIXED_POINT_SCALAR, minimumCollateralization);
         vm.startPrank(alOwner);
         alchemist.setCollateralizationLowerBound(collateralizationRatio);
         vm.assertApproxEqAbs(alchemist.collateralizationLowerBound(), collateralizationRatio, minimumDepositOrWithdrawalLoss);
@@ -266,7 +266,7 @@ contract AlchemistV3Test is Test {
 
     function testSetCollateralizationLowerBound_Invalid_Below_One(uint256 collateralizationRatio) external {
         // ~ all possible ratios below minimum collaterization ratio
-        vm.assume(collateralizationRatio < 1e18);
+        vm.assume(collateralizationRatio < FIXED_POINT_SCALAR);
         vm.startPrank(alOwner);
         vm.expectRevert(IllegalArgument.selector);
         alchemist.setCollateralizationLowerBound(collateralizationRatio);
@@ -380,7 +380,7 @@ contract AlchemistV3Test is Test {
     }
 
     function testSetMinCollateralization_Variable_Collateralization(uint256 collateralization) external {
-        vm.assume(collateralization >= 1e18);
+        vm.assume(collateralization >= FIXED_POINT_SCALAR);
         vm.assume(collateralization < 20e18);
         vm.startPrank(address(0xdead));
         alchemist.setMinimumCollateralization(collateralization);
@@ -448,7 +448,7 @@ contract AlchemistV3Test is Test {
     }
 
     function testDeposit_New_Position(uint256 amount) external {
-        amount = bound(amount, 1e18, 1000e18);
+        amount = bound(amount, FIXED_POINT_SCALAR, 1000e18);
         vm.startPrank(address(0xbeef));
         SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
         alchemist.deposit(amount, address(0xbeef), 0);
@@ -469,7 +469,7 @@ contract AlchemistV3Test is Test {
 
         assertEq(
             alchemist.getMaxBorrowable(tokenId),
-            alchemist.normalizeUnderlyingTokensToDebt(fakeYieldToken.price() * amount / 1e18) * 1e18 / alchemist.minimumCollateralization()
+            alchemist.normalizeUnderlyingTokensToDebt(fakeYieldToken.price() * amount / FIXED_POINT_SCALAR) * FIXED_POINT_SCALAR / alchemist.minimumCollateralization()
         );
 
         assertEq(alchemist.getTotalUnderlyingValue(), alchemist.convertYieldTokensToUnderlying(amount));
@@ -478,7 +478,7 @@ contract AlchemistV3Test is Test {
     }
 
     function testDeposit_ExistingPosition(uint256 amount) external {
-        amount = bound(amount, 1e18, 1000e18);
+        amount = bound(amount, FIXED_POINT_SCALAR, 1000e18);
         vm.startPrank(address(0xbeef));
         SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), (amount * 2) + 100e18);
 
@@ -499,7 +499,7 @@ contract AlchemistV3Test is Test {
 
         assertEq(
             alchemist.getMaxBorrowable(tokenId),
-            alchemist.normalizeUnderlyingTokensToDebt((fakeYieldToken.price() * (amount * 2) / 1e18) * 1e18 / alchemist.minimumCollateralization())
+            alchemist.normalizeUnderlyingTokensToDebt((fakeYieldToken.price() * (amount * 2) / FIXED_POINT_SCALAR) * FIXED_POINT_SCALAR / alchemist.minimumCollateralization())
         );
 
         assertEq(alchemist.getTotalUnderlyingValue(), alchemist.convertYieldTokensToUnderlying((amount * 2)));
@@ -555,7 +555,7 @@ contract AlchemistV3Test is Test {
     }
 
     function testWithdraw(uint256 amount) external {
-        amount = bound(amount, 1e18, accountFunds);
+        amount = bound(amount, FIXED_POINT_SCALAR, accountFunds);
         vm.startPrank(address(0xbeef));
         SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
         alchemist.deposit(amount, address(0xbeef), 0);
@@ -577,7 +577,7 @@ contract AlchemistV3Test is Test {
 
         assertApproxEqAbs(
             alchemist.getMaxBorrowable(tokenId),
-            alchemist.normalizeUnderlyingTokensToDebt(fakeYieldToken.price() * amount / 2 / 1e18) * 1e18 / alchemist.minimumCollateralization(),
+            alchemist.normalizeUnderlyingTokensToDebt(fakeYieldToken.price() * amount / 2 / FIXED_POINT_SCALAR) * FIXED_POINT_SCALAR / alchemist.minimumCollateralization(),
             1
         );
         assertApproxEqAbs(alchemist.getTotalUnderlyingValue(), alchemist.convertYieldTokensToUnderlying(amount / 2), 1);
@@ -649,7 +649,7 @@ contract AlchemistV3Test is Test {
     }
 
     function testOwnershipTransferBeforeWithdraw(uint256 amount) external {
-        amount = bound(amount, 1e18, accountFunds);
+        amount = bound(amount, FIXED_POINT_SCALAR, accountFunds);
         vm.startPrank(address(0xbeef));
         SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
         alchemist.deposit(amount, address(0xbeef), 0);
@@ -675,14 +675,14 @@ contract AlchemistV3Test is Test {
 
         assertApproxEqAbs(
             alchemist.getMaxBorrowable(tokenId),
-            alchemist.normalizeUnderlyingTokensToDebt(fakeYieldToken.price() * amount / 2 / 1e18) * 1e18 / alchemist.minimumCollateralization(),
+            alchemist.normalizeUnderlyingTokensToDebt(fakeYieldToken.price() * amount / 2 / FIXED_POINT_SCALAR) * FIXED_POINT_SCALAR / alchemist.minimumCollateralization(),
             1
         );
         assertApproxEqAbs(alchemist.getTotalUnderlyingValue(), alchemist.convertYieldTokensToUnderlying(amount / 2), 1);
     }
 
     function testOwnershipTransferBeforeWithdrawUnauthorizedRevert(uint256 amount) external {
-        amount = bound(amount, 1e18, accountFunds);
+        amount = bound(amount, FIXED_POINT_SCALAR, accountFunds);
         vm.startPrank(address(0xbeef));
         SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
         alchemist.deposit(amount, address(0xbeef), 0);
@@ -725,7 +725,7 @@ contract AlchemistV3Test is Test {
     }
 
     function testOwnership_Transfer_Before_Mint_Variable_Amount(uint256 amount) external {
-        amount = bound(amount, 1e18, accountFunds);
+        amount = bound(amount, FIXED_POINT_SCALAR, accountFunds);
         uint256 ltv = 2e17;
         vm.startPrank(address(0xbeef));
         SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
@@ -751,7 +751,7 @@ contract AlchemistV3Test is Test {
 
         assertApproxEqAbs(
             alchemist.getMaxBorrowable(tokenId),
-            (alchemist.normalizeUnderlyingTokensToDebt(fakeYieldToken.price() * amount / 1e18) * 1e18 / alchemist.minimumCollateralization())
+            (alchemist.normalizeUnderlyingTokensToDebt(fakeYieldToken.price() * amount / FIXED_POINT_SCALAR) * FIXED_POINT_SCALAR / alchemist.minimumCollateralization())
                 - (amount * ltv) / FIXED_POINT_SCALAR,
             1
         );
@@ -760,7 +760,7 @@ contract AlchemistV3Test is Test {
     }
 
     function testOwnership_Transfer_Before_Mint_UnauthorizedRevert(uint256 amount) external {
-        amount = bound(amount, 1e18, accountFunds);
+        amount = bound(amount, FIXED_POINT_SCALAR, accountFunds);
         uint256 ltv = 2e17;
         vm.startPrank(address(0xbeef));
         SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
@@ -843,7 +843,7 @@ contract AlchemistV3Test is Test {
     }
 
     function testMint_Variable_Amount(uint256 amount) external {
-        amount = bound(amount, 1e18, accountFunds);
+        amount = bound(amount, FIXED_POINT_SCALAR, accountFunds);
         uint256 ltv = 2e17;
         vm.startPrank(address(0xbeef));
         SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
@@ -862,7 +862,7 @@ contract AlchemistV3Test is Test {
 
         assertApproxEqAbs(
             alchemist.getMaxBorrowable(tokenId),
-            (alchemist.normalizeUnderlyingTokensToDebt(fakeYieldToken.price() * amount / 1e18) * 1e18 / alchemist.minimumCollateralization())
+            (alchemist.normalizeUnderlyingTokensToDebt(fakeYieldToken.price() * amount / FIXED_POINT_SCALAR) * FIXED_POINT_SCALAR / alchemist.minimumCollateralization())
                 - (amount * ltv) / FIXED_POINT_SCALAR,
             1
         );
@@ -871,9 +871,9 @@ contract AlchemistV3Test is Test {
     }
 
     function testMint_Revert_Exceeds_Min_Collateralization(uint256 amount, uint256 collateralization) external {
-        amount = bound(amount, 1e18, accountFunds);
+        amount = bound(amount, FIXED_POINT_SCALAR, accountFunds);
 
-        collateralization = bound(collateralization, 1e18, 100e18);
+        collateralization = bound(collateralization, FIXED_POINT_SCALAR, 100e18);
         vm.prank(address(0xdead));
         alchemist.setMinimumCollateralization(collateralization);
         vm.startPrank(address(0xbeef));
@@ -890,7 +890,7 @@ contract AlchemistV3Test is Test {
     }
 
     function testMintFrom_Variable_Amount_Revert_No_Allowance(uint256 amount) external {
-        amount = bound(amount, 1e18, accountFunds);
+        amount = bound(amount, FIXED_POINT_SCALAR, accountFunds);
         uint256 minCollateralization = 2e18;
 
         vm.startPrank(externalUser);
@@ -910,7 +910,7 @@ contract AlchemistV3Test is Test {
     }
 
     function testMintFrom_Variable_Amount(uint256 amount) external {
-        amount = bound(amount, 1e18, accountFunds);
+        amount = bound(amount, FIXED_POINT_SCALAR, accountFunds);
         uint256 ltv = 2e17;
 
         vm.startPrank(externalUser);
@@ -979,7 +979,7 @@ contract AlchemistV3Test is Test {
 
     function testMintFrom_InvalidIdRevert(uint256 amount, uint256 tokenId) external {
         vm.assume(tokenId > 1);
-        amount = bound(amount, 1e18, accountFunds);
+        amount = bound(amount, FIXED_POINT_SCALAR, accountFunds);
         uint256 ltv = 2e17;
 
         vm.startPrank(externalUser);
@@ -1166,7 +1166,7 @@ contract AlchemistV3Test is Test {
     }
 
     function testRepayUnearmarkedDebtOnly_Variable_Amount(uint256 repayAmount) external {
-        repayAmount = bound(repayAmount, 1e18, accountFunds / 2);
+        repayAmount = bound(repayAmount, FIXED_POINT_SCALAR, accountFunds / 2);
 
         vm.startPrank(address(0xbeef));
         SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), 200e18 + repayAmount);
@@ -1468,7 +1468,7 @@ contract AlchemistV3Test is Test {
 
     function testLiquidate_Revert_If_Invalid_Token_Id(uint256 amount, uint256 tokenId) external {
         vm.assume(tokenId > 1);
-        amount = bound(amount, 1e18, accountFunds);
+        amount = bound(amount, FIXED_POINT_SCALAR, accountFunds);
         vm.startPrank(someWhale);
         fakeYieldToken.mint(whaleSupply, someWhale);
         vm.stopPrank();
@@ -1542,10 +1542,10 @@ contract AlchemistV3Test is Test {
         vm.assertApproxEqAbs(assets, 103_291_784_702_549_576_851_282, minimumDepositOrWithdrawalLoss);
 
         // ensure liquidator fee is correct (3% of liquidation amount)
-        vm.assertApproxEqAbs(fee, 3_186_000_000_000_000_057_969, 1e18);
+        vm.assertApproxEqAbs(fee, 3_186_000_000_000_000_057_969, FIXED_POINT_SCALAR);
 
         // liquidator gets correct amount of fee
-        vm.assertApproxEqAbs(liquidatorPostTokenBalance, liquidatorPrevTokenBalance + fee, 1e18);
+        vm.assertApproxEqAbs(liquidatorPostTokenBalance, liquidatorPrevTokenBalance + fee, FIXED_POINT_SCALAR);
     }
 
     function testLiquidate_Full_Liquidation_Bad_Debt() external {
@@ -1602,10 +1602,10 @@ contract AlchemistV3Test is Test {
         vm.assertApproxEqAbs(assets, 180_000_000_000_000_000_018_000, minimumDepositOrWithdrawalLoss);
 
         // ensure liquidator fee is correct (3% of 0 if collateral fully liquidated as a result of bad debt)
-        vm.assertApproxEqAbs(fee, 0, 1e18);
+        vm.assertApproxEqAbs(fee, 0, FIXED_POINT_SCALAR);
 
         // liquidator gets correct amount of fee
-        vm.assertApproxEqAbs(liquidatorPostTokenBalance, liquidatorPrevTokenBalance + fee, 1e18);
+        vm.assertApproxEqAbs(liquidatorPostTokenBalance, liquidatorPrevTokenBalance + fee, FIXED_POINT_SCALAR);
     }
 
     function testLiquidate_Full_Liquidation_Globally_Undercollateralized() external {
@@ -1653,10 +1653,10 @@ contract AlchemistV3Test is Test {
         vm.assertApproxEqAbs(assets, 185_400_000_000_000_000_018_540, minimumDepositOrWithdrawalLoss);
 
         // ensure liquidator fee is correct (3% of 0 if collateral fully liquidated as a result of bad debt)
-        vm.assertApproxEqAbs(fee, 5_718_600_000_000_000_006_050, 1e18);
+        vm.assertApproxEqAbs(fee, 5_718_600_000_000_000_006_050, FIXED_POINT_SCALAR);
 
         // liquidator gets correct amount of fee
-        vm.assertApproxEqAbs(liquidatorPostTokenBalance, liquidatorPrevTokenBalance + fee, 1e18);
+        vm.assertApproxEqAbs(liquidatorPostTokenBalance, liquidatorPrevTokenBalance + fee, FIXED_POINT_SCALAR);
     }
 
     function testBatch_Liquidate_Undercollateralized_Position() external {
@@ -1740,14 +1740,14 @@ contract AlchemistV3Test is Test {
         vm.assertApproxEqAbs(assets, 206_583_569_405_099_153_702_564, minimumDepositOrWithdrawalLoss);
 
         // ensure liquidator fee is correct (3% of liquidation amount)
-        vm.assertApproxEqAbs(fee, 6_372_000_000_000_000_115_938, 1e18);
+        vm.assertApproxEqAbs(fee, 6_372_000_000_000_000_115_938, FIXED_POINT_SCALAR);
 
         // liquidator gets correct amount of fee
-        vm.assertApproxEqAbs(liquidatorPostTokenBalance, liquidatorPrevTokenBalance + fee, 1e18);
+        vm.assertApproxEqAbs(liquidatorPostTokenBalance, liquidatorPrevTokenBalance + fee, FIXED_POINT_SCALAR);
     }
 
     function testLiquidate_Revert_If_Overcollateralized_Position(uint256 amount) external {
-        amount = bound(amount, 1e18, accountFunds);
+        amount = bound(amount, FIXED_POINT_SCALAR, accountFunds);
         vm.startPrank(someWhale);
         fakeYieldToken.mint(whaleSupply, someWhale);
         vm.stopPrank();
@@ -1768,7 +1768,7 @@ contract AlchemistV3Test is Test {
     }
 
     function testBatch_Liquidate_Revert_If_Overcollateralized_Position(uint256 amount) external {
-        amount = bound(amount, 1e18, accountFunds);
+        amount = bound(amount, FIXED_POINT_SCALAR, accountFunds);
         vm.startPrank(someWhale);
         fakeYieldToken.mint(whaleSupply, someWhale);
         vm.stopPrank();
@@ -1805,7 +1805,7 @@ contract AlchemistV3Test is Test {
     }
 
     function testBatch_Liquidate_Revert_If_Missing_Data(uint256 amount) external {
-        amount = bound(amount, 1e18, accountFunds);
+        amount = bound(amount, FIXED_POINT_SCALAR, accountFunds);
         vm.startPrank(someWhale);
         fakeYieldToken.mint(whaleSupply, someWhale);
         vm.stopPrank();
@@ -1839,7 +1839,7 @@ contract AlchemistV3Test is Test {
     }
 
     function testLiquidate_Revert_If_Zero_Debt(uint256 amount) external {
-        amount = bound(amount, 1e18, accountFunds);
+        amount = bound(amount, FIXED_POINT_SCALAR, accountFunds);
         vm.startPrank(someWhale);
         fakeYieldToken.mint(whaleSupply, someWhale);
         vm.stopPrank();
@@ -1942,10 +1942,10 @@ contract AlchemistV3Test is Test {
         vm.assertApproxEqAbs(assets, 103_291_784_702_549_576_851_282, minimumDepositOrWithdrawalLoss);
 
         // ensure liquidator fee is correct (3% of liquidation amount)
-        vm.assertApproxEqAbs(fee, 3_186_000_000_000_000_057_969, 1e18);
+        vm.assertApproxEqAbs(fee, 3_186_000_000_000_000_057_969, FIXED_POINT_SCALAR);
 
         // liquidator gets correct amount of fee
-        vm.assertApproxEqAbs(liquidatorPostTokenBalance, liquidatorPrevTokenBalance + fee, 1e18);
+        vm.assertApproxEqAbs(liquidatorPostTokenBalance, liquidatorPrevTokenBalance + fee, FIXED_POINT_SCALAR);
     }
 
     function testBatch_Liquidate_Undercollateralized_Position_And_Skip_Zero_Ids() external {
@@ -2029,10 +2029,10 @@ contract AlchemistV3Test is Test {
         vm.assertApproxEqAbs(assets, 206_583_569_405_099_153_702_564, minimumDepositOrWithdrawalLoss);
 
         // ensure liquidator fee is correct (3% of liquidation amount)
-        vm.assertApproxEqAbs(fee, 6_372_000_000_000_000_115_938, 1e18);
+        vm.assertApproxEqAbs(fee, 6_372_000_000_000_000_115_938, FIXED_POINT_SCALAR);
 
         // liquidator gets correct amount of fee
-        vm.assertApproxEqAbs(liquidatorPostTokenBalance, liquidatorPrevTokenBalance + fee, 1e18);
+        vm.assertApproxEqAbs(liquidatorPostTokenBalance, liquidatorPrevTokenBalance + fee, FIXED_POINT_SCALAR);
     }
 
     function testEarmarkDebtAndRedeem() external {
@@ -2078,7 +2078,7 @@ contract AlchemistV3Test is Test {
 
         assertApproxEqAbs(yieldBalance, 50e18, 1);
         assertApproxEqAbs(deposited, 50e18, 1);
-        assertApproxEqAbs(borrowable, 50e18 * 1e18 / alchemist.minimumCollateralization(), 1);
+        assertApproxEqAbs(borrowable, 50e18 * FIXED_POINT_SCALAR / alchemist.minimumCollateralization(), 1);
     }
 
     function testEarmarkDebtAndRedeemPartial() external {
@@ -2124,7 +2124,7 @@ contract AlchemistV3Test is Test {
 
         assertApproxEqAbs(yieldBalance, 75e18, 1);
         assertApproxEqAbs(deposited, 75e18, 1);
-        assertApproxEqAbs(borrowable, (75e18 * 1e18 / alchemist.minimumCollateralization()) - 25e18, 1);
+        assertApproxEqAbs(borrowable, (75e18 * FIXED_POINT_SCALAR / alchemist.minimumCollateralization()) - 25e18, 1);
     }
 
     function testRedemptionNotTransmuter() external {
