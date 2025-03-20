@@ -2,7 +2,6 @@
 pragma solidity ^0.8.26;
 
 import "./interfaces/IAlchemistV3.sol";
-import "./interfaces/IERC20Minimal.sol";
 import "./interfaces/ITransmuter.sol";
 import "./base/TransmuterErrors.sol";
 
@@ -216,6 +215,10 @@ contract Transmuter is ITransmuter, ERC721 {
         uint256 blocksLeft = position.maturationBlock > block.number ? position.maturationBlock - block.number : 0;
         uint256 amountNottransmuted = blocksLeft > 0 ? position.amount * blocksLeft / transmutationTime : 0;
         uint256 amountTransmuted = position.amount - amountNottransmuted;
+
+        if (_requireOwned(id) != msg.sender) {
+            revert CallerNotOwner();
+        }
 
         // Burn position NFT
         _burn(id);
