@@ -65,9 +65,6 @@ contract Transmuter is ITransmuter, ERC721 {
     /// @dev Array of registered alchemists.
     address[] public alchemists;
 
-    /// @dev Map of alchemist addresses to corresponding entry data.
-    mapping(address => AlchemistEntry) internal _alchemistEntries;
-
     /// @dev Map of user positions data.
     mapping(uint256 => StakingPosition) internal _positions;
 
@@ -161,13 +158,6 @@ contract Transmuter is ITransmuter, ERC721 {
         _checkArgument(value != address(0));
         protocolFeeReceiver = value;
         emit ProtocolFeeReceiverUpdated(value);
-    }
-
-    /// @inheritdoc ITransmuter
-    function alchemistEntries(address alchemist) external view returns (uint256, bool) {
-        AlchemistEntry storage entry = _alchemistEntries[alchemist];
-
-        return (entry.index, entry.isActive);
     }
 
     /// @inheritdoc ITransmuter

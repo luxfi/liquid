@@ -8,10 +8,9 @@ import "../../lib/forge-std/src/Test.sol";
 import {SafeERC20} from "../libraries/SafeERC20.sol";
 import {console} from "../../lib/forge-std/src/console.sol";
 import {AlchemistV3} from "../AlchemistV3.sol";
-import {AlchemicTokenV3} from "../AlchemicTokenV3.sol";
+import {AlchemicTokenV3} from "../test/mocks/AlchemicTokenV3.sol";
 import {EulerUSDCAdapter} from "../adapters/EulerUSDCAdapter.sol";
 import {Transmuter} from "../Transmuter.sol";
-import {TransmuterBuffer} from "../TransmuterBuffer.sol";
 import {Whitelist} from "../utils/Whitelist.sol";
 import {TestERC20} from "./mocks/TestERC20.sol";
 import {TestYieldToken} from "./mocks/TestYieldToken.sol";
@@ -32,19 +31,16 @@ contract RedemptionIntegrationTest is Test {
     // Callable contract variables
     AlchemistV3 alchemist;
     Transmuter transmuter;
-    TransmuterBuffer transmuterBuffer;
     AlchemistV3Position alchemistNFT;
 
     // // Proxy variables
     TransparentUpgradeableProxy proxyAlchemist;
     TransparentUpgradeableProxy proxyTransmuter;
-    TransparentUpgradeableProxy proxyTransmuterBuffer;
 
     // // Contract variables
     // CheatCodes cheats = CheatCodes(HEVM_ADDRESS);
     AlchemistV3 alchemistLogic;
     Transmuter transmuterLogic;
-    TransmuterBuffer transmuterBufferLogic;
     AlchemicTokenV3 alToken;
     Whitelist whitelist;
 
@@ -126,7 +122,6 @@ contract RedemptionIntegrationTest is Test {
 
         // Contracts and logic contracts
         alOwner = caller;
-        transmuterBufferLogic = new TransmuterBuffer();
         transmuterLogic = new Transmuter(transParams);
         alchemistLogic = new AlchemistV3();
         whitelist = new Whitelist();

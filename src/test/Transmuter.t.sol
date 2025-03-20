@@ -173,6 +173,24 @@ contract TransmuterTest is Test {
         assertEq(alETH.balanceOf(address(transmuter)), 0);
     }
 
+    function testClaimRedemptionNotOwner() public {
+        deal(address(collateralToken), address(transmuter), uint256(type(int256).max)/1e20);
+
+        vm.prank(address(0xbeef));
+        transmuter.createRedemption(100e18);
+
+        vm.roll(block.number + 5256000);
+
+        assertEq(collateralToken.balanceOf(address(0xbeef)), 0);
+        assertEq(alETH.balanceOf(address(transmuter)), 100e18);
+
+        vm.startPrank(address(0xbeef123));
+        vm.expectRevert(CallerNotOwner.selector);
+        transmuter.claimRedemption(1);
+
+        vm.stopPrank();
+    }
+
     function testClaimRedemptionFromAlchemist() public {
         vm.prank(address(0xbeef));
         transmuter.createRedemption(100e18);
