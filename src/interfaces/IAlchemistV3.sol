@@ -2,7 +2,7 @@
 pragma solidity ^0.8.26;
 
 /// @notice Contract initialization parameters.
-struct InitializationParams {
+struct AlchemistInitializationParams {
     // The initial admin account.
     address admin;
     // The ERC20 token used to represent debt. i.e. the alAsset.

@@ -15,7 +15,7 @@ import {Whitelist} from "../utils/Whitelist.sol";
 import {TestERC20} from "./mocks/TestERC20.sol";
 import {TestYieldToken} from "./mocks/TestYieldToken.sol";
 import {TokenAdapterMock} from "./mocks/TokenAdapterMock.sol";
-import {IAlchemistV3, IAlchemistV3Errors, InitializationParams} from "../interfaces/IAlchemistV3.sol";
+import {IAlchemistV3, IAlchemistV3Errors, AlchemistInitializationParams} from "../interfaces/IAlchemistV3.sol";
 import {IAlchemicToken} from "../interfaces/IAlchemicToken.sol";
 import {ITransmuter} from "../interfaces/ITransmuter.sol";
 import {ITestYieldToken} from "../interfaces/test/ITestYieldToken.sol";
@@ -25,7 +25,6 @@ import {AlchemistNFTHelper} from "./libraries/AlchemistNFTHelper.sol";
 import {AlchemistV3Position} from "../AlchemistV3Position.sol";
 import {ETHUSDPriceFeedAdapter} from "../adapters/ETHUSDPriceFeedAdapter.sol";
 import {AlchemistETHVault} from "../AlchemistETHVault.sol";
-import "../interfaces/IYearnVaultV2.sol";
 import {TokenUtils} from "../libraries/TokenUtils.sol";
 
 // Tests for integration with Euler V2 Earn Vault
@@ -116,7 +115,7 @@ contract RedemptionIntegrationTest is Test {
         vm.assume(caller != proxyOwner);
         vm.startPrank(caller);
 
-        ITransmuter.InitializationParams memory transParams = ITransmuter.InitializationParams({
+        ITransmuter.TransmuterInitializationParams memory transParams = ITransmuter.TransmuterInitializationParams({
             syntheticToken: alUSD,
             feeReceiver: receiver,
             timeToTransmute: 5_256_000,
@@ -149,7 +148,7 @@ contract RedemptionIntegrationTest is Test {
         vaultAdapter = new EulerUSDCAdapter(EULER_USDC, USDC);
 
         // AlchemistV3 proxy
-        InitializationParams memory params = InitializationParams({
+        AlchemistInitializationParams memory params = AlchemistInitializationParams({
             admin: alOwner,
             debtToken: alUSD,
             underlyingToken: USDC,
@@ -233,8 +232,6 @@ contract RedemptionIntegrationTest is Test {
     }
 
     function testRepay() external {
-        uint256 debtAmount = alchemist.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
-
         vm.startPrank(address(0xbeef));
         IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
         alchemist.deposit(100_000e6, address(0xbeef), 0);
@@ -246,7 +243,7 @@ contract RedemptionIntegrationTest is Test {
         alchemist.repay(alchemist.convertDebtTokensToYield(maxBorrow), tokenId);
         vm.stopPrank();
 
-        (uint256 collateral, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
+        (uint256 collateral, uint256 debt,) = alchemist.getCDP(tokenId);
 
         assertApproxEqAbs(debt, 0, 9201);
         assertEq(collateral, 100_000e6);
@@ -420,8 +417,6 @@ contract RedemptionIntegrationTest is Test {
     }
 
     function testBurn() external {
-        uint256 debtAmount = alchemist.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
-
         vm.startPrank(address(0xbeef));
         IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
         alchemist.deposit(100_000e6, address(0xbeef), 0);
@@ -433,7 +428,7 @@ contract RedemptionIntegrationTest is Test {
         alchemist.burn(maxBorrow, tokenId);
         vm.stopPrank();
 
-        (uint256 collateral, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
+        (uint256 collateral, uint256 debt,) = alchemist.getCDP(tokenId);
 
         assertEq(debt, 0);
         assertEq(collateral, 100_000e6);
@@ -472,7 +467,7 @@ contract RedemptionIntegrationTest is Test {
         alchemist.burn(maxBorrow, tokenId);
         vm.stopPrank();
 
-        (uint256 collateral, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
+        (uint256 collateral, uint256 debt,) = alchemist.getCDP(tokenId);
 
         // Make sure only unEarmarked debt is repaid
         assertEq(debt, maxBorrow / 4);
@@ -493,7 +488,6 @@ contract RedemptionIntegrationTest is Test {
         uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
         uint256 maxBorrow = alchemist.getMaxBorrowable(tokenId);
         alchemist.mint(tokenId, maxBorrow, address(0xbeef));
-        (uint256 collateralprev, uint256 debtprev, uint256 earmarkedprev) = alchemist.getCDP(tokenId);
         vm.stopPrank();
 
         vm.startPrank(address(0xdad));
@@ -508,7 +502,7 @@ contract RedemptionIntegrationTest is Test {
         alchemist.burn(maxBorrow, tokenId);
         vm.stopPrank();
 
-        (uint256 collateral, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
+        (uint256 collateral, uint256 debt,) = alchemist.getCDP(tokenId);
 
         // Make sure only unEarmarked debt is repaid
         // This means only the fee has been paid off

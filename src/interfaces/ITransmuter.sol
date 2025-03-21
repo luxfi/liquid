@@ -7,15 +7,13 @@ interface ITransmuter {
     struct StakingPosition {
         // Amount staked.
         uint256 amount;
-
         // Block when the position was opened
         uint256 startBlock;
-
         // Time when the transmutation will be complete/claimable.
         uint256 maturationBlock;
     }
 
-    struct InitializationParams {
+    struct TransmuterInitializationParams {
         address syntheticToken;
         address feeReceiver;
         uint256 timeToTransmute;
@@ -33,7 +31,7 @@ interface ITransmuter {
     ///
     /// @return admin The admin address.
     function admin() external view returns (address admin);
-    
+
     /// @notice Gets the address of the pending admin.
     ///
     /// @return pendingAdmin The pending admin address.
@@ -143,7 +141,7 @@ interface ITransmuter {
     /// @param id      NFT ID,
     ///
     /// @return position   Position data.
-    function getPosition(uint256 id) external view returns(StakingPosition memory position);
+    function getPosition(uint256 id) external view returns (StakingPosition memory position);
 
     /// @notice Creates a new staking position in the transmuter.
     ///
@@ -192,22 +190,14 @@ interface ITransmuter {
     /// @param creator          The address that created the position.
     /// @param amountStaked     The amount of tokens staked.
     /// @param nftId            The id of the newly minted NFT.
-    event PositionCreated(
-        address indexed creator,
-        uint256 amountStaked,
-        uint256 nftId
-    );
+    event PositionCreated(address indexed creator, uint256 amountStaked, uint256 nftId);
 
     /// @dev Emitted when a position is claimed.
     ///
     /// @param claimer          The address that claimed the position.
     /// @param amountClaimed    The amount of tokens claimed.
     /// @param amountUnclaimed  The amount of tokens that were not transmuted.
-    event PositionClaimed(
-        address indexed claimer,
-        uint256 amountClaimed,
-        uint256 amountUnclaimed
-    );
+    event PositionClaimed(address indexed claimer, uint256 amountClaimed, uint256 amountUnclaimed);
 
     /// @dev Emitted when the graph size is extended.
     ///
@@ -238,5 +228,4 @@ interface ITransmuter {
     ///
     /// @param recevier  The new receiver.
     event ProtocolFeeReceiverUpdated(address recevier);
-}   
-
+}
