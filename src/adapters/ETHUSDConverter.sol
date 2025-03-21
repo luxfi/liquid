@@ -4,7 +4,9 @@ pragma solidity 0.8.26;
 import {AggregatorV3Interface} from "../../lib/chainlink-brownie-contracts/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
 library ETHUSDConverter {
+    // Error for chainlink malfunction
     error ChainlinkMalfunction(address priceFeed, int256 price);
+    // Error for incomplete round
     error IncompleteRound(address priceFeed, uint256 updateTime);
 
     // Address of the mainnet ETH/USD price feed
