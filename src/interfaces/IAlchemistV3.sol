@@ -23,6 +23,8 @@ struct AlchemistInitializationParams {
     uint256 collateralizationLowerBound;
     // Token adapter used to get price for yiel tokens.
     address tokenAdapter;
+    // Token adapter used to get price for eth.
+    address ethUsdAdapter;
     // The initial transmuter or transmuter buffer.
     address transmuter;
     // The fee on user debt paid to the protocol.
@@ -209,22 +211,25 @@ interface IAlchemistV3Actions {
     /// @return amountRepaid The amount of tokens that were repaid.
     function repay(uint256 amount, uint256 recipientTokenId) external returns (uint256 amountRepaid);
 
-    /// @notice Liquidates `owner` if the debt for account `owner` is greater than the underlying value of their collateral * LTV.
-    ///
-    /// @notice `owner` must be non-zero or this call will revert with an {IllegalArgument} error.
-    ///
-    /// @notice Emits a {Liquidate} event.
-    ///
-    /// @notice **Example:**
-    /// @notice ```
-    /// @notice AlchemistV2(alchemistAddress).liquidate(id4);
-    /// @notice ```
-    ///
-    /// @param accountId   The tokenId of account
-    ///
-    /// @return underlyingAmount    Underlying tokens sent to the transmuter.
-    /// @return fee                 Underlying tokens sent to the liquidator.
-    function liquidate(uint256 accountId) external returns (uint256 underlyingAmount, uint256 fee);
+    /**
+     * @notice Liquidates `owner` if the debt for account `owner` is greater than the underlying value of their collateral * LTV.
+     *
+     * @notice `owner` must be non-zero or this call will revert with an {IllegalArgument} error.
+     *
+     * @notice Emits a {Liquidate} event.
+     *
+     * @notice **Example:**
+     * @notice ```
+     * @notice AlchemistV2(alchemistAddress).liquidate(id4);
+     * @notice ```
+     *
+     * @param accountId   The tokenId of account
+     *
+     * @return underlyingAmount    Underlying tokens sent to the transmuter.
+     * @return feeInYield          Fee paid to liquidator in yield tokens.
+     * @return feeInETH            Fee paid to liquidator in ETH (if needed i.e. if there isn't enough remaining collateral to cover the fee).
+     */
+    function liquidate(uint256 accountId) external returns (uint256 underlyingAmount, uint256 feeInYield, uint256 feeInETH);
 
     /// @notice Liquidates `owners` if the debt for account `owner` is greater than the underlying value of their collateral * LTV.
     ///
@@ -239,8 +244,9 @@ interface IAlchemistV3Actions {
     /// @param accountIds   The tokenId of each account
     ///
     /// @return totalAmountLiquidated    Equivalent amount of underlying tokens in yield tokens sent to the transmuter.
-    /// @return totalFees                Amount sent to liquidator in yield tokens.
-    function batchLiquidate(uint256[] memory accountIds) external returns (uint256 totalAmountLiquidated, uint256 totalFees);
+    /// @return totalFeesInYield        Amount sent to liquidator in yield tokens.
+    /// @return totalFeesInETH          Amount sent to liquidator in ETH (if needed i.e. if there isn't enough remaining collateral to cover the fee).
+    function batchLiquidate(uint256[] memory accountIds) external returns (uint256 totalAmountLiquidated, uint256 totalFeesInYield, uint256 totalFeesInETH);
 
     /// @notice Redeems `amount` debt from the alchemist in exchange for yield tokens sent to the transmuter.
     ///
@@ -318,6 +324,15 @@ interface IAlchemistV3AdminActions {
     ///
     /// @param value The address of token adapter.
     function setTokenAdapter(address value) external;
+
+    /// @notice Sets the token adapter for the eth.
+    ///
+    /// @notice `msg.sender` must be the admin or this call will will revert with an {Unauthorized} error.
+    ///
+    /// @notice Emits a {EthUsdAdapterUpdated} event.
+    ///
+    /// @param value The address of the new eth usd adapter.
+    function setEthUsdAdapter(address value) external;
 
     /// @notice Set the minimum collateralization ratio.
     ///
@@ -399,6 +414,15 @@ interface IAlchemistV3AdminActions {
     ///
     /// @param isPaused The new pause state for loans in the alchemist.
     function pauseLoans(bool isPaused) external;
+
+    /// @notice Set the alchemist ETH vault.
+    ///
+    /// @notice `msg.sender` must be the admin or this call will revert with an {Unauthorized} error.
+    ///
+    /// @notice Emits a {AlchemistETHVaultUpdated} event.
+    ///
+    /// @param value The address of the new alchemist ETH vault.
+    function setAlchemistETHVault(address value) external;
 }
 
 interface IAlchemistV3Events {
@@ -406,6 +430,11 @@ interface IAlchemistV3Events {
     ///
     /// @param pendingAdmin The address of the pending admin.
     event PendingAdminUpdated(address pendingAdmin);
+
+    /// @notice Emitted when the alchemist ETH vault is updated.
+    ///
+    /// @param alchemistETHVault The address of the alchemist ETH vault.
+    event AlchemistETHVaultUpdated(address alchemistETHVault);
 
     /// @notice Emitted when the administrator is updated.
     ///
@@ -432,6 +461,11 @@ interface IAlchemistV3Events {
     ///
     /// @param transmuter The updated address of the transmuter.
     event TransmuterUpdated(address transmuter);
+
+    /// @notice Emitted when the eth usd adapter is updated.
+    ///
+    /// @param ethUsdAdapter The updated address of the eth usd adapter.
+    event EthUsdAdapterUpdated(address ethUsdAdapter);
 
     /// @notice Emitted when the minimum collateralization is updated.
     ///
@@ -531,16 +565,18 @@ interface IAlchemistV3Events {
     /// @param accountId        The token id of the account liquidated
     /// @param liquidator   The address of the liquidator
     /// @param amount       The amount liquidated
-    /// @param fee          The liquidation fee sent to 'liquidator'
-    event Liquidated(uint256 indexed accountId, address liquidator, uint256 amount, uint256 fee);
+    /// @param feeInYield          The liquidation fee sent to 'liquidator' in yield tokens.
+    /// @param feeInETH            The liquidation fee sent to 'liquidator' in ETH (if needed i.e. if there isn't enough remaining collateral to cover the fee).
+    event Liquidated(uint256 indexed accountId, address liquidator, uint256 amount, uint256 feeInYield, uint256 feeInETH);
 
     /// @notice Emitted when account for 'owner' has been liquidated.
     ///
     /// @param accounts       The address of the accounts liquidated
     /// @param liquidator   The address of the liquidator
     /// @param amount       The amount liquidated
-    /// @param fee          The liquidation fee sent to 'liquidator'
-    event BatchLiquidated(uint256[] indexed accounts, address liquidator, uint256 amount, uint256 fee);
+    /// @param feeInYield          The liquidation fee sent to 'liquidator' in yield tokens.
+    /// @param feeInETH            The liquidation fee sent to 'liquidator' in ETH (if needed i.e. if there isn't enough remaining collateral to cover the fee).
+    event BatchLiquidated(uint256[] indexed accounts, address liquidator, uint256 amount, uint256 feeInYield, uint256 feeInETH);
 
     /// @notice Emitted when all mint allowances for account managed by `tokenId` are reset.
     ///
@@ -600,6 +636,8 @@ interface IAlchemistV3State {
 
     function alchemistPositionNFT() external view returns (address nftContract);
 
+    function alchemistETHVault() external view returns (address vault);
+
     /// @notice Gets the address of the pending administrator.
     ///
     /// @return pendingAdmin The pending administrator address.
@@ -609,6 +647,9 @@ interface IAlchemistV3State {
     ///
     /// @return adapter The token adapter address.
     function tokenAdapter() external returns (address adapter);
+
+    /// @notice Gets the address of the current eth usd adapter.
+    function ethUsdAdapter() external view returns (address adapter);
 
     /// @notice Gets the address of the transmuter.
     ///

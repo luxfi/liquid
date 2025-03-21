@@ -20,9 +20,11 @@ import {ITransmuter} from "../interfaces/ITransmuter.sol";
 import {ITestYieldToken} from "../interfaces/test/ITestYieldToken.sol";
 import {InsufficientAllowance} from "../base/Errors.sol";
 import {Unauthorized, IllegalArgument, IllegalState, MissingInputData} from "../base/Errors.sol";
-import "../interfaces/IYearnVaultV2.sol";
 import {AlchemistNFTHelper} from "./libraries/AlchemistNFTHelper.sol";
 import {AlchemistV3Position} from "../AlchemistV3Position.sol";
+import {AlchemistETHVault} from "../AlchemistETHVault.sol";
+import {ETHUSDPriceFeedAdapter} from "../adapters/ETHUSDPriceFeedAdapter.sol";
+import {TokenUtils} from "../libraries/TokenUtils.sol";
 
 contract InvariantsTest is Test {
     bytes4[] internal selectors;
@@ -31,6 +33,8 @@ contract InvariantsTest is Test {
     AlchemistV3 alchemist;
     Transmuter transmuter;
     AlchemistV3Position alchemistNFT;
+    AlchemistETHVault ethVault;
+    ETHUSDPriceFeedAdapter ethUsdAdapter;
 
     // // Proxy variables
     TransparentUpgradeableProxy proxyAlchemist;
@@ -65,6 +69,8 @@ contract InvariantsTest is Test {
     /*     mapping(address => bool) users;
     */
     uint256 public constant FIXED_POINT_SCALAR = 1e18;
+    address ETH_USD_PRICE_FEED_MAINNET = 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419;
+    uint256 ETH_USD_UPDATE_TIME_MAINNET = 3600 seconds;
 
     uint256 public minimumCollateralization = uint256(FIXED_POINT_SCALAR * FIXED_POINT_SCALAR) / 9e17;
 
@@ -110,6 +116,8 @@ contract InvariantsTest is Test {
 
         fakeUnderlyingToken = new TestERC20(100e18, uint8(18));
         fakeYieldToken = new TestYieldToken(address(fakeUnderlyingToken));
+        ethUsdAdapter =
+            new ETHUSDPriceFeedAdapter(ETH_USD_PRICE_FEED_MAINNET, ETH_USD_UPDATE_TIME_MAINNET, TokenUtils.expectDecimals(address(fakeUnderlyingToken)));
 
         alToken = new AlchemicTokenV3(_name, _symbol, _flashFee);
 
@@ -154,6 +162,7 @@ contract InvariantsTest is Test {
             collateralizationLowerBound: 1_052_631_578_950_000_000, // 1.05 collateralization
             globalMinimumCollateralization: 1_111_111_111_111_111_111, // 1.1
             tokenAdapter: address(fakeYieldToken),
+            ethUsdAdapter: address(ethUsdAdapter),
             transmuter: address(transmuterLogic),
             protocolFee: 0,
             protocolFeeReceiver: address(10),
