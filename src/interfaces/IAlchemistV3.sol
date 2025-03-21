@@ -2,7 +2,7 @@
 pragma solidity ^0.8.26;
 
 /// @notice Contract initialization parameters.
-struct InitializationParams {
+struct AlchemistInitializationParams {
     // The initial admin account.
     address admin;
     // The ERC20 token used to represent debt. i.e. the alAsset.
@@ -254,7 +254,7 @@ interface IAlchemistV3Actions {
     /// @notice Subtracts `amount` synthetics from total minted from the alchemist.
     ///
     /// @notice This function is only callable by the transmuter.
-    ///    
+    ///
     /// @param amount The amount of synthetic tokens to adjust.
     function adjustTotalSyntheticsIssued(uint256 amount) external;
 

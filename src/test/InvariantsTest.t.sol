@@ -15,7 +15,7 @@ import {Whitelist} from "../utils/Whitelist.sol";
 import {TestERC20} from "./mocks/TestERC20.sol";
 import {TestYieldToken} from "./mocks/TestYieldToken.sol";
 import {TokenAdapterMock} from "./mocks/TokenAdapterMock.sol";
-import {IAlchemistV3, IAlchemistV3Errors, InitializationParams} from "../interfaces/IAlchemistV3.sol";
+import {IAlchemistV3, IAlchemistV3Errors, AlchemistInitializationParams} from "../interfaces/IAlchemistV3.sol";
 import {ITransmuter} from "../interfaces/ITransmuter.sol";
 import {ITestYieldToken} from "../interfaces/test/ITestYieldToken.sol";
 import {InsufficientAllowance} from "../base/Errors.sol";
@@ -62,10 +62,10 @@ contract InvariantsTest is Test {
     uint256 public _flashFee;
     address public alOwner;
 
-    mapping(address => bool) users;
-
+    /*     mapping(address => bool) users;
+    */
     uint256 public constant FIXED_POINT_SCALAR = 1e18;
-    
+
     uint256 public minimumCollateralization = uint256(FIXED_POINT_SCALAR * FIXED_POINT_SCALAR) / 9e17;
 
     // ----- Variables for deposits & withdrawals -----
@@ -113,7 +113,7 @@ contract InvariantsTest is Test {
 
         alToken = new AlchemicTokenV3(_name, _symbol, _flashFee);
 
-        ITransmuter.InitializationParams memory transParams = ITransmuter.InitializationParams({
+        ITransmuter.TransmuterInitializationParams memory transParams = ITransmuter.TransmuterInitializationParams({
             syntheticToken: address(alToken),
             feeReceiver: address(this),
             timeToTransmute: 5_256_000,
@@ -143,7 +143,7 @@ contract InvariantsTest is Test {
         // transmuter = TransmuterV3(address(proxyTransmuter));
 
         // AlchemistV3 proxy
-        InitializationParams memory params = InitializationParams({
+        AlchemistInitializationParams memory params = AlchemistInitializationParams({
             admin: alOwner,
             debtToken: address(alToken),
             underlyingToken: address(fakeUnderlyingToken),
@@ -225,7 +225,7 @@ contract InvariantsTest is Test {
 
     /* UTILS */
 
-    function _randomDepositor(address[] memory users, uint256 seed) internal view returns (address) {
+    function _randomDepositor(address[] memory users, uint256 seed) internal pure returns (address) {
         return _randomNonZero(users, seed);
     }
 
@@ -239,7 +239,7 @@ contract InvariantsTest is Test {
             uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(user, address(alchemistNFT));
 
             uint256 borrowable;
-            
+
             if (tokenId != 0) borrowable = alchemist.getMaxBorrowable(tokenId);
 
             if (borrowable > 0) {
@@ -259,7 +259,7 @@ contract InvariantsTest is Test {
             uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(user, address(alchemistNFT));
 
             uint256 borrowable;
-            
+
             if (tokenId != 0) alchemist.getMaxBorrowable(tokenId);
 
             if (borrowable > 0) {
@@ -277,10 +277,10 @@ contract InvariantsTest is Test {
             address user = users[i];
             // a single position nft would have been minted to address(0xbeef)
             uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(user, address(alchemistNFT));
-            uint256 collateral; 
+            uint256 collateral;
             uint256 debt;
 
-            if (tokenId != 0) (collateral, debt, ) = alchemist.getCDP(tokenId);            
+            if (tokenId != 0) (collateral, debt,) = alchemist.getCDP(tokenId);
 
             if (debt > 0) {
                 candidates[i] = user;
@@ -297,12 +297,12 @@ contract InvariantsTest is Test {
             address user = users[i];
             // a single position nft would have been minted to address(0xbeef)
             uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(user, address(alchemistNFT));
-            
-            uint256 collateral; 
+
+            uint256 collateral;
             uint256 debt;
             uint256 earmarked;
-            
-            if (tokenId != 0) (collateral, debt, earmarked) = alchemist.getCDP(tokenId);            
+
+            if (tokenId != 0) (collateral, debt, earmarked) = alchemist.getCDP(tokenId);
 
             if (debt > 0 && debt > earmarked) {
                 candidates[i] = user;
@@ -312,7 +312,7 @@ contract InvariantsTest is Test {
         return _randomNonZero(candidates, seed);
     }
 
-    function _randomStaker(address[] memory users, uint256 seed) internal view returns (address) {
+    function _randomStaker(address[] memory users, uint256 seed) internal pure returns (address) {
         return _randomNonZero(users, seed);
     }
 

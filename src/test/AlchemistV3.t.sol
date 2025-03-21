@@ -18,7 +18,7 @@ import {Whitelist} from "../utils/Whitelist.sol";
 import {TestERC20} from "./mocks/TestERC20.sol";
 import {TestYieldToken} from "./mocks/TestYieldToken.sol";
 import {TokenAdapterMock} from "./mocks/TokenAdapterMock.sol";
-import {IAlchemistV3, IAlchemistV3Errors, InitializationParams} from "../interfaces/IAlchemistV3.sol";
+import {IAlchemistV3, IAlchemistV3Errors, AlchemistInitializationParams} from "../interfaces/IAlchemistV3.sol";
 import {ITransmuter} from "../interfaces/ITransmuter.sol";
 import {ITestYieldToken} from "../interfaces/test/ITestYieldToken.sol";
 import {InsufficientAllowance} from "../base/Errors.sol";
@@ -115,7 +115,7 @@ contract AlchemistV3Test is Test {
 
         alToken = new AlchemicTokenV3(_name, _symbol, _flashFee);
 
-        ITransmuter.InitializationParams memory transParams = ITransmuter.InitializationParams({
+        ITransmuter.TransmuterInitializationParams memory transParams = ITransmuter.TransmuterInitializationParams({
             syntheticToken: address(alToken),
             feeReceiver: address(this),
             timeToTransmute: 5_256_000,
@@ -131,7 +131,7 @@ contract AlchemistV3Test is Test {
         whitelist = new Whitelist();
 
         // AlchemistV3 proxy
-        InitializationParams memory params = InitializationParams({
+        AlchemistInitializationParams memory params = AlchemistInitializationParams({
             admin: alOwner,
             debtToken: address(alToken),
             underlyingToken: address(fakeUnderlyingToken),
@@ -451,7 +451,7 @@ contract AlchemistV3Test is Test {
         // a single position nft would have been minted to address(0xbeef)
         uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
 
-        (uint256 depositedCollateral, uint256 debt,) = alchemist.getCDP(tokenId);
+        (uint256 depositedCollateral,,) = alchemist.getCDP(tokenId);
         vm.assertApproxEqAbs(depositedCollateral, amount, minimumDepositOrWithdrawalLoss);
         vm.stopPrank();
 
@@ -487,7 +487,7 @@ contract AlchemistV3Test is Test {
         // second deposit to existing position with tokenId
         alchemist.deposit(amount, address(0xbeef), tokenId);
 
-        (uint256 depositedCollateral, uint256 debt,) = alchemist.getCDP(tokenId);
+        (uint256 depositedCollateral,,) = alchemist.getCDP(tokenId);
         vm.assertApproxEqAbs(depositedCollateral, (amount * 2), minimumDepositOrWithdrawalLoss);
         vm.stopPrank();
 
@@ -1023,7 +1023,7 @@ contract AlchemistV3Test is Test {
 
         vm.roll(block.number + 2_600_000);
 
-        (uint256 deposited, uint256 userDebt,) = alchemist.getCDP(tokenId);
+        (, uint256 userDebt,) = alchemist.getCDP(tokenId);
 
         assertEq(userDebt, (amount / 2) + ((amount / 2) * 100 / 10_000));
 
@@ -1052,7 +1052,7 @@ contract AlchemistV3Test is Test {
 
         vm.roll(block.number + 2_600_000 / 2);
 
-        (uint256 deposited, uint256 userDebt,) = alchemist.getCDP(tokenId);
+        (, uint256 userDebt,) = alchemist.getCDP(tokenId);
 
         assertEq(userDebt, (amount / 2) + ((amount / 2) * 100 / 10_000 / 2));
 
@@ -1089,8 +1089,8 @@ contract AlchemistV3Test is Test {
 
         vm.roll(block.number + 2_600_000);
 
-        (uint256 deposited, uint256 userDebt,) = alchemist.getCDP(tokenIdFor0xBeef);
-        (uint256 deposited2, uint256 userDebt2,) = alchemist.getCDP(tokenIdForExternalUser);
+        (, uint256 userDebt,) = alchemist.getCDP(tokenIdFor0xBeef);
+        (, uint256 userDebt2,) = alchemist.getCDP(tokenIdForExternalUser);
 
         assertEq(userDebt, (amount / 2) + ((amount / 2) * 100 / 10_000));
         assertEq(userDebt2, (amount / 2) + ((amount / 2) * 100 / 10_000));
@@ -1129,8 +1129,8 @@ contract AlchemistV3Test is Test {
 
         vm.roll(block.number + 2_600_000 / 2);
 
-        (uint256 deposited, uint256 userDebt,) = alchemist.getCDP(tokenIdFor0xBeef);
-        (uint256 deposited2, uint256 userDebt2,) = alchemist.getCDP(tokenIdForExternalUser);
+        (, uint256 userDebt,) = alchemist.getCDP(tokenIdFor0xBeef);
+        (, uint256 userDebt2,) = alchemist.getCDP(tokenIdForExternalUser);
 
         assertEq(userDebt, (amount / 2) + ((amount / 2) * 100 / 10_000 / 2));
         assertEq(userDebt2, (amount / 2) + ((amount / 2) * 100 / 10_000 / 2));
@@ -1158,7 +1158,7 @@ contract AlchemistV3Test is Test {
         alchemist.repay(100e18, tokenId);
         vm.stopPrank();
 
-        (uint256 deposited, uint256 userDebt,) = alchemist.getCDP(tokenId);
+        (, uint256 userDebt,) = alchemist.getCDP(tokenId);
 
         assertEq(userDebt, 0);
 
@@ -1184,7 +1184,7 @@ contract AlchemistV3Test is Test {
         alchemist.repay(repayAmount, tokenId);
         vm.stopPrank();
 
-        (uint256 deposited, uint256 userDebt,) = alchemist.getCDP(tokenId);
+        (, uint256 userDebt,) = alchemist.getCDP(tokenId);
 
         uint256 repaidAmount = alchemist.convertYieldTokensToDebt(repayAmount) > 100e18 / 2 ? 100e18 / 2 : alchemist.convertYieldTokensToDebt(repayAmount);
 
@@ -1217,7 +1217,7 @@ contract AlchemistV3Test is Test {
         vm.prank(address(0xbeef));
         alchemist.repay(25e18, tokenId);
 
-        (uint256 collateral, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
+        (, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
 
         // All debt is earmarked at this point so these values should be the same
         assertEq(debt, (amount / 2) - (amount / 4));
@@ -1245,7 +1245,7 @@ contract AlchemistV3Test is Test {
         vm.prank(address(0xbeef));
         alchemist.repay(25e18, tokenId);
 
-        (uint256 collateral, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
+        (, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
 
         // 50 debt / 2 - 25 repaid
         assertEq(debt, (amount / 2) - (amount / 4));
@@ -1316,7 +1316,7 @@ contract AlchemistV3Test is Test {
         alchemist.burn(amount / 2, tokenId);
         vm.stopPrank();
 
-        (uint256 deposited, uint256 userDebt,) = alchemist.getCDP(tokenId);
+        (, uint256 userDebt,) = alchemist.getCDP(tokenId);
 
         assertEq(userDebt, 0);
     }
@@ -1337,7 +1337,7 @@ contract AlchemistV3Test is Test {
         alchemist.burn(burnAmount, tokenId);
         vm.stopPrank();
 
-        (uint256 deposited, uint256 userDebt,) = alchemist.getCDP(tokenId);
+        (, uint256 userDebt,) = alchemist.getCDP(tokenId);
 
         uint256 burnedAmount = burnAmount > amount / 2 ? amount / 2 : burnAmount;
 
@@ -1436,7 +1436,7 @@ contract AlchemistV3Test is Test {
         alchemist.burn(amount, tokenId);
         vm.stopPrank();
 
-        (uint256 deposited, uint256 userDebt, uint256 earmarked) = alchemist.getCDP(tokenId);
+        (, uint256 userDebt, uint256 earmarked) = alchemist.getCDP(tokenId);
 
         // Only 1/2 debt can be paid off since the rest is earmarked
         assertEq(userDebt, (amount / 8));
@@ -1488,7 +1488,7 @@ contract AlchemistV3Test is Test {
         // let another user liquidate the previous user position
         vm.startPrank(externalUser);
         vm.expectRevert();
-        (uint256 assets, uint256 fees) = alchemist.liquidate(tokenId);
+        alchemist.liquidate(tokenId);
         vm.stopPrank();
     }
 
@@ -1516,7 +1516,7 @@ contract AlchemistV3Test is Test {
         vm.stopPrank();
 
         // modify yield token price via modifying underlying token supply
-        (uint256 prevDepositedCollateral, uint256 prevDebt,) = alchemist.getCDP(tokenIdFor0xBeef);
+        (, uint256 prevDebt,) = alchemist.getCDP(tokenIdFor0xBeef);
         uint256 initialVaultSupply = IERC20(address(fakeYieldToken)).totalSupply();
         fakeYieldToken.updateMockTokenSupply(initialVaultSupply);
         // increasing yeild token suppy by 59 bps or 5.9%  while keeping the unederlying supply unchanged
@@ -1577,7 +1577,7 @@ contract AlchemistV3Test is Test {
         vm.stopPrank();
 
         // modify yield token price via modifying underlying token supply
-        (uint256 prevDepositedCollateral, uint256 prevDebt,) = alchemist.getCDP(tokenIdFor0xBeef);
+        (, uint256 prevDebt,) = alchemist.getCDP(tokenIdFor0xBeef);
         // ensure initial debt is correct
         vm.assertApproxEqAbs(prevDebt, 180_000_000_000_000_000_018_000, minimumDepositOrWithdrawalLoss);
 
@@ -1628,7 +1628,7 @@ contract AlchemistV3Test is Test {
         vm.stopPrank();
 
         // modify yield token price via modifying underlying token supply
-        (uint256 prevDepositedCollateral, uint256 prevDebt,) = alchemist.getCDP(tokenIdFor0xBeef);
+        (, uint256 prevDebt,) = alchemist.getCDP(tokenIdFor0xBeef);
         // ensure initial debt is correct
         vm.assertApproxEqAbs(prevDebt, 180_000_000_000_000_000_018_000, minimumDepositOrWithdrawalLoss);
 
@@ -1767,7 +1767,7 @@ contract AlchemistV3Test is Test {
         // let another user liquidate the previous user position
         vm.startPrank(externalUser);
         vm.expectRevert(IAlchemistV3Errors.LiquidationError.selector);
-        (uint256 assets, uint256 fees) = alchemist.liquidate(tokenIdFor0xBeef);
+        alchemist.liquidate(tokenIdFor0xBeef);
         vm.stopPrank();
     }
 
@@ -1803,8 +1803,7 @@ contract AlchemistV3Test is Test {
         uint256[] memory accountsToLiquidate = new uint256[](2);
         accountsToLiquidate[0] = tokenIdFor0xBeef;
         accountsToLiquidate[1] = tokenIdForExternalUser;
-
-        (uint256 assets, uint256 fee) = alchemist.batchLiquidate(accountsToLiquidate);
+        alchemist.batchLiquidate(accountsToLiquidate);
         vm.stopPrank();
     }
 
@@ -1838,7 +1837,7 @@ contract AlchemistV3Test is Test {
 
         // Batch Liquidation for  empty array
         uint256[] memory accountsToLiquidate = new uint256[](0);
-        (uint256 assets, uint256 fee) = alchemist.batchLiquidate(accountsToLiquidate);
+        alchemist.batchLiquidate(accountsToLiquidate);
         vm.stopPrank();
     }
 
@@ -1858,7 +1857,7 @@ contract AlchemistV3Test is Test {
         // let another user liquidate the previous user position
         vm.startPrank(externalUser);
         vm.expectRevert(IAlchemistV3Errors.LiquidationError.selector);
-        (uint256 assets, uint256 fees) = alchemist.liquidate(tokenIdFor0xBeef);
+        alchemist.liquidate(tokenIdFor0xBeef);
         vm.stopPrank();
     }
 
@@ -2165,7 +2164,7 @@ contract AlchemistV3Test is Test {
         vm.stopPrank();
     }
 
-    function testContractSize() external {
+    function testContractSize() external view {
         // Get size of deployed contract
         uint256 size = address(alchemist).code.length;
 
@@ -2192,8 +2191,7 @@ contract AlchemistV3Test is Test {
         // Verify it starts with the data URI prefix
         assertEq(AlchemistNFTHelper.slice(uri, 0, 29), "data:application/json;base64,", "URI should start with data:application/json;base64,");
 
-        // Extract and decode the base64 content
-        string memory base64Content = AlchemistNFTHelper.base64Content(uri);
+        // Extract and decode the JSON content
         string memory jsonContent = AlchemistNFTHelper.jsonContent(uri);
 
         // Verify JSON contains expected fields

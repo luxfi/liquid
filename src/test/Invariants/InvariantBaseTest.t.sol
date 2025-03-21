@@ -96,10 +96,10 @@ contract InvariantBaseTest is InvariantsTest {
         if (amount == 0) return;
 
         uint256 tokenId;
-        
+
         try AlchemistNFTHelper.getFirstTokenId(onBehalf, address(alchemistNFT)) {
             tokenId = AlchemistNFTHelper.getFirstTokenId(onBehalf, address(alchemistNFT));
-        } catch  {
+        } catch {
             tokenId = 0;
         }
 
@@ -165,9 +165,9 @@ contract InvariantBaseTest is InvariantsTest {
         if (onBehalf == address(0)) return;
 
         // TODO: Fix after burn discussion
-        uint256 totalLocked = transmuterLogic.totalLocked() > fakeYieldToken.balanceOf(address(transmuterLogic))
-            ? transmuterLogic.totalLocked() - fakeYieldToken.balanceOf(address(transmuterLogic))
-            : 0;
+        // uint256 totalLocked = transmuterLogic.totalLocked() > fakeYieldToken.balanceOf(address(transmuterLogic))
+        //     ? transmuterLogic.totalLocked() - fakeYieldToken.balanceOf(address(transmuterLogic))
+        //    : 0;
 
         amount = bound(amount, 0, alchemist.totalDebt());
         if (amount == 0) return;
