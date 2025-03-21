@@ -15,16 +15,29 @@ import {IWETH} from "./interfaces/IWETH.sol";
 contract AlchemistETHVault is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
+    // Error for unauthorized access
     error Unauthorized(address caller);
+    // Error for failed transfers
     error TransferFailed();
+    // Error for invalid amounts
     error InvalidAmount();
+    // Error for invalid WETH addresses
+    error InvalidWETHAddress();
+    // Error for invalid admin addresses
+    error InvalidAdminAddress();
 
+    // Address of the WETH contract
     address public immutable weth;
+    // Address of the admin
     address public admin;
+    // Address of the AlchemistV3 contract
     address public alchemist;
 
+    // Event to track deposits
     event Deposited(address indexed depositor, uint256 amount);
+    // Event to track withdrawals
     event Withdrawn(address indexed recipient, uint256 amount);
+    // Event to track alchemist address updates
     event AlchemistV3Updated(address indexed newAlchemist);
 
     /**
@@ -33,8 +46,8 @@ contract AlchemistETHVault is ReentrancyGuard {
      * @param _admin Address of the admin
      */
     constructor(address _weth, address _alchemist, address _admin) {
-        require(_weth != address(0), "Invalid WETH address");
-        require(_admin != address(0), "Invalid admin address");
+        require(_weth != address(0), InvalidWETHAddress());
+        require(_admin != address(0), InvalidAdminAddress());
         weth = _weth;
         admin = _admin;
         alchemist = _alchemist;
