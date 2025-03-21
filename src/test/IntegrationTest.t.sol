@@ -23,7 +23,9 @@ import {InsufficientAllowance} from "../base/Errors.sol";
 import {Unauthorized, IllegalArgument, IllegalState, MissingInputData} from "../base/Errors.sol";
 import {AlchemistNFTHelper} from "./libraries/AlchemistNFTHelper.sol";
 import {AlchemistV3Position} from "../AlchemistV3Position.sol";
-import "../interfaces/IYearnVaultV2.sol";
+import {ETHUSDPriceFeedAdapter} from "../adapters/ETHUSDPriceFeedAdapter.sol";
+import {AlchemistETHVault} from "../AlchemistETHVault.sol";
+import {TokenUtils} from "../libraries/TokenUtils.sol";
 
 // Tests for integration with Euler V2 Earn Vault
 contract RedemptionIntegrationTest is Test {
@@ -42,6 +44,7 @@ contract RedemptionIntegrationTest is Test {
     Transmuter transmuterLogic;
     AlchemicTokenV3 alToken;
     Whitelist whitelist;
+    ETHUSDPriceFeedAdapter ethUsdAdapter;
 
     // Total minted debt
     uint256 public minted;
@@ -53,7 +56,9 @@ contract RedemptionIntegrationTest is Test {
     uint256 public sentToTransmuter;
 
     EulerUSDCAdapter public vaultAdapter;
-
+    address weth = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    address ETH_USD_PRICE_FEED_MAINNET = 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419;
+    uint256 ETH_USD_UPDATE_TIME_MAINNET = 3600 seconds;
     // Parameters for AlchemicTokenV2
     string public _name;
     string public _symbol;
@@ -124,6 +129,7 @@ contract RedemptionIntegrationTest is Test {
         transmuterLogic = new Transmuter(transParams);
         alchemistLogic = new AlchemistV3();
         whitelist = new Whitelist();
+        ethUsdAdapter = new ETHUSDPriceFeedAdapter(ETH_USD_PRICE_FEED_MAINNET, ETH_USD_UPDATE_TIME_MAINNET, TokenUtils.expectDecimals(address(USDC)));
 
         // // Proxy contracts
         // // TransmuterBuffer proxy
@@ -153,6 +159,7 @@ contract RedemptionIntegrationTest is Test {
             collateralizationLowerBound: 1_052_631_578_950_000_000, // 1.05 collateralization
             globalMinimumCollateralization: 1_111_111_111_111_111_111, // 1.1
             tokenAdapter: address(vaultAdapter),
+            ethUsdAdapter: address(ethUsdAdapter),
             transmuter: address(transmuterLogic),
             protocolFee: 100,
             protocolFeeReceiver: receiver,
