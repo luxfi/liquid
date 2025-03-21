@@ -83,7 +83,7 @@ contract Transmuter is ITransmuter, ERC721 {
     }
 
     // TODO: Replace with upgradeable initializer
-    constructor(InitializationParams memory params) ERC721("Alchemix V3 Transmuter", "TRNSMTR") {
+    constructor(ITransmuter.TransmuterInitializationParams memory params) ERC721("Alchemix V3 Transmuter", "TRNSMTR") {
         syntheticToken = params.syntheticToken;
         timeToTransmute = params.timeToTransmute;
         transmutationFee = params.transmutationFee;
@@ -189,7 +189,7 @@ contract Transmuter is ITransmuter, ERC721 {
         totalLocked += syntheticDepositAmount;
 
         _mint(msg.sender, _nonce);
-        
+
         emit PositionCreated(msg.sender, syntheticDepositAmount, _nonce);
     }
 

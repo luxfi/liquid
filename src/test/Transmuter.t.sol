@@ -12,8 +12,6 @@ import "../interfaces/ITransmuter.sol";
 
 import "../base/TransmuterErrors.sol";
 
-import {console} from "../../lib/forge-std/src/console.sol";
-
 contract MockAlchemist {
     AlEth collateral;
 
@@ -22,20 +20,20 @@ contract MockAlchemist {
     constructor(AlEth _collateral) {
         collateral = _collateral;
     }
-    
-    function convertYieldTokensToUnderlying(uint256 amount) external view returns (uint256) {
+
+    function convertYieldTokensToUnderlying(uint256 amount) external pure returns (uint256) {
         return (amount * 2 * FIXED_POINT_SCALAR) / FIXED_POINT_SCALAR;
     }
 
-    function convertUnderlyingTokensToYield(uint256 amount) public view returns (uint256) {
+    function convertUnderlyingTokensToYield(uint256 amount) public pure returns (uint256) {
         return amount * FIXED_POINT_SCALAR / (2 * FIXED_POINT_SCALAR);
     }
 
-    function convertYieldTokensToDebt(uint256 amount) public view returns (uint256) {
+    function convertYieldTokensToDebt(uint256 amount) public pure returns (uint256) {
         return (amount * 2 * FIXED_POINT_SCALAR) / FIXED_POINT_SCALAR;
     }
 
-    function convertDebtTokensToYield(uint256 amount) public view returns (uint256) {
+    function convertDebtTokensToYield(uint256 amount) public pure returns (uint256) {
         return amount * FIXED_POINT_SCALAR / (2 * FIXED_POINT_SCALAR);
     }
 
@@ -43,19 +41,19 @@ contract MockAlchemist {
         collateral.transfer(msg.sender, convertUnderlyingTokensToYield(underlying));
     }
 
-    function totalDebt() external returns (uint256) {
+    function totalDebt() external pure returns (uint256) {
         return type(uint256).max;
     }
 
-    function totalSyntheticsIssued() external returns (uint256) {
+    function totalSyntheticsIssued() external pure returns (uint256) {
         return type(uint256).max;
     }
 
-    function adjustTotalSyntheticsIssued(uint256 amount) external {
+    /*    function adjustTotalSyntheticsIssued(uint256 amount) external {
 
-    }
+    } */
 
-    function yieldToken() external returns (address) {
+    function yieldToken() external view returns (address) {
         return address(collateral);
     }
 }
@@ -75,7 +73,7 @@ contract TransmuterTest is Test {
 
         alchemist = new MockAlchemist(collateralToken);
 
-        transmuter = new Transmuter(ITransmuter.InitializationParams(address(alETH), address(this), 5256000, 0, 0, 52560000 / 2));
+        transmuter = new Transmuter(ITransmuter.TransmuterInitializationParams(address(alETH), address(this), 5_256_000, 0, 0, 52_560_000 / 2));
 
         transmuter.setAlchemist(address(alchemist));
 
@@ -91,14 +89,14 @@ contract TransmuterTest is Test {
         alETH.approve(address(transmuter), type(uint256).max);
     }
 
-    function testSetTransmutaitonFeeTooHigh() public { 
+    function testSetTransmutaitonFeeTooHigh() public {
         vm.expectRevert();
-        transmuter.setTransmutationFee(10001);
+        transmuter.setTransmutationFee(10_001);
     }
 
-    function testSetExitFeeTooHigh() public { 
+    function testSetExitFeeTooHigh() public {
         vm.expectRevert();
-        transmuter.setExitFee(10001);
+        transmuter.setExitFee(10_001);
     }
 
     function testSetTransmutationTime() public {
@@ -126,7 +124,7 @@ contract TransmuterTest is Test {
 
     function testFuzzCreateRedemption(uint256 amount) public {
         vm.assume(amount > 0);
-        vm.assume(amount < uint256(type(int256).max)/1e20);
+        vm.assume(amount < uint256(type(int256).max) / 1e20);
 
         vm.prank(address(0xbeef));
         transmuter.createRedemption(amount);
@@ -156,12 +154,12 @@ contract TransmuterTest is Test {
     }
 
     function testClaimRedemption() public {
-        deal(address(collateralToken), address(transmuter), uint256(type(int256).max)/1e20);
+        deal(address(collateralToken), address(transmuter), uint256(type(int256).max) / 1e20);
 
         vm.prank(address(0xbeef));
         transmuter.createRedemption(100e18);
 
-        vm.roll(block.number + 5256000);
+        vm.roll(block.number + 5_256_000);
 
         assertEq(collateralToken.balanceOf(address(0xbeef)), 0);
         assertEq(alETH.balanceOf(address(transmuter)), 100e18);
@@ -174,12 +172,12 @@ contract TransmuterTest is Test {
     }
 
     function testClaimRedemptionNotOwner() public {
-        deal(address(collateralToken), address(transmuter), uint256(type(int256).max)/1e20);
+        deal(address(collateralToken), address(transmuter), uint256(type(int256).max) / 1e20);
 
         vm.prank(address(0xbeef));
         transmuter.createRedemption(100e18);
 
-        vm.roll(block.number + 5256000);
+        vm.roll(block.number + 5_256_000);
 
         assertEq(collateralToken.balanceOf(address(0xbeef)), 0);
         assertEq(alETH.balanceOf(address(transmuter)), 100e18);
@@ -195,7 +193,7 @@ contract TransmuterTest is Test {
         vm.prank(address(0xbeef));
         transmuter.createRedemption(100e18);
 
-        vm.roll(block.number + 5256000);
+        vm.roll(block.number + 5_256_000);
 
         assertEq(collateralToken.balanceOf(address(0xbeef)), 0);
         assertEq(alETH.balanceOf(address(transmuter)), 100e18);
@@ -212,15 +210,15 @@ contract TransmuterTest is Test {
     }
 
     function testFuzzClaimRedemption(uint256 amount) public {
-        deal(address(collateralToken), address(transmuter), uint256(type(int256).max)/1e20);
+        deal(address(collateralToken), address(transmuter), uint256(type(int256).max) / 1e20);
 
         vm.assume(amount > 0);
-        vm.assume(amount < uint256(type(int256).max)/1e20);
+        vm.assume(amount < uint256(type(int256).max) / 1e20);
 
         vm.prank(address(0xbeef));
         transmuter.createRedemption(amount);
 
-        vm.roll(block.number + 5256000);
+        vm.roll(block.number + 5_256_000);
 
         assertEq(collateralToken.balanceOf(address(0xbeef)), 0);
 
@@ -232,7 +230,7 @@ contract TransmuterTest is Test {
     }
 
     function testClaimRedemptionWithTransmuterFee() public {
-        deal(address(collateralToken), address(transmuter), uint256(type(int256).max)/1e20);
+        deal(address(collateralToken), address(transmuter), uint256(type(int256).max) / 1e20);
 
         // 1% fee
         transmuter.setTransmutationFee(100);
@@ -241,20 +239,20 @@ contract TransmuterTest is Test {
         vm.prank(address(0xbeef));
         transmuter.createRedemption(100e18);
 
-        vm.roll(block.number + 5256000);
+        vm.roll(block.number + 5_256_000);
 
         assertEq(collateralToken.balanceOf(address(0xbeef)), 0);
 
         vm.prank(address(0xbeef));
         transmuter.claimRedemption(1);
 
-        assertEq(collateralToken.balanceOf(address(0xbeef)), alchemist.convertUnderlyingTokensToYield(100e18) * 9900 / 10000);
-        assertEq(collateralToken.balanceOf(address(this)), alchemist.convertUnderlyingTokensToYield(100e18) * 100 / 10000);
+        assertEq(collateralToken.balanceOf(address(0xbeef)), alchemist.convertUnderlyingTokensToYield(100e18) * 9900 / 10_000);
+        assertEq(collateralToken.balanceOf(address(this)), alchemist.convertUnderlyingTokensToYield(100e18) * 100 / 10_000);
         assertEq(alETH.balanceOf(address(transmuter)), 0);
     }
 
     function testFuzzClaimRedemptionWithTransmuterFee(uint256 fee) public {
-        deal(address(collateralToken), address(transmuter), uint256(type(int256).max)/1e20);
+        deal(address(collateralToken), address(transmuter), uint256(type(int256).max) / 1e20);
 
         vm.assume(fee <= 10_000);
 
@@ -264,20 +262,20 @@ contract TransmuterTest is Test {
         vm.prank(address(0xbeef));
         transmuter.createRedemption(100e18);
 
-        vm.roll(block.number + 5256000);
+        vm.roll(block.number + 5_256_000);
 
         assertEq(collateralToken.balanceOf(address(0xbeef)), 0);
 
         vm.prank(address(0xbeef));
         transmuter.claimRedemption(1);
 
-        assertEq(collateralToken.balanceOf(address(0xbeef)), alchemist.convertUnderlyingTokensToYield(100e18) * (10000 - fee) / 10000);
-        assertEq(collateralToken.balanceOf(address(this)), alchemist.convertUnderlyingTokensToYield(100e18) * fee / 10000);
+        assertEq(collateralToken.balanceOf(address(0xbeef)), alchemist.convertUnderlyingTokensToYield(100e18) * (10_000 - fee) / 10_000);
+        assertEq(collateralToken.balanceOf(address(this)), alchemist.convertUnderlyingTokensToYield(100e18) * fee / 10_000);
         assertEq(alETH.balanceOf(address(transmuter)), 0);
     }
 
     function testClaimRedemptionPremature() public {
-        deal(address(collateralToken), address(transmuter), uint256(type(int256).max)/1e20);
+        deal(address(collateralToken), address(transmuter), uint256(type(int256).max) / 1e20);
 
         uint256 balanceBefore = alETH.balanceOf(address(0xbeef));
 
@@ -287,7 +285,7 @@ contract TransmuterTest is Test {
         // uint256 query = transmuter.queryGraph(block.number + 1, block.number + 5256000);
         // assertEq(query, 100e18);
 
-        vm.roll(block.number + (5256000 / 2));
+        vm.roll(block.number + (5_256_000 / 2));
 
         vm.prank(address(0xbeef));
         transmuter.claimRedemption(1);
@@ -299,21 +297,21 @@ contract TransmuterTest is Test {
         assertEq(alETH.balanceOf(address(transmuter)), 0);
 
         // Make sure remaining graph is cleared
-        uint256 query2 = transmuter.queryGraph(block.number + 1, block.number + (5256000 / 2));
+        uint256 query2 = transmuter.queryGraph(block.number + 1, block.number + (5_256_000 / 2));
 
         assertApproxEqAbs(query2, 0, 1);
     }
 
     function testFuzzClaimRedemptionPremature(uint256 time) public {
         vm.assume(time > 0);
-        vm.assume(time < 5256000);
+        vm.assume(time < 5_256_000);
 
         uint256 balanceBefore = alETH.balanceOf(address(0xbeef));
 
         vm.prank(address(0xbeef));
         transmuter.createRedemption(100e18);
 
-        uint256 query = transmuter.queryGraph(block.number + 1, block.number + 5256000);
+        uint256 query = transmuter.queryGraph(block.number + 1, block.number + 5_256_000);
         assertEq(query, 100e18);
 
         vm.roll(block.number + time);
@@ -323,8 +321,8 @@ contract TransmuterTest is Test {
 
         uint256 balanceAfter = alETH.balanceOf(address(0xbeef));
 
-        assertApproxEqAbs(collateralToken.balanceOf(address(0xbeef)), alchemist.convertUnderlyingTokensToYield((100e18 * time) / 5256000), 1);
-        assertApproxEqAbs(balanceBefore - balanceAfter, (100e18 * time) / 5256000, 1);
+        assertApproxEqAbs(collateralToken.balanceOf(address(0xbeef)), alchemist.convertUnderlyingTokensToYield((100e18 * time) / 5_256_000), 1);
+        assertApproxEqAbs(balanceBefore - balanceAfter, (100e18 * time) / 5_256_000, 1);
         assertEq(alETH.balanceOf(address(transmuter)), 0);
 
         // Make sure remaining graph is cleared
@@ -342,7 +340,7 @@ contract TransmuterTest is Test {
 
         uint256 balanceBefore = alETH.balanceOf(address(0xbeef));
 
-        vm.roll(block.number + (5256000 / 2));
+        vm.roll(block.number + (5_256_000 / 2));
 
         vm.prank(address(0xbeef));
         transmuter.claimRedemption(1);
@@ -350,18 +348,18 @@ contract TransmuterTest is Test {
         uint256 balanceAfter = alETH.balanceOf(address(0xbeef));
 
         assertEq(collateralToken.balanceOf(address(0xbeef)), alchemist.convertUnderlyingTokensToYield(50e18));
-        assertEq(balanceAfter - balanceBefore, 50e18 - (50e18 * 100 / 10000));
+        assertEq(balanceAfter - balanceBefore, 50e18 - (50e18 * 100 / 10_000));
         assertEq(alETH.balanceOf(address(transmuter)), 0);
-        assertEq(alETH.balanceOf(address(this)), 50e18 * 100 / 10000);
+        assertEq(alETH.balanceOf(address(this)), 50e18 * 100 / 10_000);
     }
 
     function testQueryGraph() external {
         vm.prank(address(0xbeef));
         transmuter.createRedemption(100e18);
 
-        vm.roll(block.number + 5256000);
+        vm.roll(block.number + 5_256_000);
 
-        uint256 treeQuery = transmuter.queryGraph(block.number - 5256000 + 1, block.number);
+        uint256 treeQuery = transmuter.queryGraph(block.number - 5_256_000 + 1, block.number);
 
         assertApproxEqAbs(treeQuery, 100e18, 1);
     }
@@ -370,9 +368,9 @@ contract TransmuterTest is Test {
         vm.prank(address(0xbeef));
         transmuter.createRedemption(100e18);
 
-        vm.roll(block.number + (5256000 / 2));
+        vm.roll(block.number + (5_256_000 / 2));
 
-        uint256 treeQuery = transmuter.queryGraph(block.number - (5256000/2) + 1, block.number);
+        uint256 treeQuery = transmuter.queryGraph(block.number - (5_256_000 / 2) + 1, block.number);
 
         assertApproxEqAbs(treeQuery, 50e18, 1);
     }
