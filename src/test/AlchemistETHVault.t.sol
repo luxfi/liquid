@@ -28,6 +28,12 @@ import {IAlchemistV3Position} from "../interfaces/IAlchemistV3Position.sol";
 import {AlchemistETHVault} from "../AlchemistETHVault.sol";
 import {ETHUSDPriceFeedAdapter} from "../adapters/ETHUSDPriceFeedAdapter.sol";
 
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {IWETH} from "../interfaces/IWETH.sol";
+
+import {VmSafe} from "../../lib/forge-std/src/Vm.sol";
+import {TokenUtils} from "../libraries/TokenUtils.sol";
+
 contract AlchemistETHVaultTest is Test {
     // ----- [SETUP] Variables for setting up a minimal CDP -----
 
@@ -55,6 +61,7 @@ contract AlchemistETHVaultTest is Test {
     // WETH address
     address public weth = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     address ETH_USD_PRICE_FEED_MAINNET = 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419;
+    uint256 ETH_USD_UPDATE_TIME_MAINNET = 3600 seconds;
 
     // Total minted debt
     uint256 public minted;
@@ -119,7 +126,8 @@ contract AlchemistETHVaultTest is Test {
 
         fakeUnderlyingToken = new TestERC20(100e18, uint8(18));
         fakeYieldToken = new TestYieldToken(address(fakeUnderlyingToken));
-        ethUsdAdapter = new ETHUSDPriceFeedAdapter(ETH_USD_PRICE_FEED_MAINNET);
+        ethUsdAdapter =
+            new ETHUSDPriceFeedAdapter(ETH_USD_PRICE_FEED_MAINNET, ETH_USD_UPDATE_TIME_MAINNET, TokenUtils.expectDecimals(address(fakeUnderlyingToken)));
 
         alToken = new AlchemicTokenV3(_name, _symbol, _flashFee);
 
@@ -191,14 +199,29 @@ contract AlchemistETHVaultTest is Test {
         new AlchemistETHVault(address(0), address(alchemist), alOwner);
     }
 
-    // ... existing code ...
-
-    function testDepositETH() public {
+    function testDeposit() public {
         uint256 depositAmount = 1 ether;
-        uint256 initialBalance = address(externalUser).balance;
-
+        uint256 startingAmount = 10 ether;
         // Give some ETH to the external user
-        vm.deal(externalUser, initialBalance + depositAmount);
+        vm.deal(externalUser, startingAmount);
+        uint256 initialBalance = address(externalUser).balance;
+        vm.startPrank(externalUser);
+
+        // Deposit ETH
+        ethVault.deposit{value: depositAmount}();
+
+        // Verify the user's ETH balance decreased
+        assertEq(address(externalUser).balance, initialBalance - depositAmount);
+        assertEq(address(ethVault).balance, depositAmount);
+        vm.stopPrank();
+    }
+
+    function testSendETHRawCall() public {
+        uint256 depositAmount = 1 ether;
+        uint256 startingAmount = 10 ether;
+        // Give some ETH to the external user
+        vm.deal(externalUser, startingAmount);
+        uint256 initialBalance = address(externalUser).balance;
 
         vm.startPrank(externalUser);
 
@@ -206,7 +229,8 @@ contract AlchemistETHVaultTest is Test {
         (bool success,) = address(ethVault).call{value: depositAmount}("");
 
         // Verify the user's ETH balance decreased
-        assertEq(address(externalUser).balance, initialBalance);
+        assertEq(address(externalUser).balance, initialBalance - depositAmount);
+        assertEq(address(ethVault).balance, depositAmount);
 
         vm.stopPrank();
     }
@@ -297,5 +321,46 @@ contract AlchemistETHVaultTest is Test {
 
         // Verify the vault received the ETH
         assertEq(address(ethVault).balance, amount);
+    }
+
+    function testDepositWETH() public {
+        uint256 depositAmount = 1 ether;
+        uint256 startingAmount = 10 ether;
+        // Give some ETH to the external user
+        vm.deal(externalUser, startingAmount);
+        uint256 initialBalance = address(externalUser).balance;
+
+        vm.startPrank(externalUser);
+        IWETH(weth).deposit{value: depositAmount}();
+        IERC20(weth).approve(address(ethVault), depositAmount);
+
+        // Expect the correct event with the right parameters
+        vm.expectEmit(true, true, true, true);
+        emit AlchemistETHVault.Deposited(externalUser, depositAmount);
+
+        // Start recording logs to count events
+        vm.recordLogs();
+
+        // Make the deposit
+        ethVault.depositWETH(depositAmount);
+
+        // Get logs and count Deposited events
+        VmSafe.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 depositedEventSignature = keccak256("Deposited(address,uint256)");
+
+        uint256 eventCount = 0;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == depositedEventSignature) {
+                eventCount++;
+            }
+        }
+
+        assertEq(address(externalUser).balance, initialBalance - depositAmount);
+        assertEq(address(ethVault).balance, depositAmount);
+
+        // Verify only one event was emitted
+        assertEq(eventCount, 1, "Deposited event should be emitted exactly once");
+
+        vm.stopPrank();
     }
 }

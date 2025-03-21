@@ -81,10 +81,15 @@ contract AlchemistETHVault is ReentrancyGuard {
     /**
      * @notice Deposit ETH into the vault
      */
-    receive() external payable {
+    function deposit() external payable nonReentrant {
         if (msg.value == 0) revert InvalidAmount();
         _deposit(msg.sender, msg.value);
     }
+
+    /**
+     * @notice Receive ETH into the vault
+     */
+    receive() external payable {}
 
     /**
      * @notice Deposit WETH into the vault (automatically unwraps to ETH)
