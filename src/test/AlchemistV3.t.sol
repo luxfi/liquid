@@ -28,6 +28,7 @@ import {IAlchemistV3Position} from "../interfaces/IAlchemistV3Position.sol";
 import {AlchemistETHVault} from "../AlchemistETHVault.sol";
 import {AggregatorV3Interface} from "../../lib/chainlink-brownie-contracts/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {ETHUSDPriceFeedAdapter} from "../adapters/ETHUSDPriceFeedAdapter.sol";
+import {TokenUtils} from "../libraries/TokenUtils.sol";
 
 contract AlchemistV3Test is Test {
     // ----- [SETUP] Variables for setting up a minimal CDP -----
@@ -109,6 +110,9 @@ contract AlchemistV3Test is Test {
     // Mock the price feed call
     address ETH_USD_PRICE_FEED_MAINNET = 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419;
 
+    // Mock the price feed call
+    uint256 ETH_USD_UPDATE_TIME_MAINNET = 3600 seconds;
+
     function setUp() external {
         // test maniplulation for convenience
         address caller = address(0xdead);
@@ -122,7 +126,8 @@ contract AlchemistV3Test is Test {
 
         fakeUnderlyingToken = new TestERC20(100e18, uint8(18));
         fakeYieldToken = new TestYieldToken(address(fakeUnderlyingToken));
-        ethUsdAdapter = new ETHUSDPriceFeedAdapter(ETH_USD_PRICE_FEED_MAINNET);
+        ethUsdAdapter =
+            new ETHUSDPriceFeedAdapter(ETH_USD_PRICE_FEED_MAINNET, ETH_USD_UPDATE_TIME_MAINNET, TokenUtils.expectDecimals(address(fakeUnderlyingToken)));
 
         alToken = new AlchemicTokenV3(_name, _symbol, _flashFee);
 

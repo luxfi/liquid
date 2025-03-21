@@ -24,6 +24,7 @@ import {AlchemistNFTHelper} from "./libraries/AlchemistNFTHelper.sol";
 import {AlchemistV3Position} from "../AlchemistV3Position.sol";
 import {AlchemistETHVault} from "../AlchemistETHVault.sol";
 import {ETHUSDPriceFeedAdapter} from "../adapters/ETHUSDPriceFeedAdapter.sol";
+import {TokenUtils} from "../libraries/TokenUtils.sol";
 
 contract InvariantsTest is Test {
     bytes4[] internal selectors;
@@ -69,6 +70,7 @@ contract InvariantsTest is Test {
 
     uint256 public constant FIXED_POINT_SCALAR = 1e18;
     address ETH_USD_PRICE_FEED_MAINNET = 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419;
+    uint256 ETH_USD_UPDATE_TIME_MAINNET = 3600 seconds;
 
     uint256 public minimumCollateralization = uint256(FIXED_POINT_SCALAR * FIXED_POINT_SCALAR) / 9e17;
 
@@ -114,7 +116,8 @@ contract InvariantsTest is Test {
 
         fakeUnderlyingToken = new TestERC20(100e18, uint8(18));
         fakeYieldToken = new TestYieldToken(address(fakeUnderlyingToken));
-        ethUsdAdapter = new ETHUSDPriceFeedAdapter(ETH_USD_PRICE_FEED_MAINNET);
+        ethUsdAdapter =
+            new ETHUSDPriceFeedAdapter(ETH_USD_PRICE_FEED_MAINNET, ETH_USD_UPDATE_TIME_MAINNET, TokenUtils.expectDecimals(address(fakeUnderlyingToken)));
 
         alToken = new AlchemicTokenV3(_name, _symbol, _flashFee);
 
