@@ -142,7 +142,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     constructor() initializer {}
 
-    function initialize(InitializationParams memory params) external initializer {
+    function initialize(AlchemistInitializationParams memory params) external initializer {
         _checkArgument(params.protocolFee <= BPS);
         _checkArgument(params.liquidatorFee <= BPS);
 
@@ -325,7 +325,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     /// @inheritdoc IAlchemistV3State
     function getMaxBorrowable(uint256 tokenId) external view returns (uint256) {
-        (uint256 debt, uint256 earmarked, uint256 collateral) = _calculateUnrealizedDebt(tokenId);
+        (uint256 debt,, uint256 collateral) = _calculateUnrealizedDebt(tokenId);
         uint256 debtValueOfCollateral = convertYieldTokensToDebt(collateral);
         return (debtValueOfCollateral * FIXED_POINT_SCALAR / minimumCollateralization) - debt;
     }
@@ -344,7 +344,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @inheritdoc IAlchemistV3State
     function totalValue(uint256 tokenId) public view returns (uint256) {
         uint256 totalUnderlying;
-        (uint256 debt, uint256 earmarked, uint256 collateral) = _calculateUnrealizedDebt(tokenId);
+        (,, uint256 collateral) = _calculateUnrealizedDebt(tokenId);
         if (collateral > 0) totalUnderlying += convertYieldTokensToUnderlying(collateral);
         return normalizeUnderlyingTokensToDebt(totalUnderlying);
     }
@@ -786,7 +786,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @dev reverts {UnknownAccountOwnerIDError} error by if no owner exists.
     ///
     /// @param tokenId The id of an account.
-    function _checkForValidAccountId(uint256 tokenId) internal {
+    function _checkForValidAccountId(uint256 tokenId) internal view {
         if (!_tokenExists(alchemistPositionNFT, tokenId)) {
             revert UnknownAccountOwnerIDError();
         }

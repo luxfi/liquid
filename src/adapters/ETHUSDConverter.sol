@@ -63,7 +63,7 @@ library ETHUSDConverter {
      * @param underlyingTokenAmount Amount of underlying token to convert
      * @return usdAmount Equivalent amount in USD (6 decimals)
      */
-    function underlyingTokenToUSD(uint256 underlyingTokenAmount, uint256 underlyingTokenDecimals) internal view returns (uint256 usdAmount) {
+    function underlyingTokenToUSD(uint256 underlyingTokenAmount, uint256 underlyingTokenDecimals) internal pure returns (uint256 usdAmount) {
         uint256 usdConversionFactor = 10 ** (underlyingTokenDecimals - USDC_DECIMALS);
         return underlyingTokenAmount / usdConversionFactor;
     }
