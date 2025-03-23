@@ -169,7 +169,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @notice Emitted when a new Position NFT is minted.
     event AlchemistV3PositionNFTMinted(address indexed to, uint256 indexed tokenId);
 
-    // Setter for the NFT position token, callable by admin.
+    /// @notice Sets the NFT position token, callable by admin.
     function setAlchemistPositionNFT(address nft) external onlyAdmin {
         if (nft == address(0)) {
             revert AlchemistV3NFTZeroAddressError();
@@ -404,7 +404,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         _checkArgument(recipient != address(0));
         _checkForValidAccountId(tokenId);
         _checkArgument(amount > 0);
-        _checkState(loansPaused == false);
+        _checkState(!loansPaused);
         _checkAccountOwnership(IAlchemistV3Position(alchemistPositionNFT).ownerOf(tokenId), msg.sender);
 
         // Query transmuter and earmark global debt
@@ -422,8 +422,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         _checkArgument(amount > 0);
         _checkForValidAccountId(tokenId);
         _checkArgument(recipient != address(0));
-        _checkState(loansPaused == false);
-
+        _checkState(!loansPaused);
         // Preemptively try and decrease the minting allowance. This will save gas when the allowance is not sufficient.
         _decreaseMintAllowance(tokenId, msg.sender, amount);
 
@@ -867,6 +866,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         account.collateralBalance -= convertDebtTokensToYield(earmarkToRedeem);
     }
 
+    /// @dev Earmarks the debt for redemption.
     function _earmark() internal {
         if (totalDebt == 0) return;
 
@@ -966,6 +966,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         return liquidationAmount;
     }
 
+    /// @dev Calculates the total value of the alchemist in the underlying token.
+    /// @return totalUnderlyingValue The total value of the alchemist in the underlying token.
     function _getTotalUnderlyingValue() internal view returns (uint256 totalUnderlyingValue) {
         uint256 yieldTokenTVL = IERC20(yieldToken).balanceOf(address(this));
         uint256 yieldTokenTVLInUnderlying = convertYieldTokensToUnderlying(yieldTokenTVL);

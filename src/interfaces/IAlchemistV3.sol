@@ -81,7 +81,7 @@ interface IAlchemistV3Actions {
 
     /// @notice Deposit a yield token into a user's account.
     /// @notice Create a new position by using zero (0) for the `recipientId`.
-    /// @notice Users may create as much positions as they want.
+    /// @notice Users may create as many positions as they want.
     ///
     /// @notice An approval must be set for `yieldToken` which is greater than `amount`.
     ///
