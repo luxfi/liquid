@@ -1,18 +1,16 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.26;
 
-import "./interfaces/IAlchemistV3.sol";
-import "./interfaces/ITransmuter.sol";
-import "./base/TransmuterErrors.sol";
-
-import "./libraries/TokenUtils.sol";
-import "@openzeppelin/contracts/utils/Strings.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IAlchemistV3} from "./interfaces/IAlchemistV3.sol";
+import {ITransmuter} from "./interfaces/ITransmuter.sol";
+import {TokenUtils} from "./libraries/TokenUtils.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {SafeCast} from "./libraries/SafeCast.sol";
 import {StakingGraph} from "./libraries/StakingGraph.sol";
-
 import {Unauthorized, IllegalArgument, IllegalState, InsufficientAllowance} from "./base/Errors.sol";
+import "./base/TransmuterErrors.sol";
 
 /// @title AlchemixV3 Transmuter
 ///
