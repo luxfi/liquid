@@ -10,6 +10,7 @@ import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {SafeCast} from "./libraries/SafeCast.sol";
 import {StakingGraph} from "./libraries/StakingGraph.sol";
 import {Unauthorized, IllegalArgument, IllegalState, InsufficientAllowance} from "./base/Errors.sol";
+import {NFTMetadataGenerator} from "./libraries/NFTMetadataGenerator.sol";
 import "./base/TransmuterErrors.sol";
 
 /// @title AlchemixV3 Transmuter
@@ -156,6 +157,12 @@ contract Transmuter is ITransmuter, ERC721 {
         _checkArgument(value != address(0));
         protocolFeeReceiver = value;
         emit ProtocolFeeReceiverUpdated(value);
+    }
+
+    function tokenURI(uint256 id) public view override returns (string memory) {
+        // revert if the token does not exist
+        ERC721(address(this)).ownerOf(id);
+        return NFTMetadataGenerator.generateTokenURI(id, "Transmuter V3 Position");
     }
 
     /// @inheritdoc ITransmuter
