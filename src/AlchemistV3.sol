@@ -14,6 +14,8 @@ import {Unauthorized, IllegalArgument, IllegalState, MissingInputData} from "./b
 import {IERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {IPriceFeedAdapter} from "./adapters/ETHUSDPriceFeedAdapter.sol";
 
+import {console} from "../../lib/forge-std/src/console.sol";
+
 /// @title  AlchemistV3
 /// @author Alchemix Finance
 contract AlchemistV3 is IAlchemistV3, Initializable {
@@ -555,12 +557,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     function redeem(uint256 amount) external onlyTransmuter {
         _earmark();
 
-        uint256 redemptionRatio = (amount << 128) / cumulativeEarmarked;
-        if (redemptionRatio >> 128 == 1) {
-            _redemptionWeight += PositionDecay.Log2NegFrac(1);
-        } else {
-            _redemptionWeight += PositionDecay.Log2NegFrac(redemptionRatio.uint256ToUint128());
-        }
+        _redemptionWeight += PositionDecay.WeightIncrement(amount,cumulativeEarmarked);
 
         cumulativeEarmarked -= amount;
         totalDebt -= amount;
@@ -842,19 +839,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         Account storage account = _accounts[tokenId];
         RedemptionInfo memory previousRedemption = _redemptions[lastRedemptionBlock];
 
-        uint256 debtFee;
-        if (_feeWeight - account.lastAccruedFeeWeight > 0) {
-            debtFee = (account.debt * (PositionDecay.Exp2NegFrac((_feeWeight - account.lastAccruedFeeWeight).uint256ToUint128()).uint128ToUint256()) >> 128);
-        }
+        uint256 debtFee = PositionDecay.ScaleByWeightDelta(account.debt, _feeWeight - account.lastAccruedFeeWeight);
 
-        uint256 debtToEarmark;
-        if (_earmarkWeight - account.lastAccruedEarmarkWeight < PositionDecay.Log2NegFrac(1) && _earmarkWeight - account.lastAccruedEarmarkWeight > 0) {
-            debtToEarmark = (account.debt - account.earmarked) - ((account.debt - account.earmarked) * (PositionDecay.Exp2NegFrac((_earmarkWeight - account.lastAccruedEarmarkWeight).uint256ToUint128()).uint128ToUint256()) >> 128);
-        } else if (_earmarkWeight - account.lastAccruedEarmarkWeight == 0) {
-            debtToEarmark = 0;
-        } else {
-            debtToEarmark = account.debt;
-        }
+        uint256 debtToEarmark = PositionDecay.ScaleByWeightDelta(account.debt - account.earmarked, _earmarkWeight - account.lastAccruedEarmarkWeight);
         
         account.lastAccruedEarmarkWeight = _earmarkWeight;
         account.earmarked += debtToEarmark;
@@ -862,30 +849,17 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         account.debt += debtFee;
         account.lastAccruedFeeWeight = _feeWeight;
 
-        uint256 earmarkToRedeem;
-        if (_redemptionWeight - account.lastAccruedRedemptionWeight < PositionDecay.Log2NegFrac(1) && _redemptionWeight - account.lastAccruedRedemptionWeight > 0) {
-            earmarkToRedeem = (account.earmarked * (PositionDecay.Exp2NegFrac((_redemptionWeight - account.lastAccruedRedemptionWeight).uint256ToUint128()).uint128ToUint256()) >> 128);
-        } else if (_redemptionWeight - account.lastAccruedRedemptionWeight == 0) {
-            earmarkToRedeem = 0;
-        } else {
-            earmarkToRedeem = account.earmarked;
-        }
+        uint256 earmarkToRedeem = PositionDecay.ScaleByWeightDelta(account.earmarked, _redemptionWeight - account.lastAccruedRedemptionWeight);
 
         // Recreate account state at last redemption block
         uint256 earmarkedCopyCopy;
         if (block.number > lastRedemptionBlock && _redemptionWeight != 0) {
             if (previousRedemption.debt != 0) {
-                uint256 debtToEarmark = (account.debt - account.earmarked) - ((account.debt - account.earmarked) * (PositionDecay.Exp2NegFrac((previousRedemption.earmarkWeight - account.lastAccruedEarmarkWeight).uint256ToUint128()).uint128ToUint256()) >> 128);
+                uint256 debtToEarmark = PositionDecay.ScaleByWeightDelta(account.debt - account.earmarked, previousRedemption.earmarkWeight - account.lastAccruedEarmarkWeight);
                 earmarkedCopyCopy = account.earmarked + debtToEarmark;
             }
 
-            if (_redemptionWeight - account.lastAccruedRedemptionWeight < PositionDecay.Log2NegFrac(1) && _redemptionWeight - account.lastAccruedRedemptionWeight > 0) {
-                earmarkToRedeem = (earmarkedCopyCopy * (PositionDecay.Exp2NegFrac((_redemptionWeight - account.lastAccruedRedemptionWeight).uint256ToUint128()).uint128ToUint256()) >> 128);
-            } else if (_redemptionWeight - account.lastAccruedRedemptionWeight == 0) {
-                earmarkToRedeem = 0;
-            } else {
-                earmarkToRedeem = earmarkedCopyCopy;
-            }
+            earmarkToRedeem = PositionDecay.ScaleByWeightDelta(earmarkedCopyCopy, _redemptionWeight - account.lastAccruedRedemptionWeight);
         }
 
         // Calculate how much of user earmarked amount has been redeemed and subtract it
@@ -904,19 +878,13 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         if (block.number > lastEarmarkBlock) {
             uint256 amount = ITransmuter(transmuter).queryGraph(lastEarmarkBlock + 1, block.number);
             if (amount > 0) {
-                uint256 unearmarkedRatio = ((totalDebt - cumulativeEarmarked - amount) << 128) / (totalDebt - cumulativeEarmarked);
-                if (unearmarkedRatio == 0) {
-                    _earmarkWeight += PositionDecay.Log2NegFrac(1);
-                } else {
-                    _earmarkWeight += PositionDecay.Log2NegFrac(unearmarkedRatio.uint256ToUint128());
-                }
+                _earmarkWeight += PositionDecay.WeightIncrement(amount, totalDebt - cumulativeEarmarked);
                 cumulativeEarmarked += amount;
             }
 
             if (protocolFee > 0) {
                 uint256 debtForFee = (protocolFee * totalDebt / BPS) * (block.number - lastEarmarkBlock) / blocksPerYear;
-                uint256 feeRatio = (debtForFee << 128) / totalDebt;
-                _feeWeight += PositionDecay.Log2NegFrac(feeRatio.uint256ToUint128());
+                _feeWeight += PositionDecay.WeightIncrement(debtForFee, totalDebt);
                 totalDebt += debtForFee;
             }
 
@@ -943,65 +911,36 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         if (block.number > lastEarmarkBlock) {
             amount = ITransmuter(transmuter).queryGraph(lastEarmarkBlock + 1, block.number);
             if (totalDebt > 0) {
-
                 if (protocolFee > 0) {
                     uint256 debtForFee = (protocolFee * totalDebt / BPS) * (block.number - lastEarmarkBlock) / blocksPerYear;
-                    uint256 feeRatio = (debtForFee << 128) / totalDebt;
-                    feeWeightCopy += PositionDecay.Log2NegFrac(feeRatio.uint256ToUint128());
+                    feeWeightCopy += PositionDecay.WeightIncrement(debtForFee, totalDebt);
                 }
 
                 if (amount > 0) {
-                    uint256 unearmarkedRatio = ((totalDebt - cumulativeEarmarked - amount) << 128) / (totalDebt - cumulativeEarmarked);
-                    // Log2 of 0 does not exist so we truncate to the smallest possible value within UQ0.128 precision
-                    if (unearmarkedRatio == 0) {
-                        earmarkWeightCopy += PositionDecay.Log2NegFrac(1);
-                    } else {
-                        earmarkWeightCopy += PositionDecay.Log2NegFrac(unearmarkedRatio.uint256ToUint128());
-                    }
+                    earmarkWeightCopy += PositionDecay.WeightIncrement(amount, totalDebt - cumulativeEarmarked);
                 }
             }
         }
 
-        uint256 debtToEarmark;
-        if (earmarkWeightCopy - account.lastAccruedEarmarkWeight < PositionDecay.Log2NegFrac(1) && earmarkWeightCopy - account.lastAccruedEarmarkWeight > 0) {
-            debtToEarmark = (account.debt - account.earmarked) - ((account.debt - account.earmarked) * (PositionDecay.Exp2NegFrac((earmarkWeightCopy - account.lastAccruedEarmarkWeight).uint256ToUint128()).uint128ToUint256()) >> 128);
-        } else if (earmarkWeightCopy - account.lastAccruedEarmarkWeight == 0) {
-            debtToEarmark = 0;
-        } else {
-            debtToEarmark = account.debt;
-        }
-
+        uint256 debtToEarmark = PositionDecay.ScaleByWeightDelta(account.debt - account.earmarked, earmarkWeightCopy - account.lastAccruedEarmarkWeight);
         uint256 earmarkedCopy = account.earmarked + debtToEarmark;
 
         uint256 debtFee;
         if (feeWeightCopy - account.lastAccruedFeeWeight > 0) {
-            debtFee = (account.debt * (PositionDecay.Exp2NegFrac((feeWeightCopy - account.lastAccruedFeeWeight).uint256ToUint128()).uint128ToUint256()) >> 128);
+            debtFee = PositionDecay.ScaleByWeightDelta(account.debt, feeWeightCopy - account.lastAccruedFeeWeight);
         }
 
-        uint256 earmarkToRedeem;   
-        if (_redemptionWeight - account.lastAccruedRedemptionWeight < PositionDecay.Log2NegFrac(1) && _redemptionWeight - account.lastAccruedRedemptionWeight > 0) {
-            earmarkToRedeem = (earmarkedCopy * (PositionDecay.Exp2NegFrac((_redemptionWeight - account.lastAccruedRedemptionWeight).uint256ToUint128()).uint128ToUint256()) >> 128);
-        } else if (_redemptionWeight - account.lastAccruedRedemptionWeight == 0) {
-            earmarkToRedeem = 0;
-        } else {
-            earmarkToRedeem = earmarkedCopy;
-        }
+        uint256 earmarkToRedeem = PositionDecay.ScaleByWeightDelta(earmarkedCopy, _redemptionWeight - account.lastAccruedRedemptionWeight);
 
         // Recreate account state at last redemption block
         uint256 earmarkedCopyCopy;
         if (block.number > lastRedemptionBlock && _redemptionWeight != 0) {
             if (previousRedemption.debt != 0) {
-                uint256 debtToEarmarkCopy = (account.debt - account.earmarked) - ((account.debt - account.earmarked) * (PositionDecay.Exp2NegFrac((previousRedemption.earmarkWeight - account.lastAccruedEarmarkWeight).uint256ToUint128()).uint128ToUint256()) >> 128);
+                uint256 debtToEarmarkCopy = PositionDecay.ScaleByWeightDelta(account.debt - account.earmarked, previousRedemption.earmarkWeight - account.lastAccruedEarmarkWeight);
                 earmarkedCopyCopy = account.earmarked + debtToEarmarkCopy;
             }
 
-            if (_redemptionWeight - account.lastAccruedRedemptionWeight < PositionDecay.Log2NegFrac(1) && _redemptionWeight - account.lastAccruedRedemptionWeight > 0) {
-                earmarkToRedeem = (earmarkedCopyCopy * (PositionDecay.Exp2NegFrac((_redemptionWeight - account.lastAccruedRedemptionWeight).uint256ToUint128()).uint128ToUint256()) >> 128);
-            } else if (_redemptionWeight - account.lastAccruedRedemptionWeight == 0) {
-                earmarkToRedeem = 0;
-            } else {
-                earmarkToRedeem = earmarkedCopyCopy;
-            }
+            earmarkToRedeem = PositionDecay.ScaleByWeightDelta(earmarkedCopyCopy, _redemptionWeight - account.lastAccruedRedemptionWeight);
         }
 
         return (account.debt - earmarkToRedeem + debtFee, earmarkedCopy - earmarkToRedeem, account.collateralBalance - convertDebtTokensToYield(earmarkToRedeem));

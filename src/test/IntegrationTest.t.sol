@@ -621,7 +621,6 @@ contract RedemptionIntegrationTest is Test {
         assertEq(collateral, 100_000e6 * 5500 / 10_000);
         // Same fee as before but half of their debt has been redeemed
         assertApproxEqAbs(debt, (debtAmount + (debtAmount * 5_256_000 / 2_600_000 * 100 / 10_000)) - debtAmount / 2, 1);
-
         assertApproxEqAbs(earmarked, (7 * debtAmount / 8) - (debtAmount / 2), 1);
 
         vm.roll(block.number + 5_256_000 / 4);
@@ -631,7 +630,7 @@ contract RedemptionIntegrationTest is Test {
         // Collateral unchanged from before since position wasnt redeemed yet
         assertEq(collateral, 100_000e6 * 5500 / 10_000);
         uint256 debt123 = (debtAmount + (debtAmount * 5256000 / 2600000 * 100 / 10000)) - debtAmount / 2;
-        assertApproxEqAbs(debt, (debt123 + (debt123 * 1314000 / 2600000 * 100 / 10000)), 2);
+        assertApproxEqAbs(debt, (debt123 + debt123 * (5_256_000 / 4) / 2_600_000 * 100 / 10_000), 1);
 
         // assertApproxEqAbs(earmarked, debtAmount / 2 , 1);
 
