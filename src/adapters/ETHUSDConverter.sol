@@ -23,10 +23,13 @@ library ETHUSDConverter {
         AggregatorV3Interface priceFeed = AggregatorV3Interface(usdPriceFeed);
         (, int256 price,, uint256 updateTime,) = priceFeed.latestRoundData();
 
-        // Ensure price is positive
-        require(price > 0, ChainlinkMalfunction(usdPriceFeed, price));
-        // Ensure update time is not 0
-        require(updateTime != 0, IncompleteRound(usdPriceFeed, updateTime));
+        if (price <= 0) {
+            revert ChainlinkMalfunction(usdPriceFeed, price);
+        }
+
+        if (updateTime == 0) {
+            revert IncompleteRound(usdPriceFeed, updateTime);
+        }
 
         if (updateTime < block.timestamp - expectedUpdateTime) {
             revert IncompleteRound(usdPriceFeed, updateTime);
@@ -46,10 +49,14 @@ library ETHUSDConverter {
         // Get the latest ETH/USD price
         AggregatorV3Interface priceFeed = AggregatorV3Interface(usdPriceFeed);
         (, int256 price,, uint256 updateTime,) = priceFeed.latestRoundData();
-        // Ensure price is positive
-        require(price > 0, ChainlinkMalfunction(usdPriceFeed, price));
-        // Ensure update time is not 0
-        require(updateTime != 0, IncompleteRound(usdPriceFeed, updateTime));
+
+        if (price <= 0) {
+            revert ChainlinkMalfunction(usdPriceFeed, price);
+        }
+
+        if (updateTime == 0) {
+            revert IncompleteRound(usdPriceFeed, updateTime);
+        }
 
         if (updateTime < block.timestamp - expectedUpdateTime) {
             revert IncompleteRound(usdPriceFeed, updateTime);
