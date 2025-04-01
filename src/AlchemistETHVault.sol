@@ -46,8 +46,14 @@ contract AlchemistETHVault is ReentrancyGuard {
      * @param _admin Address of the admin
      */
     constructor(address _weth, address _alchemist, address _admin) {
-        require(_weth != address(0), InvalidWETHAddress());
-        require(_admin != address(0), InvalidAdminAddress());
+        if (_weth == address(0)) {
+            revert  InvalidWETHAddress();
+        }
+
+        if (_admin == address(0)) {
+            revert  InvalidAdminAddress();
+        }
+
         weth = _weth;
         admin = _admin;
         alchemist = _alchemist;
