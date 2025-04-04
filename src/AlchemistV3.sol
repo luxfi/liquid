@@ -949,25 +949,25 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         }
 
         uint256 debtToEarmark = PositionDecay.ScaleByWeightDelta(account.debt - account.earmarked, earmarkWeightCopy - account.lastAccruedEarmarkWeight);
-        uint256 earmarkedCopy = account.earmarked + debtToEarmark;
+        uint256 earmarkedState = account.earmarked + debtToEarmark;
 
         // Recreate account state at last redemption block
-        uint256 earmarkedCopyCopy;
+        uint256 earmarkedPreviousState;
         uint256 earmarkToRedeem;
         if (block.number > lastRedemptionBlock && _redemptionWeight != 0) {
             if (previousRedemption.debt != 0) {
                 uint256 debtToEarmarkCopy = PositionDecay.ScaleByWeightDelta(account.debt - account.earmarked, previousRedemption.earmarkWeight - account.lastAccruedEarmarkWeight);
-                earmarkedCopyCopy = account.earmarked + debtToEarmarkCopy;
+                earmarkedPreviousState = account.earmarked + debtToEarmarkCopy;
             }
 
-            earmarkToRedeem = PositionDecay.ScaleByWeightDelta(earmarkedCopyCopy, _redemptionWeight - account.lastAccruedRedemptionWeight);
+            earmarkToRedeem = PositionDecay.ScaleByWeightDelta(earmarkedPreviousState, _redemptionWeight - account.lastAccruedRedemptionWeight);
         } else {
-            earmarkToRedeem = PositionDecay.ScaleByWeightDelta(earmarkedCopy, _redemptionWeight - account.lastAccruedRedemptionWeight);
+            earmarkToRedeem = PositionDecay.ScaleByWeightDelta(earmarkedState, _redemptionWeight - account.lastAccruedRedemptionWeight);
         }
 
         uint256 userDebtBalance = account.scaledDebt * debtScalingWeightCopy / DEBT_SCALING_FACTOR;
 
-        return (userDebtBalance, earmarkedCopy - earmarkToRedeem, account.collateralBalance - convertDebtTokensToYield(earmarkToRedeem));
+        return (userDebtBalance, earmarkedState - earmarkToRedeem, account.collateralBalance - convertDebtTokensToYield(earmarkToRedeem));
     }
 
     /// @dev Checks that the account owned by `tokenId` is properly collateralized.
