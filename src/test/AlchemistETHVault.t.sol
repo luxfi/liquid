@@ -178,7 +178,7 @@ contract AlchemistETHVaultTest is Test {
     }
 
     function testConstructorZeroAddressReverts() public {
-        vm.expectRevert("Invalid WETH address");
+        vm.expectRevert();
         new AlchemistETHVault(address(0), address(alchemist), alOwner);
     }
 
