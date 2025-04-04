@@ -49,9 +49,9 @@ contract MockAlchemist {
         return type(uint256).max;
     }
 
-    /*    function adjustTotalSyntheticsIssued(uint256 amount) external {
+    function adjustTotalSyntheticsIssued(uint256 amount) external {
 
-    } */
+    }
 
     function yieldToken() external view returns (address) {
         return address(collateral);
