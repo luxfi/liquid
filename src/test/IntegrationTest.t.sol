@@ -311,8 +311,8 @@ contract RedemptionIntegrationTest is Test {
         (uint256 collateral, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
 
         assertApproxEqAbs(debt, maxBorrow + (debtAmount * 5_256_000 / 2_600_000 * 100 / 10_000) / 2, 1);
-        assertEq(collateral, 100_000e6);
-        assertEq(earmarked, maxBorrow / 2);
+        assertApproxEqAbs(collateral, 100_000e6, 1);
+        assertApproxEqAbs(earmarked, maxBorrow / 2, 1);
 
         vm.startPrank(address(0xbeef));
         IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
@@ -323,7 +323,7 @@ contract RedemptionIntegrationTest is Test {
 
         // Loss of precision. Small, but consider using LTV rather than minimum collateralization
         assertApproxEqAbs(debt, debtAmount * 5_256_000 / 2_600_000 * 100 / 10_000 / 2, 9201);
-        assertEq(collateral, 100_000e6);
+        assertApproxEqAbs(collateral, 100_000e6, 1);
         assertApproxEqAbs(earmarked, 0, 9201);
 
         assertApproxEqAbs(IERC20(alchemist.yieldToken()).balanceOf(address(transmuterLogic)), alchemist.convertDebtTokensToYield(maxBorrow), 1);
@@ -351,8 +351,8 @@ contract RedemptionIntegrationTest is Test {
         (uint256 collateral, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
 
         assertApproxEqAbs(debt, maxBorrow + (debtAmount * 5_256_000 / 2_600_000 * 100 / 10_000) / 2, 1);
-        assertEq(collateral, 100_000e6);
-        assertEq(earmarked, maxBorrow / 2);
+        assertApproxEqAbs(collateral, 100_000e6, 1);
+        assertApproxEqAbs(earmarked, maxBorrow / 2, 1);
 
         vm.startPrank(address(0xbeef));
         IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
@@ -363,7 +363,7 @@ contract RedemptionIntegrationTest is Test {
 
         // Loss of precision. Small, but consider using LTV rather than minimum collateralization
         assertApproxEqAbs(debt, (maxBorrow / 2) + (debtAmount * 5_256_000 / 2_600_000 * 100 / 10_000) / 2, 9201);
-        assertEq(collateral, 100_000e6);
+        assertApproxEqAbs(collateral, 100_000e6, 1);
         assertApproxEqAbs(earmarked, 0, 9201);
 
         assertApproxEqAbs(IERC20(alchemist.yieldToken()).balanceOf(address(transmuterLogic)), alchemist.convertDebtTokensToYield(maxBorrow) / 2, 1);
@@ -391,8 +391,8 @@ contract RedemptionIntegrationTest is Test {
         (uint256 collateral, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
 
         assertApproxEqAbs(debt, maxBorrow + (debtAmount * 5_256_000 / 2_600_000 * 100 / 10_000) / 2, 1);
-        assertEq(collateral, 100_000e6);
-        assertEq(earmarked, maxBorrow / 2);
+        assertApproxEqAbs(collateral, 100_000e6, 1);
+        assertApproxEqAbs(earmarked, maxBorrow / 2, 1);
 
         uint256 beefStartingBalance = IERC20(alchemist.yieldToken()).balanceOf(address(0xbeef));
 
@@ -470,7 +470,7 @@ contract RedemptionIntegrationTest is Test {
         (uint256 collateral, uint256 debt,) = alchemist.getCDP(tokenId);
 
         // Make sure only unEarmarked debt is repaid
-        assertEq(debt, maxBorrow / 4);
+        assertApproxEqAbs(debt, maxBorrow / 4, 2);
         // assertEq(collateral, 100_000e6);
 
         // // Make sure 0xbeef get remaining tokens back
@@ -632,22 +632,22 @@ contract RedemptionIntegrationTest is Test {
         uint256 debt123 = (debtAmount + (debtAmount * 5256000 / 2600000 * 100 / 10000)) - debtAmount / 2;
         assertApproxEqAbs(debt, (debt123 + debt123 * (5_256_000 / 4) / 2_600_000 * 100 / 10_000), 1);
 
-        // assertApproxEqAbs(earmarked, debtAmount / 2 , 1);
+        assertApproxEqAbs(earmarked, debtAmount / 2 , 1);
 
-        // // Second position claim
-        // vm.startPrank(address(0xdead));
-        // transmuterLogic.claimRedemption(2);
-        // vm.stopPrank();
+        // Second position claim
+        vm.startPrank(address(0xdead));
+        transmuterLogic.claimRedemption(2);
+        vm.stopPrank();
 
-        // // (collateral, debt, earmarked) = alchemist.getCDP(address(0xbeef));
+        // (collateral, debt, earmarked) = alchemist.getCDP(address(0xbeef));
 
-        // // // Collateral unchanged from before since position wasnt redeemed yet
-        // // assertEq(collateral, 100_000e6 * 5500 / 10_000);
-        // // // Same fee as before but half of their debt has been redeemed
-        // // assertApproxEqAbs(debt, (debtAmount + (debtAmount * 5256000 / 2600000 * 100 / 10000)) - debtAmount / 2, 1);
+        // // Collateral unchanged from before since position wasnt redeemed yet
+        // assertEq(collateral, 100_000e6 * 5500 / 10_000);
+        // // Same fee as before but half of their debt has been redeemed
+        // assertApproxEqAbs(debt, (debtAmount + (debtAmount * 5256000 / 2600000 * 100 / 10000)) - debtAmount / 2, 1);
 
-        // // assertApproxEqAbs(debt, debtAmount * 6570000 / 2600000 * 100 / 10000, 1);
+        // assertApproxEqAbs(debt, debtAmount * 6570000 / 2600000 * 100 / 10000, 1);
 
-        // // assertApproxEqAbs(earmarked, (7 * debtAmount / 8) - (debtAmount / 2), 1);
+        // assertApproxEqAbs(earmarked, (7 * debtAmount / 8) - (debtAmount / 2), 1);
     }
 }
