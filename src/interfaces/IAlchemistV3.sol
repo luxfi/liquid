@@ -64,7 +64,6 @@ struct RedemptionInfo {
     uint256 earmarked;
     uint256 debt;
     uint256 earmarkWeight;
-    uint256 feeWeight;
 }
 
 interface IAlchemistV3Actions {
@@ -619,8 +618,6 @@ interface IAlchemistV3State {
     function totalDebt() external view returns (uint256 debt);
 
     function scaledDebt() external view returns (uint256 scaledDebt);
-
-    function debtScalingWeight() external view returns (uint256 scalingWeight);
 
     function totalSyntheticsIssued() external view returns (uint256 syntheticAmount);
 
