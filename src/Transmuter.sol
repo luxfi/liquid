@@ -245,8 +245,6 @@ contract Transmuter is ITransmuter, ERC721 {
 
         totalLocked -= position.amount;
 
-        alchemist.adjustTotalSyntheticsIssued(amountTransmuted);
-
         emit PositionClaimed(msg.sender, claimAmount, syntheticReturned);
 
         delete _positions[id];
