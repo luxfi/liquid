@@ -1060,18 +1060,28 @@ contract AlchemistV3Test is Test {
         vm.assertApproxEqAbs(IERC20(alToken).balanceOf(address(0xbeef)), (amount / 2), minimumDepositOrWithdrawalLoss);
         vm.stopPrank();
 
-        vm.roll(block.number + 2_600_000);
+        vm.startPrank(address(0xdad));
+        SafeERC20.safeApprove(address(alToken), address(transmuterLogic), 50e18);
+        transmuterLogic.createRedemption(50e18);
+        vm.stopPrank();
 
-        (, uint256 userDebt,) = alchemist.getCDP(tokenId);
+        vm.roll(block.number + 5_256_000);
 
-        assertEq(userDebt, (amount / 2) + ((amount / 2) * 100 / 10_000));
+        (uint256 collateral, uint256 userDebt,) = alchemist.getCDP(tokenId);
 
-        // // Total debt should not change since data is not actually written yet
-        // assertEq(alchemist.totalDebt(), (amount / 2));
+        assertEq(userDebt, (amount / 2));
+        assertApproxEqAbs(collateral, amount, 0);
 
-        // alchemist.poke(tokenId);
+        vm.startPrank(address(0xdad));
+        transmuterLogic.claimRedemption(1);
+        vm.stopPrank();
 
-        // assertEq(alchemist.totalDebt(), (amount / 2) + ((amount / 2) * 100 / 10_000));
+        assertApproxEqAbs(collateral, amount, 0);
+
+        (collateral, userDebt,) = alchemist.getCDP(tokenId);
+
+        assertEq(userDebt, 0);
+        assertApproxEqAbs(collateral, (amount / 2) - (amount / 2) * 100 / 10000, 1);
     }
 
     function testMintFeeOnDebtPartial() external {
@@ -1089,18 +1099,28 @@ contract AlchemistV3Test is Test {
         vm.assertApproxEqAbs(IERC20(alToken).balanceOf(address(0xbeef)), (amount / 2), minimumDepositOrWithdrawalLoss);
         vm.stopPrank();
 
-        vm.roll(block.number + 2_600_000 / 2);
+        vm.startPrank(address(0xdad));
+        SafeERC20.safeApprove(address(alToken), address(transmuterLogic), 50e18);
+        transmuterLogic.createRedemption(50e18);
+        vm.stopPrank();
 
-        (, uint256 userDebt,) = alchemist.getCDP(tokenId);
+        vm.roll(block.number + 5_256_000 / 2);
 
-        assertEq(userDebt, (amount / 2) + ((amount / 2) * 100 / 10_000 / 2));
+        (uint256 collateral, uint256 userDebt,) = alchemist.getCDP(tokenId);
 
-        // Total debt should not change since data is not actually written yet
-        assertEq(alchemist.totalDebt(), (amount / 2));
+        assertEq(userDebt, (amount / 2));
+        assertApproxEqAbs(collateral, amount, 0);
 
-        alchemist.poke(tokenId);
+        vm.startPrank(address(0xdad));
+        transmuterLogic.claimRedemption(1);
+        vm.stopPrank();
 
-        assertEq(alchemist.totalDebt(), (amount / 2) + ((amount / 2) * 100 / 10_000 / 2));
+        assertApproxEqAbs(collateral, amount, 0);
+
+        (collateral, userDebt,) = alchemist.getCDP(tokenId);
+
+        assertEq(userDebt, amount / 4);
+        assertApproxEqAbs(collateral, (3 * amount / 4) - (amount / 4) * 100 / 10000, 1);
     }
 
     function testMintFeeOnDebtMultipleUsers() external {
@@ -1126,20 +1146,25 @@ contract AlchemistV3Test is Test {
         vm.assertApproxEqAbs(IERC20(alToken).balanceOf(externalUser), (amount / 2), minimumDepositOrWithdrawalLoss);
         vm.stopPrank();
 
-        vm.roll(block.number + 2_600_000);
+        vm.startPrank(address(0xdad));
+        SafeERC20.safeApprove(address(alToken), address(transmuterLogic), 50e18);
+        transmuterLogic.createRedemption(50e18);
+        vm.stopPrank();
 
-        (, uint256 userDebt,) = alchemist.getCDP(tokenIdFor0xBeef);
-        (, uint256 userDebt2,) = alchemist.getCDP(tokenIdForExternalUser);
+        vm.roll(block.number + 5_256_000);
 
-        assertEq(userDebt, (amount / 2) + ((amount / 2) * 100 / 10_000));
-        assertEq(userDebt2, (amount / 2) + ((amount / 2) * 100 / 10_000));
+        vm.startPrank(address(0xdad));
+        transmuterLogic.claimRedemption(1);
+        vm.stopPrank();
 
-        // Total debt should not change since data is not actually written yet
-        assertEq(alchemist.totalDebt(), (amount));
+        (uint256 collateral, uint256 userDebt,) = alchemist.getCDP(tokenIdFor0xBeef);
+        (uint256 collateral2, uint256 userDebt2,) = alchemist.getCDP(tokenIdForExternalUser);
 
-        alchemist.poke(tokenIdFor0xBeef);
-        // After poking 0xbeef an earmark should trigger and update total debt for everyones fees
-        assertEq(alchemist.totalDebt(), (amount) + ((amount) * 100 / 10_000));
+        assertEq(userDebt, amount / 4);
+        assertApproxEqAbs(collateral, (3 * amount / 4) - (amount / 4) * 100 / 10000, 1);
+
+        assertEq(userDebt2, amount / 4);
+        assertApproxEqAbs(collateral2, (3 * amount / 4) - (amount / 4) * 100 / 10000, 1);
     }
 
     function testMintFeeOnDebtPartialMultipleUsers() external {
@@ -1166,20 +1191,25 @@ contract AlchemistV3Test is Test {
         vm.assertApproxEqAbs(IERC20(alToken).balanceOf(externalUser), (amount / 2), minimumDepositOrWithdrawalLoss);
         vm.stopPrank();
 
-        vm.roll(block.number + 2_600_000 / 2);
+        vm.startPrank(address(0xdad));
+        SafeERC20.safeApprove(address(alToken), address(transmuterLogic), 50e18);
+        transmuterLogic.createRedemption(50e18);
+        vm.stopPrank();
 
-        (, uint256 userDebt,) = alchemist.getCDP(tokenIdFor0xBeef);
-        (, uint256 userDebt2,) = alchemist.getCDP(tokenIdForExternalUser);
+        vm.roll(block.number + 5_256_000 / 2);
 
-        assertEq(userDebt, (amount / 2) + ((amount / 2) * 100 / 10_000 / 2));
-        assertEq(userDebt2, (amount / 2) + ((amount / 2) * 100 / 10_000 / 2));
+        vm.startPrank(address(0xdad));
+        transmuterLogic.claimRedemption(1);
+        vm.stopPrank();
 
-        // Total debt should not change since data is not actually written yet
-        assertEq(alchemist.totalDebt(), (amount));
+        (uint256 collateral, uint256 userDebt,) = alchemist.getCDP(tokenIdFor0xBeef);
+        (uint256 collateral2, uint256 userDebt2,) = alchemist.getCDP(tokenIdForExternalUser);
 
-        alchemist.poke(tokenIdFor0xBeef);
-        // After poking 0xbeef an earmark should trigger and update total debt for everyones fees
-        assertEq(alchemist.totalDebt(), (amount) + ((amount / 2) * 100 / 10_000));
+        assertEq(userDebt, 3 * amount / 8);
+        assertApproxEqAbs(collateral, (7 * amount / 8) - (amount / 8) * 100 / 10000, 1);
+
+        assertEq(userDebt2, 3 * amount / 8);
+        assertApproxEqAbs(collateral2, (7 * amount / 8) - (amount / 8) * 100 / 10000, 1);
     }
 
     function testRepayUnearmarkedDebtOnly() external {

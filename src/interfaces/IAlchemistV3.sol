@@ -40,8 +40,6 @@ struct AlchemistInitializationParams {
 struct Account {
     /// @notice User's debt.
     uint256 debt;
-    /// @notice A user's debt scaled to include accumulated fees.
-    uint256 scaledDebt; 
     /// @notice User's collateral.
     uint256 collateralBalance;
     /// @notice User debt earmarked for redemption.
@@ -257,13 +255,6 @@ interface IAlchemistV3Actions {
     ///
     /// @param amount The amount of tokens to redeem.
     function redeem(uint256 amount) external;
-
-    /// @notice Subtracts `amount` synthetics from total minted from the alchemist.
-    ///
-    /// @notice This function is only callable by the transmuter.
-    ///
-    /// @param amount The amount of synthetic tokens to adjust.
-    function adjustTotalSyntheticsIssued(uint256 amount) external;
 
     /// @notice Resets all mint allowances by account managed by `tokenId`.
     ///
@@ -616,8 +607,6 @@ interface IAlchemistV3State {
     function lastRedemptionBlock() external view returns (uint256 block);
 
     function totalDebt() external view returns (uint256 debt);
-
-    function scaledDebt() external view returns (uint256 scaledDebt);
 
     function totalSyntheticsIssued() external view returns (uint256 syntheticAmount);
 

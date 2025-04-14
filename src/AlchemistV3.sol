@@ -31,9 +31,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     uint256 public constant FIXED_POINT_SCALAR = 1e18;
 
-    // Scaling factor to preserve precission with weighting
-    uint256 public constant DEBT_SCALING_FACTOR = 1e27;
-
     /// @inheritdoc IAlchemistV3State
     address public admin;
 
@@ -72,9 +69,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     /// @inheritdoc IAlchemistV3State
     uint256 public totalDebt;
-
-    /// @inheritdoc IAlchemistV3State
-    uint256 public scaledDebt;
 
     /// @inheritdoc IAlchemistV3State
     uint256 public totalSyntheticsIssued;
@@ -118,11 +112,11 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @inheritdoc IAlchemistV3State
     mapping(address => bool) public guardians;
 
-    uint256 private _debtScalingWeight;
-
     uint256 private _earmarkWeight;
 
     uint256 private _redemptionWeight;
+
+    uint256 private _collateralFeeWeight;
 
     mapping(uint256 => Account) private _accounts;
 
@@ -173,7 +167,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         liquidatorFee = params.liquidatorFee;
         lastEarmarkBlock = block.number;
         lastRedemptionBlock = block.number;
-        _debtScalingWeight = DEBT_SCALING_FACTOR;
     }
 
     /// @notice Emitted when a new Position NFT is minted.
@@ -563,13 +556,12 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         _redemptionWeight += PositionDecay.WeightIncrement(amount,cumulativeEarmarked);
 
+        uint256 collateralPerDebt = (1e18 * 1e18) / convertDebtTokensToYield(1e18);
+        _collateralFeeWeight += (((protocolFee * amount / BPS) + amount) * collateralPerDebt) / totalDebt;
+
         cumulativeEarmarked -= amount;
         totalDebt -= amount;
-
-        uint256 totalEffective = scaledDebt * _debtScalingWeight / DEBT_SCALING_FACTOR;
-        uint256 newEffective = totalEffective - amount;
-        uint256 factor = newEffective * DEBT_SCALING_FACTOR / totalEffective;
-        _debtScalingWeight = _debtScalingWeight * factor / DEBT_SCALING_FACTOR;
+        totalSyntheticsIssued -= amount;
 
         lastRedemptionBlock = block.number;
 
@@ -579,11 +571,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         TokenUtils.safeTransfer(yieldToken, transmuter, collateralToRedeem);
 
         emit Redemption(amount);
-    }
-
-    /// @inheritdoc IAlchemistV3Actions
-    function adjustTotalSyntheticsIssued(uint256 amount) external onlyTransmuter {
-        totalSyntheticsIssued -= amount;
     }
 
     /// @inheritdoc IAlchemistV3Actions
@@ -746,10 +733,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         Account storage account = _accounts[tokenId];
         account.debt += amount;
         totalDebt += amount;
-
-        uint256 scaledAmount = amount * DEBT_SCALING_FACTOR / _debtScalingWeight;
-        _accounts[tokenId].scaledDebt += scaledAmount;
-        scaledDebt += scaledAmount;
     }
 
     /// @dev Increases the debt by `amount` for the account owned by `tokenId`.
@@ -759,10 +742,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         Account storage account = _accounts[tokenId];
         account.debt -= amount;
         totalDebt -= amount;
-
-        uint256 scaledAmount = amount * DEBT_SCALING_FACTOR / _debtScalingWeight;
-        account.scaledDebt -= scaledAmount;
-        scaledDebt -= scaledAmount;
     }
 
     /// @dev Set the mint allowance for `spender` to `amount` for the account owned by `tokenId`.
@@ -856,33 +835,33 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         Account storage account = _accounts[tokenId];
         RedemptionInfo memory previousRedemption = _redemptions[lastRedemptionBlock];
 
-        uint256 userDebtBalance = account.scaledDebt * _debtScalingWeight / DEBT_SCALING_FACTOR;
-
         uint256 debtToEarmark = PositionDecay.ScaleByWeightDelta(account.debt - account.earmarked, _earmarkWeight - account.lastAccruedEarmarkWeight);
-        
-        account.lastAccruedEarmarkWeight = _earmarkWeight;
-        account.earmarked += debtToEarmark;
-        account.debt = userDebtBalance;
+        uint256 earmarkedState = account.earmarked + debtToEarmark;
 
-        uint256 earmarkToRedeem = PositionDecay.ScaleByWeightDelta(account.earmarked, _redemptionWeight - account.lastAccruedRedemptionWeight);
+        uint256 deltaWeight = _collateralFeeWeight - account.lastAccruedFeeWeight;
+        uint256 collateralFee = (account.debt * deltaWeight) / 1e18;
 
-        // Recreate account state at last redemption block
-        uint256 earmarkedCopyCopy;
+        // Recreate account state at last redemption block if the redemption was in the past
+        uint256 earmarkToRedeem;
+        uint256 earmarkPreviousState;
         if (block.number > lastRedemptionBlock && _redemptionWeight != 0) {
             if (previousRedemption.debt != 0) {
                 debtToEarmark = PositionDecay.ScaleByWeightDelta(account.debt - account.earmarked, previousRedemption.earmarkWeight - account.lastAccruedEarmarkWeight);
-                earmarkedCopyCopy = account.earmarked + debtToEarmark;
+                earmarkPreviousState = account.earmarked + debtToEarmark;
             }
-
-            earmarkToRedeem = PositionDecay.ScaleByWeightDelta(earmarkedCopyCopy, _redemptionWeight - account.lastAccruedRedemptionWeight);
+            earmarkToRedeem = PositionDecay.ScaleByWeightDelta(earmarkPreviousState, _redemptionWeight - account.lastAccruedRedemptionWeight);
+        } else {
+            earmarkToRedeem = PositionDecay.ScaleByWeightDelta(earmarkedState, _redemptionWeight - account.lastAccruedRedemptionWeight);
         }
 
         // Calculate how much of user earmarked amount has been redeemed and subtract it
-        account.earmarked -= earmarkToRedeem;
+        account.earmarked = earmarkedState - earmarkToRedeem;
+        account.debt -= earmarkToRedeem;
         account.lastAccruedRedemptionWeight = _redemptionWeight;
-
+        account.lastAccruedEarmarkWeight = _earmarkWeight;
+        account.lastAccruedFeeWeight = _collateralFeeWeight;
         // Redeem user collateral equal to value of debt tokens redeemed
-        account.collateralBalance -= convertDebtTokensToYield(earmarkToRedeem);
+        account.collateralBalance -= collateralFee;
     }
 
     /// @dev Earmarks the debt for redemption.
@@ -896,12 +875,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
                 cumulativeEarmarked += amount;
             }
 
-            if (protocolFee > 0) {
-                uint256 debtForFee = (protocolFee * totalDebt / BPS) * (block.number - lastEarmarkBlock) / blocksPerYear;
-                totalDebt += debtForFee;
-
-                _debtScalingWeight = _debtScalingWeight * (DEBT_SCALING_FACTOR + ((protocolFee * DEBT_SCALING_FACTOR / BPS) * (block.number - lastEarmarkBlock) / blocksPerYear)) / DEBT_SCALING_FACTOR;
-            }
             lastEarmarkBlock = block.number;
         }
     }
@@ -919,29 +892,22 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         uint256 amount;
         uint256 earmarkWeightCopy = _earmarkWeight;
-        uint256 debtForFee;
-        uint256 debtScalingWeightCopy = _debtScalingWeight;
 
-        // If earmark was not this block then simulate and earmark and store temporary variables for proper debt calculation
+        // If earmark was not this block then simulate, earmark, and store temporary variables for proper debt calculation
         if (block.number > lastEarmarkBlock) {
             amount = ITransmuter(transmuter).queryGraph(lastEarmarkBlock + 1, block.number);
-            if (totalDebt > 0) {
-                if (protocolFee > 0) {
-                    debtForFee = (protocolFee * totalDebt / BPS) * (block.number - lastEarmarkBlock) / blocksPerYear;
-
-                    debtScalingWeightCopy = _debtScalingWeight * (DEBT_SCALING_FACTOR + ((protocolFee * DEBT_SCALING_FACTOR / BPS) * (block.number - lastEarmarkBlock) / blocksPerYear)) / DEBT_SCALING_FACTOR;
-                }
-
-                if (amount > 0) {
-                    earmarkWeightCopy += PositionDecay.WeightIncrement(amount, totalDebt - cumulativeEarmarked);
-                }
+            if (amount > 0) {
+                earmarkWeightCopy += PositionDecay.WeightIncrement(amount, totalDebt - cumulativeEarmarked);
             }
         }
 
         uint256 debtToEarmark = PositionDecay.ScaleByWeightDelta(account.debt - account.earmarked, earmarkWeightCopy - account.lastAccruedEarmarkWeight);
         uint256 earmarkedState = account.earmarked + debtToEarmark;
 
-        // Recreate account state at last redemption block
+        uint256 deltaWeight = _collateralFeeWeight - account.lastAccruedFeeWeight;
+        uint256 collateralFee = (account.debt * deltaWeight) / 1e18;
+
+        // Recreate account state at last redemption block if the redemption was in the past
         uint256 earmarkedPreviousState;
         uint256 earmarkToRedeem;
         if (block.number > lastRedemptionBlock && _redemptionWeight != 0) {
@@ -949,15 +915,12 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
                 uint256 debtToEarmarkCopy = PositionDecay.ScaleByWeightDelta(account.debt - account.earmarked, previousRedemption.earmarkWeight - account.lastAccruedEarmarkWeight);
                 earmarkedPreviousState = account.earmarked + debtToEarmarkCopy;
             }
-
             earmarkToRedeem = PositionDecay.ScaleByWeightDelta(earmarkedPreviousState, _redemptionWeight - account.lastAccruedRedemptionWeight);
         } else {
             earmarkToRedeem = PositionDecay.ScaleByWeightDelta(earmarkedState, _redemptionWeight - account.lastAccruedRedemptionWeight);
         }
 
-        uint256 userDebtBalance = account.scaledDebt * debtScalingWeightCopy / DEBT_SCALING_FACTOR;
-
-        return (userDebtBalance, earmarkedState - earmarkToRedeem, account.collateralBalance - convertDebtTokensToYield(earmarkToRedeem));
+        return (account.debt - earmarkToRedeem, earmarkedState - earmarkToRedeem, account.collateralBalance - collateralFee);
     }
 
     /// @dev Checks that the account owned by `tokenId` is properly collateralized.
