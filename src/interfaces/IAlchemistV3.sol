@@ -23,8 +23,6 @@ struct AlchemistInitializationParams {
     uint256 collateralizationLowerBound;
     // Token adapter used to get price for yiel tokens.
     address tokenAdapter;
-    // Token adapter used to get price for eth.
-    address ethUsdAdapter;
     // The initial transmuter or transmuter buffer.
     address transmuter;
     // The fee on user debt paid to the protocol.
@@ -227,9 +225,9 @@ interface IAlchemistV3Actions {
      *
      * @return underlyingAmount    Underlying tokens sent to the transmuter.
      * @return feeInYield          Fee paid to liquidator in yield tokens.
-     * @return feeInETH            Fee paid to liquidator in ETH (if needed i.e. if there isn't enough remaining collateral to cover the fee).
+     * @return feeInUnderlying     Fee paid to liquidator in underlying token.
      */
-    function liquidate(uint256 accountId) external returns (uint256 underlyingAmount, uint256 feeInYield, uint256 feeInETH);
+    function liquidate(uint256 accountId) external returns (uint256 underlyingAmount, uint256 feeInYield, uint256 feeInUnderlying);
 
     /// @notice Liquidates `owners` if the debt for account `owner` is greater than the underlying value of their collateral * LTV.
     ///
@@ -245,8 +243,10 @@ interface IAlchemistV3Actions {
     ///
     /// @return totalAmountLiquidated    Equivalent amount of underlying tokens in yield tokens sent to the transmuter.
     /// @return totalFeesInYield        Amount sent to liquidator in yield tokens.
-    /// @return totalFeesInETH          Amount sent to liquidator in ETH (if needed i.e. if there isn't enough remaining collateral to cover the fee).
-    function batchLiquidate(uint256[] memory accountIds) external returns (uint256 totalAmountLiquidated, uint256 totalFeesInYield, uint256 totalFeesInETH);
+    /// @return totalFeesInUnderlying   Amount sent to liquidator in underlying token.
+    function batchLiquidate(uint256[] memory accountIds)
+        external
+        returns (uint256 totalAmountLiquidated, uint256 totalFeesInYield, uint256 totalFeesInUnderlying);
 
     /// @notice Redeems `amount` debt from the alchemist in exchange for yield tokens sent to the transmuter.
     ///
@@ -324,15 +324,6 @@ interface IAlchemistV3AdminActions {
     ///
     /// @param value The address of token adapter.
     function setTokenAdapter(address value) external;
-
-    /// @notice Sets the token adapter for the eth.
-    ///
-    /// @notice `msg.sender` must be the admin or this call will will revert with an {Unauthorized} error.
-    ///
-    /// @notice Emits a {EthUsdAdapterUpdated} event.
-    ///
-    /// @param value The address of the new eth usd adapter.
-    function setEthUsdAdapter(address value) external;
 
     /// @notice Set the minimum collateralization ratio.
     ///
@@ -415,14 +406,14 @@ interface IAlchemistV3AdminActions {
     /// @param isPaused The new pause state for loans in the alchemist.
     function pauseLoans(bool isPaused) external;
 
-    /// @notice Set the alchemist ETH vault.
+    /// @notice Set the alchemist Fee vault.
     ///
     /// @notice `msg.sender` must be the admin or this call will revert with an {Unauthorized} error.
     ///
-    /// @notice Emits a {AlchemistETHVaultUpdated} event.
+    /// @notice Emits a {AlchemistFeeVaultUpdated} event.
     ///
-    /// @param value The address of the new alchemist ETH vault.
-    function setAlchemistETHVault(address value) external;
+    /// @param value The address of the new alchemist Fee vault.
+    function setAlchemistFeeVault(address value) external;
 }
 
 interface IAlchemistV3Events {
@@ -431,10 +422,10 @@ interface IAlchemistV3Events {
     /// @param pendingAdmin The address of the pending admin.
     event PendingAdminUpdated(address pendingAdmin);
 
-    /// @notice Emitted when the alchemist ETH vault is updated.
+    /// @notice Emitted when the alchemist Fee vault is updated.
     ///
-    /// @param alchemistETHVault The address of the alchemist ETH vault.
-    event AlchemistETHVaultUpdated(address alchemistETHVault);
+    /// @param alchemistFeeVault The address of the alchemist Fee vault.
+    event AlchemistFeeVaultUpdated(address alchemistFeeVault);
 
     /// @notice Emitted when the administrator is updated.
     ///
@@ -461,11 +452,6 @@ interface IAlchemistV3Events {
     ///
     /// @param transmuter The updated address of the transmuter.
     event TransmuterUpdated(address transmuter);
-
-    /// @notice Emitted when the eth usd adapter is updated.
-    ///
-    /// @param ethUsdAdapter The updated address of the eth usd adapter.
-    event EthUsdAdapterUpdated(address ethUsdAdapter);
 
     /// @notice Emitted when the minimum collateralization is updated.
     ///
@@ -636,8 +622,6 @@ interface IAlchemistV3State {
 
     function alchemistPositionNFT() external view returns (address nftContract);
 
-    function alchemistETHVault() external view returns (address vault);
-
     /// @notice Gets the address of the pending administrator.
     ///
     /// @return pendingAdmin The pending administrator address.
@@ -648,8 +632,10 @@ interface IAlchemistV3State {
     /// @return adapter The token adapter address.
     function tokenAdapter() external returns (address adapter);
 
-    /// @notice Gets the address of the current eth usd adapter.
-    function ethUsdAdapter() external view returns (address adapter);
+    /// @notice Gets the address of the alchemist fee vault.
+    ///
+    /// @return vault The alchemist fee vault address.
+    function alchemistFeeVault() external view returns (address vault);
 
     /// @notice Gets the address of the transmuter.
     ///
@@ -775,6 +761,9 @@ interface IAlchemistV3Errors {
 
     /// @notice An error which is used to indicate that the NFT address for the Alchemist has already been set
     error AlchemistV3NFTAlreadySetError();
+
+    /// @notice An error which is used to indicate that the token address for the AlchemistTokenVault does not match the underlyingToken
+    error AlchemistVaultTokenMismatchError();
 }
 
 /// @title  IAlchemistV3
