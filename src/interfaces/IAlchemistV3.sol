@@ -223,11 +223,11 @@ interface IAlchemistV3Actions {
      *
      * @param accountId   The tokenId of account
      *
-     * @return underlyingAmount    Underlying tokens sent to the transmuter.
+     * @return yieldAmount         Yield tokens sent to the transmuter.
      * @return feeInYield          Fee paid to liquidator in yield tokens.
      * @return feeInUnderlying     Fee paid to liquidator in underlying token.
      */
-    function liquidate(uint256 accountId) external returns (uint256 underlyingAmount, uint256 feeInYield, uint256 feeInUnderlying);
+    function liquidate(uint256 accountId) external returns (uint256 yieldAmount, uint256 feeInYield, uint256 feeInUnderlying);
 
     /// @notice Liquidates `owners` if the debt for account `owner` is greater than the underlying value of their collateral * LTV.
     ///
@@ -241,7 +241,7 @@ interface IAlchemistV3Actions {
     ///
     /// @param accountIds   The tokenId of each account
     ///
-    /// @return totalAmountLiquidated    Equivalent amount of underlying tokens in yield tokens sent to the transmuter.
+    /// @return totalAmountLiquidated   Amount in yield tokens sent to the transmuter.
     /// @return totalFeesInYield        Amount sent to liquidator in yield tokens.
     /// @return totalFeesInUnderlying   Amount sent to liquidator in underlying token.
     function batchLiquidate(uint256[] memory accountIds)
@@ -546,14 +546,14 @@ interface IAlchemistV3Events {
     /// @param receiver   The address of the new receiver.
     event ProtocolFeeReceiverUpdated(address receiver);
 
-    /// @notice Emitted when account owned by 'tokenId' has been liquidated.
+    /// @notice Emitted when account owned by 'accountId' has been liquidated.
     ///
     /// @param accountId        The token id of the account liquidated
     /// @param liquidator   The address of the liquidator
-    /// @param amount       The amount liquidated
+    /// @param amount       The amount liquidated in yield tokens
     /// @param feeInYield          The liquidation fee sent to 'liquidator' in yield tokens.
-    /// @param feeInETH            The liquidation fee sent to 'liquidator' in ETH (if needed i.e. if there isn't enough remaining collateral to cover the fee).
-    event Liquidated(uint256 indexed accountId, address liquidator, uint256 amount, uint256 feeInYield, uint256 feeInETH);
+    /// @param feeInUnderlying            The liquidation fee sent to 'liquidator' in ETH (if needed i.e. if there isn't enough remaining collateral to cover the fee).
+    event Liquidated(uint256 indexed accountId, address liquidator, uint256 amount, uint256 feeInYield, uint256 feeInUnderlying);
 
     /// @notice Emitted when account for 'owner' has been liquidated.
     ///
@@ -682,6 +682,26 @@ interface IAlchemistV3State {
     ///
     /// @param amount   The amount to convert.
     function convertUnderlyingTokensToYield(uint256 amount) external view returns (uint256);
+
+    /// @notice Calculates fee, net debt burn, and gross collateral seize,
+    ///         using a single minCollateralization factor (FIXED_POINT_SCALAR scaled).
+    /// @param collateral               Current collateral value
+    /// @param debt                     Current debt value
+    /// @param targetCollateralization  Target collateralization ratio, (e.g. 100/90 =  1.1111e18 for 111.11%)
+    /// @param alchemistCurrentCollateralization Current collateralization ratio of the alchemist
+    /// @param alchemistMinimumCollateralization Minimum collateralization ratio of the alchemist to trigger full liquidation
+    /// @param feeBps                   Fee in basis points on the surplus (0–10000)
+    /// @return grossCollateralToSeize  Total collateral to take (fee + net)
+    /// @return debtToBurn              Amount of debt to erase (sent to protocol)
+    /// @return fee                     Amount of collateral paid to liquidator
+    function calculateLiquidation(
+        uint256 collateral,
+        uint256 debt,
+        uint256 targetCollateralization,
+        uint256 alchemistCurrentCollateralization,
+        uint256 alchemistMinimumCollateralization,
+        uint256 feeBps
+    ) external view returns (uint256 grossCollateralToSeize, uint256 debtToBurn, uint256 fee);
 
     /// @dev Normalizes underlying tokens to debt tokens.
     /// @notice This is to handle decimal conversion in the case where underlying tokens have < 18 decimals.
