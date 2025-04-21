@@ -690,12 +690,56 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         emit Mint(tokenId, amount, recipient);
     }
 
+    /**
+     * @notice Force repays earmarked debt of the account owned by `accountId` using account's collateral balance.
+     * @param accountId The tokenId of the account to repay from.
+     * @param amount The amount to repay in yield tokens.
+     * @return creditToYield The amount of yield tokens repaid.
+     */
+    function _forceRepay(uint256 accountId, uint256 amount) internal returns (uint256) {
+        _checkArgument(amount > 0);
+        _checkForValidAccountId(accountId);
+        Account storage account = _accounts[accountId];
+
+        // Query transmuter and earmark global debt
+        _earmark();
+
+        // Sync current user debt before deciding how much is available to be repaid
+        _sync(accountId);
+
+        uint256 debt;
+
+        // Burning yieldTokens will pay off all types of debt
+        _checkState((debt = account.debt) > 0);
+
+        uint256 yieldToDebt = convertYieldTokensToDebt(amount);
+        uint256 credit = yieldToDebt > debt ? debt : yieldToDebt;
+        uint256 creditToYield = convertDebtTokensToYield(credit);
+        _subDebt(accountId, credit);
+
+        // Repay debt from earmarked amount of debt first
+        account.earmarked -= credit > account.earmarked ? account.earmarked : credit;
+
+        account.collateralBalance -= creditToYield;
+
+        // Transfer the repaid tokens from the account to the transmuter.
+        TokenUtils.safeTransfer(yieldToken, address(this), creditToYield);
+        // emit Repay(sender, amount, recipientTokenId, creditToYield);
+
+        return creditToYield;
+    }
+
     /// @dev Fetches and applies the liquidation amount to account `tokenId` if the account collateral ratio touches `collateralizationLowerBound`.
     /// @param accountId  The tokenId of the account to to liquidate.
     /// @return debtAmount  The amount (in yield tokens) removed from the account `tokenId`.
     /// @return feeInYield The additional fee as a % of the liquidation amount to be sent to the liquidator
     /// @return feeInUnderlying The additional fee as a % of the liquidation amount, denominated in underlying token, to be sent to the liquidator
     function _liquidate(uint256 accountId) internal returns (uint256 debtAmount, uint256 feeInYield, uint256 feeInUnderlying) {
+        // Query transmuter and earmark global debt
+        _earmark();
+        // Sync current user debt before deciding how much needs to be liquidated
+        _sync(accountId);
+
         Account storage account = _accounts[accountId];
 
         // Early return if no debt exists
@@ -715,14 +759,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         // Try to repay earmarked debt if it exists
         uint256 repaidAmountInYield = 0;
         if (account.earmarked > 0) {
-            repaidAmountInYield = repay(account.earmarked, accountId);
-        } else {
-            // Query transmuter and earmark global debt
-            _earmark();
-            // Sync current user debt before deciding how much needs to be liquidated
-            _sync(accountId);
+            repaidAmountInYield = _forceRepay(accountId, convertDebtTokensToYield(account.earmarked));
         }
-
         // If debt is fully cleared, return with only the repaid amount, no liquidation, no liquidation fees
         if (account.debt == 0) {
             return (repaidAmountInYield, 0, 0);
