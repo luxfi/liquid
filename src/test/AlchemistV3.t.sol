@@ -71,6 +71,8 @@ contract AlchemistV3Test is Test {
 
     uint256 public constant FIXED_POINT_SCALAR = 1e18;
 
+    uint256 public liquidatorFeeBPS = 300; // in BPS, 3%
+
     uint256 public minimumCollateralization = uint256(FIXED_POINT_SCALAR * FIXED_POINT_SCALAR) / 9e17;
 
     // ----- Variables for deposits & withdrawals -----
@@ -156,7 +158,7 @@ contract AlchemistV3Test is Test {
             transmuter: address(transmuterLogic),
             protocolFee: 0,
             protocolFeeReceiver: address(10),
-            liquidatorFee: 300 // in bps? 3%
+            liquidatorFee: liquidatorFeeBPS
         });
 
         bytes memory alchemParams = abi.encodeWithSelector(AlchemistV3.initialize.selector, params);
@@ -193,9 +195,6 @@ contract AlchemistV3Test is Test {
         deal(address(fakeUnderlyingToken), externalUser, accountFunds);
         deal(address(fakeUnderlyingToken), yetAnotherExternalUser, accountFunds);
         deal(address(fakeUnderlyingToken), anotherExternalUser, accountFunds);
-
-        // Give some ETH to the alchemistETHVault
-        //vm.deal(alchemist.alchemistFeeVault(), 10_000 ether);
         deal(address(fakeUnderlyingToken), alchemist.alchemistFeeVault(), 10_000 ether);
 
         vm.startPrank(anotherExternalUser);
@@ -1543,7 +1542,7 @@ contract AlchemistV3Test is Test {
         vm.stopPrank();
 
         // modify yield token price via modifying underlying token supply
-        (, uint256 prevDebt,) = alchemist.getCDP(tokenIdFor0xBeef);
+        (uint256 prevCollateral, uint256 prevDebt,) = alchemist.getCDP(tokenIdFor0xBeef);
         uint256 initialVaultSupply = IERC20(address(fakeYieldToken)).totalSupply();
         fakeYieldToken.updateMockTokenSupply(initialVaultSupply);
         // increasing yeild token suppy by 59 bps or 5.9%  while keeping the unederlying supply unchanged
@@ -1557,6 +1556,21 @@ contract AlchemistV3Test is Test {
         vm.startPrank(externalUser);
         uint256 liquidatorPrevTokenBalance = IERC20(fakeYieldToken).balanceOf(address(externalUser));
         uint256 liquidatorPrevUnderlyingBalance = IERC20(fakeUnderlyingToken).balanceOf(address(externalUser));
+
+        uint256 alchemistCurrentCollateralization =
+            alchemist.normalizeUnderlyingTokensToDebt(alchemist.getTotalUnderlyingValue()) * FIXED_POINT_SCALAR / alchemist.totalDebt();
+        (uint256 liquidationAmount, uint256 expectedDebtToBurn, uint256 expectedBaseFee) = alchemist.calculateLiquidation(
+            alchemist.totalValue(tokenIdFor0xBeef),
+            prevDebt,
+            alchemist.minimumCollateralization(),
+            alchemistCurrentCollateralization,
+            alchemist.globalMinimumCollateralization(),
+            liquidatorFeeBPS
+        );
+        uint256 expectedLiquidationAmountInYield = alchemist.convertDebtTokensToYield(liquidationAmount);
+        uint256 expectedBaseFeeInYield = alchemist.convertDebtTokensToYield(expectedBaseFee);
+        uint256 expectedFeeInUnderlying = expectedDebtToBurn * liquidatorFeeBPS / 10_000;
+
         (uint256 assets, uint256 feeInYield, uint256 feeInUnderlying) = alchemist.liquidate(tokenIdFor0xBeef);
         uint256 liquidatorPostTokenBalance = IERC20(fakeYieldToken).balanceOf(address(externalUser));
         uint256 liquidatorPostUnderlyingBalance = IERC20(fakeUnderlyingToken).balanceOf(address(externalUser));
@@ -1565,17 +1579,17 @@ contract AlchemistV3Test is Test {
         vm.stopPrank();
 
         // ensure debt is reduced by the result of (collateral - y)/(debt - y) = minimum collateral ratio
-        vm.assertApproxEqAbs(debt, 79_716_713_881_019_828_317_726, minimumDepositOrWithdrawalLoss);
+        vm.assertApproxEqAbs(debt, prevDebt - expectedDebtToBurn, minimumDepositOrWithdrawalLoss);
 
         // ensure depositedCollateral is reduced by the result of (collateral - y)/(debt - y) = minimum collateral ratio
-        vm.assertApproxEqAbs(depositedCollateral, 90_613_999_999_999_998_009_700, minimumDepositOrWithdrawalLoss);
+        vm.assertApproxEqAbs(depositedCollateral, prevCollateral - expectedLiquidationAmountInYield, minimumDepositOrWithdrawalLoss);
 
         // ensure assets is equal to liquidation amount i.e. y in (collateral - y)/(debt - y) = minimum collateral ratio
-        vm.assertApproxEqAbs(assets, 103_291_784_702_549_576_851_282, minimumDepositOrWithdrawalLoss);
+        vm.assertApproxEqAbs(assets, expectedLiquidationAmountInYield, minimumDepositOrWithdrawalLoss);
 
         // ensure liquidator fee is correct (3% of liquidation amount)
-        vm.assertApproxEqAbs(feeInYield, 3_186_000_000_000_000_057_969, 1e18);
-        vm.assertEq(feeInUnderlying, 0);
+        vm.assertApproxEqAbs(feeInYield, expectedBaseFeeInYield, 1e18);
+        vm.assertEq(feeInUnderlying, expectedFeeInUnderlying);
 
         // liquidator gets correct amount of fee
         vm.assertApproxEqAbs(liquidatorPostTokenBalance, liquidatorPrevTokenBalance + feeInYield, 1e18);
@@ -1621,6 +1635,19 @@ contract AlchemistV3Test is Test {
         vm.startPrank(externalUser);
         uint256 liquidatorPrevTokenBalance = IERC20(fakeYieldToken).balanceOf(address(externalUser));
         uint256 liquidatorPrevUnderlyingBalance = IERC20(fakeUnderlyingToken).balanceOf(address(externalUser));
+
+        uint256 alchemistCurrentCollateralization =
+            alchemist.normalizeUnderlyingTokensToDebt(alchemist.getTotalUnderlyingValue()) * FIXED_POINT_SCALAR / alchemist.totalDebt();
+        (, uint256 expectedDebtToBurn,) = alchemist.calculateLiquidation(
+            alchemist.totalValue(tokenIdFor0xBeef),
+            prevDebt,
+            alchemist.minimumCollateralization(),
+            alchemistCurrentCollateralization,
+            alchemist.globalMinimumCollateralization(),
+            liquidatorFeeBPS
+        );
+        uint256 expectedFeeInUnderlying = expectedDebtToBurn * liquidatorFeeBPS / 10_000;
+
         (, uint256 feeInYield, uint256 feeInUnderlying) = alchemist.liquidate(tokenIdFor0xBeef);
         uint256 liquidatorPostTokenBalance = IERC20(fakeYieldToken).balanceOf(address(externalUser));
         uint256 liquidatorPostUnderlyingBalance = IERC20(fakeUnderlyingToken).balanceOf(address(externalUser));
@@ -1628,14 +1655,13 @@ contract AlchemistV3Test is Test {
 
         vm.stopPrank();
 
-        // ensure liquidator fee is correct (3% of liquidation amount)
+        // ensure liquidator fee is correct (3% of surplus (account collateral - debt)
         vm.assertApproxEqAbs(feeInYield, 0, 1e18);
-        vm.assertEq(feeInUnderlying, 5_400_000_000_000_000_000_540);
+        vm.assertEq(feeInUnderlying, expectedFeeInUnderlying);
 
         // liquidator gets correct amount of fee
         vm.assertApproxEqAbs(liquidatorPostTokenBalance, liquidatorPrevTokenBalance + feeInYield, 1e18);
-        // Verify the user's ETH balance decreased
-        // TODO: This is not working as expected
+        // Verify the user's Underlying balance decreased
         vm.assertEq(liquidatorPostUnderlyingBalance, liquidatorPrevUnderlyingBalance + feeInUnderlying);
         vm.assertApproxEqAbs(alchemistFeeVault.totalDeposits(), 10_000 ether - feeInUnderlying, 1e18);
     }
@@ -1678,6 +1704,20 @@ contract AlchemistV3Test is Test {
         vm.startPrank(externalUser);
         uint256 liquidatorPrevTokenBalance = IERC20(fakeYieldToken).balanceOf(address(externalUser));
         uint256 liquidatorPrevUnderlyingBalance = IERC20(fakeUnderlyingToken).balanceOf(address(externalUser));
+
+        uint256 alchemistCurrentCollateralization =
+            alchemist.normalizeUnderlyingTokensToDebt(alchemist.getTotalUnderlyingValue()) * FIXED_POINT_SCALAR / alchemist.totalDebt();
+        (uint256 liquidationAmount, uint256 expectedDebtToBurn,) = alchemist.calculateLiquidation(
+            alchemist.totalValue(tokenIdFor0xBeef),
+            prevDebt,
+            alchemist.minimumCollateralization(),
+            alchemistCurrentCollateralization,
+            alchemist.globalMinimumCollateralization(),
+            liquidatorFeeBPS
+        );
+
+        uint256 expectedLiquidationAmountInYield = alchemist.convertDebtTokensToYield(liquidationAmount);
+        uint256 expectedFeeInUnderlying = expectedDebtToBurn * liquidatorFeeBPS / 10_000;
         (uint256 assets, uint256 feeInYield, uint256 feeInUnderlying) = alchemist.liquidate(tokenIdFor0xBeef);
 
         uint256 liquidatorPostTokenBalance = IERC20(fakeYieldToken).balanceOf(address(externalUser));
@@ -1693,11 +1733,11 @@ contract AlchemistV3Test is Test {
         vm.assertApproxEqAbs(depositedCollateral, 0, minimumDepositOrWithdrawalLoss);
 
         // ensure assets liquidated is equal (collateral - (90% of collateral))
-        vm.assertApproxEqAbs(assets, 180_000_000_000_000_000_018_000, minimumDepositOrWithdrawalLoss);
+        vm.assertApproxEqAbs(assets, expectedLiquidationAmountInYield, minimumDepositOrWithdrawalLoss);
 
         // ensure liquidator fee is correct (3% of 0 if collateral fully liquidated as a result of bad debt)
         vm.assertApproxEqAbs(feeInYield, 0, 1e18);
-        vm.assertEq(feeInUnderlying, 5_400_000_000_000_000_000_540);
+        vm.assertEq(feeInUnderlying, expectedFeeInUnderlying);
 
         // liquidator gets correct amount of fee
         vm.assertApproxEqAbs(liquidatorPostTokenBalance, liquidatorPrevTokenBalance + feeInYield, 1e18);
@@ -1720,7 +1760,7 @@ contract AlchemistV3Test is Test {
         vm.stopPrank();
 
         // modify yield token price via modifying underlying token supply
-        (, uint256 prevDebt,) = alchemist.getCDP(tokenIdFor0xBeef);
+        (uint256 prevCollateral, uint256 prevDebt,) = alchemist.getCDP(tokenIdFor0xBeef);
         // ensure initial debt is correct
         vm.assertApproxEqAbs(prevDebt, 180_000_000_000_000_000_018_000, minimumDepositOrWithdrawalLoss);
 
@@ -1734,6 +1774,21 @@ contract AlchemistV3Test is Test {
         vm.startPrank(externalUser);
         uint256 liquidatorPrevTokenBalance = IERC20(fakeYieldToken).balanceOf(address(externalUser));
         uint256 liquidatorPrevUnderlyingBalance = IERC20(fakeUnderlyingToken).balanceOf(address(externalUser));
+
+        uint256 alchemistCurrentCollateralization =
+            alchemist.normalizeUnderlyingTokensToDebt(alchemist.getTotalUnderlyingValue()) * FIXED_POINT_SCALAR / alchemist.totalDebt();
+        (uint256 liquidationAmount, uint256 expectedDebtToBurn, uint256 expectedBaseFee) = alchemist.calculateLiquidation(
+            alchemist.totalValue(tokenIdFor0xBeef),
+            prevDebt,
+            alchemist.minimumCollateralization(),
+            alchemistCurrentCollateralization,
+            alchemist.globalMinimumCollateralization(),
+            liquidatorFeeBPS
+        );
+        uint256 expectedLiquidationAmountInYield = alchemist.convertDebtTokensToYield(liquidationAmount);
+        uint256 expectedBaseFeeInYield = alchemist.convertDebtTokensToYield(expectedBaseFee);
+        uint256 expectedFeeInUnderlying = expectedDebtToBurn * liquidatorFeeBPS / 10_000;
+
         (uint256 assets, uint256 feeInYield, uint256 feeInUnderlying) = alchemist.liquidate(tokenIdFor0xBeef);
         uint256 liquidatorPostTokenBalance = IERC20(fakeYieldToken).balanceOf(address(externalUser));
         uint256 liquidatorPostUnderlyingBalance = IERC20(fakeUnderlyingToken).balanceOf(address(externalUser));
@@ -1745,14 +1800,14 @@ contract AlchemistV3Test is Test {
         vm.assertApproxEqAbs(debt, 0, minimumDepositOrWithdrawalLoss);
 
         // ensure depositedCollateral is reduced by the result of (collateral - y)/(debt - y) = minimum collateral ratio
-        vm.assertApproxEqAbs(depositedCollateral, 3_661_399_999_999_999_792_273, minimumDepositOrWithdrawalLoss);
+        vm.assertApproxEqAbs(depositedCollateral, prevCollateral - expectedLiquidationAmountInYield, minimumDepositOrWithdrawalLoss);
 
         // ensure assets liquidated is equal (collateral - (90% of collateral))
-        vm.assertApproxEqAbs(assets, 185_400_000_000_000_000_018_540, minimumDepositOrWithdrawalLoss);
+        vm.assertApproxEqAbs(assets, expectedLiquidationAmountInYield, minimumDepositOrWithdrawalLoss);
 
         // ensure liquidator fee is correct (3% of 0 if collateral fully liquidated as a result of bad debt)
-        vm.assertApproxEqAbs(feeInYield, 5_718_600_000_000_000_006_050, 1e18);
-        vm.assertEq(feeInUnderlying, 0);
+        vm.assertApproxEqAbs(feeInYield, expectedBaseFeeInYield, 1e18);
+        vm.assertEq(feeInUnderlying, expectedFeeInUnderlying);
 
         // liquidator gets correct amount of fee
         vm.assertApproxEqAbs(liquidatorPostTokenBalance, liquidatorPrevTokenBalance + feeInYield, 1e18);
@@ -1774,6 +1829,8 @@ contract AlchemistV3Test is Test {
         // a single position nft would have been minted to 0xbeef
         uint256 tokenIdFor0xBeef = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
         alchemist.mint(tokenIdFor0xBeef, (alchemist.totalValue(tokenIdFor0xBeef) * FIXED_POINT_SCALAR) / minimumCollateralization, address(0xbeef));
+        (uint256 prevCollateralFor0xBeef, uint256 prevDebtFor0xBeef,) = alchemist.getCDP(tokenIdFor0xBeef);
+
         vm.stopPrank();
 
         vm.startPrank(anotherExternalUser);
@@ -1784,6 +1841,7 @@ contract AlchemistV3Test is Test {
         alchemist.mint(
             tokenIdForExternalUser, (alchemist.totalValue(tokenIdForExternalUser) * FIXED_POINT_SCALAR) / minimumCollateralization, anotherExternalUser
         );
+        (uint256 prevCollateralForExternalUser, uint256 prevDebtForExternalUser,) = alchemist.getCDP(tokenIdForExternalUser);
         vm.stopPrank();
 
         // just ensureing global alchemist collateralization stays above the minimum required for regular liquidations
@@ -1810,6 +1868,34 @@ contract AlchemistV3Test is Test {
         accountsToLiquidate[0] = tokenIdFor0xBeef;
         accountsToLiquidate[1] = tokenIdForExternalUser;
 
+        // Calculate liquidation amount for 0xBeef
+        uint256 alchemistCurrentCollateralization =
+            alchemist.normalizeUnderlyingTokensToDebt(alchemist.getTotalUnderlyingValue()) * FIXED_POINT_SCALAR / alchemist.totalDebt();
+        (uint256 liquidationAmountFor0xBeef, uint256 expectedDebtToBurnFor0xBeef, uint256 expectedBaseFeeFor0xBeef) = alchemist.calculateLiquidation(
+            alchemist.totalValue(tokenIdFor0xBeef),
+            prevDebtFor0xBeef,
+            alchemist.minimumCollateralization(),
+            alchemistCurrentCollateralization,
+            alchemist.globalMinimumCollateralization(),
+            liquidatorFeeBPS
+        );
+        uint256 expectedLiquidationAmountInYieldFor0xBeef = alchemist.convertDebtTokensToYield(liquidationAmountFor0xBeef);
+        uint256 expectedBaseFeeInYieldFor0xBeef = alchemist.convertDebtTokensToYield(expectedBaseFeeFor0xBeef);
+        uint256 expectedFeeInUnderlyingFor0xBeef = expectedDebtToBurnFor0xBeef * liquidatorFeeBPS / 10_000;
+
+        (uint256 liquidationAmountForExternalUser, uint256 expectedDebtToBurnForExternalUser, uint256 expectedBaseFeeForExternalUser) = alchemist
+            .calculateLiquidation(
+            alchemist.totalValue(tokenIdForExternalUser),
+            prevDebtForExternalUser,
+            alchemist.minimumCollateralization(),
+            alchemistCurrentCollateralization,
+            alchemist.globalMinimumCollateralization(),
+            liquidatorFeeBPS
+        );
+        uint256 expectedLiquidationAmountInYieldForExternalUser = alchemist.convertDebtTokensToYield(liquidationAmountForExternalUser);
+        uint256 expectedBaseFeeInYieldForExternalUser = alchemist.convertDebtTokensToYield(expectedBaseFeeForExternalUser);
+        uint256 expectedFeeInUnderlyingForExternalUser = expectedDebtToBurnForExternalUser * liquidatorFeeBPS / 10_000;
+
         (uint256 assets, uint256 feeInYield, uint256 feeInUnderlying) = alchemist.batchLiquidate(accountsToLiquidate);
 
         uint256 liquidatorPostTokenBalance = IERC20(fakeYieldToken).balanceOf(address(externalUser));
@@ -1821,29 +1907,33 @@ contract AlchemistV3Test is Test {
         /// Tests for first liquidated User ///
 
         // ensure debt is reduced by the result of (collateral - y)/(debt - y) = minimum collateral ratio
-        vm.assertApproxEqAbs(debt, 79_716_713_881_019_828_317_726, minimumDepositOrWithdrawalLoss);
+        vm.assertApproxEqAbs(debt, prevDebtFor0xBeef - expectedDebtToBurnFor0xBeef, minimumDepositOrWithdrawalLoss);
 
         // ensure depositedCollateral is reduced by the result of (collateral - y)/(debt - y) = minimum collateral ratio
-        vm.assertApproxEqAbs(depositedCollateral, 90_613_999_999_999_998_009_700, minimumDepositOrWithdrawalLoss);
+        vm.assertApproxEqAbs(depositedCollateral, prevCollateralFor0xBeef - expectedLiquidationAmountInYieldFor0xBeef, minimumDepositOrWithdrawalLoss);
 
         /// Tests for second liquidated User ///
 
         (depositedCollateral, debt,) = alchemist.getCDP(tokenIdForExternalUser);
 
         // ensure debt is reduced by the result of (collateral - y)/(debt - y) = minimum collateral ratio
-        vm.assertApproxEqAbs(debt, 79_716_713_881_019_828_317_726, minimumDepositOrWithdrawalLoss);
+        vm.assertApproxEqAbs(debt, prevDebtForExternalUser - expectedDebtToBurnForExternalUser, minimumDepositOrWithdrawalLoss);
 
         // ensure depositedCollateral is reduced by the result of (collateral - y)/(debt - y) = minimum collateral ratio
-        vm.assertApproxEqAbs(depositedCollateral, 90_613_999_999_999_998_009_700, minimumDepositOrWithdrawalLoss);
+        vm.assertApproxEqAbs(
+            depositedCollateral, prevCollateralForExternalUser - expectedLiquidationAmountInYieldForExternalUser, minimumDepositOrWithdrawalLoss
+        );
 
         // Tests for Liquidator ///
 
         // ensure assets liquidated is equal ~ 2 * result of (collateral - y)/(debt - y) = minimum collateral ratio for the users with similar positions
-        vm.assertApproxEqAbs(assets, 206_583_569_405_099_153_702_564, minimumDepositOrWithdrawalLoss);
+        vm.assertApproxEqAbs(
+            assets, expectedLiquidationAmountInYieldFor0xBeef + expectedLiquidationAmountInYieldForExternalUser, minimumDepositOrWithdrawalLoss
+        );
 
         // ensure liquidator fee is correct (3% of liquidation amount)
-        vm.assertApproxEqAbs(feeInYield, 6_372_000_000_000_000_115_938, 1e18);
-        vm.assertEq(feeInUnderlying, 0);
+        vm.assertApproxEqAbs(feeInYield, expectedBaseFeeInYieldFor0xBeef + expectedBaseFeeInYieldForExternalUser, 1e18);
+        vm.assertEq(feeInUnderlying, expectedFeeInUnderlyingFor0xBeef + expectedFeeInUnderlyingForExternalUser);
 
         // liquidator gets correct amount of fee
         vm.assertApproxEqAbs(liquidatorPostTokenBalance, liquidatorPrevTokenBalance + feeInYield, 1e18);
@@ -1977,6 +2067,7 @@ contract AlchemistV3Test is Test {
         // a single position nft would have been minted to 0xbeef
         uint256 tokenIdFor0xBeef = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
         alchemist.mint(tokenIdFor0xBeef, alchemist.totalValue(tokenIdFor0xBeef) * FIXED_POINT_SCALAR / minimumCollateralization, address(0xbeef));
+        (uint256 prevCollateralFor0xBeef, uint256 prevDebtFor0xBeef,) = alchemist.getCDP(tokenIdFor0xBeef);
         vm.stopPrank();
 
         // Position that should still be collateralized and skipped
@@ -2014,6 +2105,20 @@ contract AlchemistV3Test is Test {
         accountsToLiquidate[0] = tokenIdForExternalUser;
         accountsToLiquidate[1] = tokenIdFor0xBeef;
 
+        uint256 alchemistCurrentCollateralization =
+            alchemist.normalizeUnderlyingTokensToDebt(alchemist.getTotalUnderlyingValue()) * FIXED_POINT_SCALAR / alchemist.totalDebt();
+        (uint256 liquidationAmountFor0xBeef, uint256 expectedDebtToBurnFor0xBeef, uint256 expectedBaseFeeFor0xBeef) = alchemist.calculateLiquidation(
+            alchemist.totalValue(tokenIdFor0xBeef),
+            prevDebtFor0xBeef,
+            alchemist.minimumCollateralization(),
+            alchemistCurrentCollateralization,
+            alchemist.globalMinimumCollateralization(),
+            liquidatorFeeBPS
+        );
+        uint256 expectedLiquidationAmountInYieldFor0xBeef = alchemist.convertDebtTokensToYield(liquidationAmountFor0xBeef);
+        uint256 expectedBaseFeeInYieldFor0xBeef = alchemist.convertDebtTokensToYield(expectedBaseFeeFor0xBeef);
+        uint256 expectedFeeInUnderlyingFor0xBeef = expectedDebtToBurnFor0xBeef * liquidatorFeeBPS / 10_000;
+
         (uint256 assets, uint256 feeInYield, uint256 feeInUnderlying) = alchemist.batchLiquidate(accountsToLiquidate);
 
         uint256 liquidatorPostTokenBalance = IERC20(fakeYieldToken).balanceOf(externalUser);
@@ -2025,10 +2130,10 @@ contract AlchemistV3Test is Test {
         /// Tests for first liquidated User ///
 
         // ensure debt is reduced by the result of (collateral - y)/(debt - y) = minimum collateral ratio
-        vm.assertApproxEqAbs(debt, 79_716_713_881_019_828_317_726, minimumDepositOrWithdrawalLoss);
+        vm.assertApproxEqAbs(debt, prevDebtFor0xBeef - expectedDebtToBurnFor0xBeef, minimumDepositOrWithdrawalLoss);
 
         // ensure depositedCollateral is reduced by the result of (collateral - y)/(debt - y) = minimum collateral ratio
-        vm.assertApproxEqAbs(depositedCollateral, 90_613_999_999_999_998_009_700, minimumDepositOrWithdrawalLoss);
+        vm.assertApproxEqAbs(depositedCollateral, prevCollateralFor0xBeef - expectedLiquidationAmountInYieldFor0xBeef, minimumDepositOrWithdrawalLoss);
 
         /// Tests for second liquidated User ///
 
@@ -2043,11 +2148,11 @@ contract AlchemistV3Test is Test {
         // Tests for Liquidator ///
 
         // ensure assets liquidated is equal ~ 2 * result of (collateral - y)/(debt - y) = minimum collateral ratio for the users with similar positions
-        vm.assertApproxEqAbs(assets, 103_291_784_702_549_576_851_282, minimumDepositOrWithdrawalLoss);
+        vm.assertApproxEqAbs(assets, expectedLiquidationAmountInYieldFor0xBeef, minimumDepositOrWithdrawalLoss);
 
         // ensure liquidator fee is correct (3% of liquidation amount)
-        vm.assertApproxEqAbs(feeInYield, 3_186_000_000_000_000_057_969, 1e18);
-        vm.assertEq(feeInUnderlying, 0);
+        vm.assertApproxEqAbs(feeInYield, expectedBaseFeeInYieldFor0xBeef, 1e18);
+        vm.assertEq(feeInUnderlying, expectedFeeInUnderlyingFor0xBeef);
 
         // liquidator gets correct amount of fee
         vm.assertApproxEqAbs(liquidatorPostTokenBalance, liquidatorPrevTokenBalance + feeInYield, 1e18);
@@ -2068,6 +2173,7 @@ contract AlchemistV3Test is Test {
         // a single position nft would have been minted to 0xbeef
         uint256 tokenIdFor0xBeef = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
         alchemist.mint(tokenIdFor0xBeef, (alchemist.totalValue(tokenIdFor0xBeef) * FIXED_POINT_SCALAR) / minimumCollateralization, address(0xbeef));
+        (uint256 prevCollateralFor0xBeef, uint256 prevDebtFor0xBeef,) = alchemist.getCDP(tokenIdFor0xBeef);
         vm.stopPrank();
 
         vm.startPrank(anotherExternalUser);
@@ -2078,6 +2184,7 @@ contract AlchemistV3Test is Test {
         alchemist.mint(
             tokenIdForExternalUser, (alchemist.totalValue(tokenIdForExternalUser) * FIXED_POINT_SCALAR) / minimumCollateralization, anotherExternalUser
         );
+        (uint256 prevCollateralForExternalUser, uint256 prevDebtForExternalUser,) = alchemist.getCDP(tokenIdForExternalUser);
         vm.stopPrank();
 
         // just ensureing global alchemist collateralization stays above the minimum required for regular liquidations
@@ -2105,6 +2212,34 @@ contract AlchemistV3Test is Test {
         accountsToLiquidate[1] = 0; // invalid zero ids
         accountsToLiquidate[2] = tokenIdForExternalUser;
 
+        // Calculate liquidation amount for 0xBeef
+        uint256 alchemistCurrentCollateralization =
+            alchemist.normalizeUnderlyingTokensToDebt(alchemist.getTotalUnderlyingValue()) * FIXED_POINT_SCALAR / alchemist.totalDebt();
+        (uint256 liquidationAmountFor0xBeef, uint256 expectedDebtToBurnFor0xBeef, uint256 expectedBaseFeeFor0xBeef) = alchemist.calculateLiquidation(
+            alchemist.totalValue(tokenIdFor0xBeef),
+            prevDebtFor0xBeef,
+            alchemist.minimumCollateralization(),
+            alchemistCurrentCollateralization,
+            alchemist.globalMinimumCollateralization(),
+            liquidatorFeeBPS
+        );
+        uint256 expectedLiquidationAmountInYieldFor0xBeef = alchemist.convertDebtTokensToYield(liquidationAmountFor0xBeef);
+        uint256 expectedBaseFeeInYieldFor0xBeef = alchemist.convertDebtTokensToYield(expectedBaseFeeFor0xBeef);
+        uint256 expectedFeeInUnderlyingFor0xBeef = expectedDebtToBurnFor0xBeef * liquidatorFeeBPS / 10_000;
+
+        (uint256 liquidationAmountForExternalUser, uint256 expectedDebtToBurnForExternalUser, uint256 expectedBaseFeeForExternalUser) = alchemist
+            .calculateLiquidation(
+            alchemist.totalValue(tokenIdForExternalUser),
+            prevDebtForExternalUser,
+            alchemist.minimumCollateralization(),
+            alchemistCurrentCollateralization,
+            alchemist.globalMinimumCollateralization(),
+            liquidatorFeeBPS
+        );
+        uint256 expectedLiquidationAmountInYieldForExternalUser = alchemist.convertDebtTokensToYield(liquidationAmountForExternalUser);
+        uint256 expectedBaseFeeInYieldForExternalUser = alchemist.convertDebtTokensToYield(expectedBaseFeeForExternalUser);
+        uint256 expectedFeeInUnderlyingForExternalUser = expectedDebtToBurnForExternalUser * liquidatorFeeBPS / 10_000;
+
         (uint256 assets, uint256 feeInYield, uint256 feeInUnderlying) = alchemist.batchLiquidate(accountsToLiquidate);
 
         uint256 liquidatorPostTokenBalance = IERC20(fakeYieldToken).balanceOf(externalUser);
@@ -2116,29 +2251,33 @@ contract AlchemistV3Test is Test {
         /// Tests for first liquidated User ///
 
         // ensure debt is reduced by the result of (collateral - y)/(debt - y) = minimum collateral ratio
-        vm.assertApproxEqAbs(debt, 79_716_713_881_019_828_317_726, minimumDepositOrWithdrawalLoss);
+        vm.assertApproxEqAbs(debt, prevDebtFor0xBeef - expectedDebtToBurnFor0xBeef, minimumDepositOrWithdrawalLoss);
 
         // ensure depositedCollateral is reduced by the result of (collateral - y)/(debt - y) = minimum collateral ratio
-        vm.assertApproxEqAbs(depositedCollateral, 90_613_999_999_999_998_009_700, minimumDepositOrWithdrawalLoss);
+        vm.assertApproxEqAbs(depositedCollateral, prevCollateralFor0xBeef - expectedLiquidationAmountInYieldFor0xBeef, minimumDepositOrWithdrawalLoss);
 
         /// Tests for second liquidated User ///
 
         (depositedCollateral, debt,) = alchemist.getCDP(tokenIdForExternalUser);
 
         // ensure debt is reduced by the result of (collateral - y)/(debt - y) = minimum collateral ratio
-        vm.assertApproxEqAbs(debt, 79_716_713_881_019_828_317_726, minimumDepositOrWithdrawalLoss);
+        vm.assertApproxEqAbs(debt, prevDebtForExternalUser - expectedDebtToBurnForExternalUser, minimumDepositOrWithdrawalLoss);
 
         // ensure depositedCollateral is reduced by the result of (collateral - y)/(debt - y) = minimum collateral ratio
-        vm.assertApproxEqAbs(depositedCollateral, 90_613_999_999_999_998_009_700, minimumDepositOrWithdrawalLoss);
+        vm.assertApproxEqAbs(
+            depositedCollateral, prevCollateralForExternalUser - expectedLiquidationAmountInYieldForExternalUser, minimumDepositOrWithdrawalLoss
+        );
 
         // Tests for Liquidator ///
 
         // ensure assets liquidated is equal ~ 2 * result of (collateral - y)/(debt - y) = minimum collateral ratio for the users with similar positions
-        vm.assertApproxEqAbs(assets, 206_583_569_405_099_153_702_564, minimumDepositOrWithdrawalLoss);
+        vm.assertApproxEqAbs(
+            assets, expectedLiquidationAmountInYieldFor0xBeef + expectedLiquidationAmountInYieldForExternalUser, minimumDepositOrWithdrawalLoss
+        );
 
         // ensure liquidator fee is correct (3% of liquidation amount)
-        vm.assertApproxEqAbs(feeInYield, 6_372_000_000_000_000_115_938, 1e18);
-
+        vm.assertApproxEqAbs(feeInYield, expectedBaseFeeInYieldFor0xBeef + expectedBaseFeeInYieldForExternalUser, 1e18);
+        vm.assertEq(feeInUnderlying, expectedFeeInUnderlyingFor0xBeef + expectedFeeInUnderlyingForExternalUser);
         // liquidator gets correct amount of fee
         vm.assertApproxEqAbs(liquidatorPostTokenBalance, liquidatorPrevTokenBalance + feeInYield, 1e18);
         vm.assertApproxEqAbs(liquidatorPostUnderlyingBalance, liquidatorPrevUnderlyingBalance + feeInUnderlying, 1e18);
