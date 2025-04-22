@@ -18,9 +18,6 @@ import {IERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20
 import {IPriceFeedAdapter} from "./adapters/ETHUSDPriceFeedAdapter.sol";
 import {IAlchemistTokenVault} from "./interfaces/IAlchemistTokenVault.sol";
 
-import {console} from "../../lib/forge-std/src/console.sol";
-
-
 /// @title  AlchemistV3
 /// @author Alchemix Finance
 contract AlchemistV3 is IAlchemistV3, Initializable {
