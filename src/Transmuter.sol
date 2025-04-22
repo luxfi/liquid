@@ -18,7 +18,6 @@ import "./base/TransmuterErrors.sol";
 /// @notice A contract which facilitates the exchange of alAssets to yield bearing assets.
 contract Transmuter is ITransmuter, ERC721 {
     using StakingGraph for mapping(uint256 => int256);
-    // using StakingGraph for StakingGraph.Graph;
     using SafeCast for int256;
     using SafeCast for uint256;
 
@@ -75,9 +74,6 @@ contract Transmuter is ITransmuter, ERC721 {
 
     /// @dev Mapping used for staking graph.
     mapping(uint256 => int256) private _graph2;
-
-    // StakingGraph.Graph private _stakingGraph;
-
 
     /// @dev Nonce data used for minting of new nft positions.
     uint256 private _nonce;
@@ -272,8 +268,6 @@ contract Transmuter is ITransmuter, ERC721 {
         if (queried == 0) return 0;
         // + 1 for rounding error
         return (queried / BLOCK_SCALING_FACTOR).toUint256() + 1;
-
-        // return _stakingGraph.queryStake(startBlock, endBlock).toUint256() / 1e8;
     }
 
     /// @dev Updates staking graphs
@@ -287,8 +281,6 @@ contract Transmuter is ITransmuter, ERC721 {
 
         _graph2.update(startBlock, graphSize, amount * (startBlock - 1).toInt256());
         _graph2.update(expirationBlock + 1, graphSize, -amount * expirationBlock.toInt256());
-
-        // _stakingGraph.addStake(amount, block.number, blocks);
     }
 
     /// @dev Checks an expression and reverts with an {IllegalArgument} error if the expression is {false}.
