@@ -465,6 +465,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         // Burn the tokens from the message sender
         TokenUtils.safeBurnFrom(debtToken, msg.sender, credit);
 
+        // Debt is subject to protocol fee similar to redemptions
+        _accounts[recipientId].collateralBalance -= convertDebtTokensToYield(credit) * protocolFee / BPS;
+
         // Update the recipient's debt.
         _subDebt(recipientId, credit);
 
@@ -496,13 +499,18 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         uint256 credit = yieldToDebt > debt ? debt : yieldToDebt;
         uint256 creditToYield = convertDebtTokensToYield(credit);
 
-        _subDebt(recipientTokenId, credit);
-
         // Repay debt from earmarked amount of debt first
-        account.earmarked -= credit > account.earmarked ? account.earmarked : credit;
+        uint256 earmarkToRemove = credit > account.earmarked ? account.earmarked : credit;
+        account.earmarked -= earmarkToRemove;
+
+        // Debt is subject to protocol fee similar to redemptions
+        account.collateralBalance -= creditToYield * protocolFee / BPS;
+
+        _subDebt(recipientTokenId, credit);
 
         // Transfer the repaid tokens to the transmuter.
         TokenUtils.safeTransferFrom(yieldToken, msg.sender, transmuter, creditToYield);
+        TokenUtils.safeTransfer(yieldToken, protocolFeeReceiver, creditToYield);
 
         emit Repay(msg.sender, amount, recipientTokenId, creditToYield);
 
@@ -862,7 +870,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
             toFree = _totalLocked;
         }
 
-        _totalLocked     -= toFree;
+        _totalLocked -= toFree;
         account.rawLocked -= toFree;
         account.freeCollateral += toFree;
         account.lastCollateralWeight = _collateralWeight;
@@ -966,16 +974,15 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         uint256 earmarkToRedeem;
         uint256 earmarkPreviousState;
         if (block.number > lastRedemptionBlock && _redemptionWeight != 0) {
-            if (previousRedemption.debt != 0) {
-                debtToEarmark = PositionDecay.ScaleByWeightDelta(account.debt - account.earmarked, previousRedemption.earmarkWeight - account.lastAccruedEarmarkWeight);
-                earmarkPreviousState = account.earmarked + debtToEarmark;
-            }
+            debtToEarmark = PositionDecay.ScaleByWeightDelta(account.debt - account.earmarked, previousRedemption.earmarkWeight - account.lastAccruedEarmarkWeight);
+
+            earmarkPreviousState = account.earmarked + debtToEarmark;
             earmarkToRedeem = PositionDecay.ScaleByWeightDelta(earmarkPreviousState, _redemptionWeight - account.lastAccruedRedemptionWeight);
         } else {
             earmarkToRedeem = PositionDecay.ScaleByWeightDelta(earmarkedState, _redemptionWeight - account.lastAccruedRedemptionWeight);
         }
 
-        uint256 collateralToRedeem = PositionDecay.ScaleByWeightDelta(account.rawLocked, _collateralWeight - account.lastCollateralWeight);
+        uint256 collateralToRemove = PositionDecay.ScaleByWeightDelta(account.rawLocked, _collateralWeight - account.lastCollateralWeight);
 
         // Calculate how much of user earmarked amount has been redeemed and subtract it
         account.earmarked = earmarkedState - earmarkToRedeem;
@@ -983,8 +990,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         account.lastAccruedRedemptionWeight = _redemptionWeight;
         account.lastAccruedEarmarkWeight = _earmarkWeight;
         // Redeem user collateral equal to value of debt tokens redeemed
-        account.collateralBalance -= collateralToRedeem;
-        account.rawLocked -= collateralToRedeem;
+        account.collateralBalance -= collateralToRemove;
+        account.rawLocked -= collateralToRemove;
         account.lastCollateralWeight = _collateralWeight;
     }
 
@@ -1032,18 +1039,17 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         uint256 earmarkedPreviousState;
         uint256 earmarkToRedeem;
         if (block.number > lastRedemptionBlock && _redemptionWeight != 0) {
-            if (previousRedemption.debt != 0) {
-                uint256 debtToEarmarkCopy = PositionDecay.ScaleByWeightDelta(account.debt - account.earmarked, previousRedemption.earmarkWeight - account.lastAccruedEarmarkWeight);
-                earmarkedPreviousState = account.earmarked + debtToEarmarkCopy;
-            }
+            debtToEarmark = PositionDecay.ScaleByWeightDelta(account.debt - account.earmarked, previousRedemption.earmarkWeight - account.lastAccruedEarmarkWeight);
+
+            earmarkedPreviousState = account.earmarked + debtToEarmark;
             earmarkToRedeem = PositionDecay.ScaleByWeightDelta(earmarkedPreviousState, _redemptionWeight - account.lastAccruedRedemptionWeight);
         } else {
             earmarkToRedeem = PositionDecay.ScaleByWeightDelta(earmarkedState, _redemptionWeight - account.lastAccruedRedemptionWeight);
         }
 
-        uint256 collateralToRedeem = PositionDecay.ScaleByWeightDelta(account.rawLocked, _collateralWeight - account.lastCollateralWeight);
+        uint256 collateralToRemove = PositionDecay.ScaleByWeightDelta(account.rawLocked, _collateralWeight - account.lastCollateralWeight);
 
-        return (account.debt - earmarkToRedeem, earmarkedState - earmarkToRedeem, account.collateralBalance - collateralToRedeem);
+        return (account.debt - earmarkToRedeem, earmarkedState - earmarkToRedeem, account.collateralBalance - collateralToRemove);
     }
 
     /// @dev Checks that the account owned by `tokenId` is properly collateralized.
