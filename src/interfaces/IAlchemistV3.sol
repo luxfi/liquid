@@ -46,10 +46,14 @@ struct Account {
     uint256 earmarked;
     /// @notice Last weight of debt from most recent account sync.
     uint256 lastAccruedEarmarkWeight;
-    /// @notice Last weight of debt fee from most recent account sync.
-    uint256 lastAccruedFeeWeight;
     /// @notice Last weight of debt from most recent account sync.
     uint256 lastAccruedRedemptionWeight;
+    /// @notice Last weight of collateral from most recent account sync.
+    uint256 lastCollateralWeight;
+    /// @notice The un-scaled locked collateral.
+    uint256 rawLocked;
+    /// @notice The amount of unlocked collateral.
+    uint256 freeCollateral;
     /// @notice allowances for minting alAssets, per version.
     mapping(uint256 => mapping(address => uint256)) mintAllowances;
     /// @notice id used in the mintAllowances map which is incremented on reset.
