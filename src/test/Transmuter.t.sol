@@ -18,6 +18,7 @@ contract MockAlchemist {
     uint256 public constant FIXED_POINT_SCALAR = 1e18;
 
     uint256 public underlyingValue;
+    uint256 public syntheticsIssued;
 
     constructor(AlEth _collateral) {
         collateral = _collateral;
@@ -25,6 +26,10 @@ contract MockAlchemist {
 
     function setUnderlyingValue(uint256 amount) public {
         underlyingValue = amount;
+    }
+
+    function setSyntheticsIssued(uint256 amount) public {
+        syntheticsIssued = amount;
     }
 
     function convertYieldTokensToUnderlying(uint256 amount) external pure returns (uint256) {
@@ -51,8 +56,12 @@ contract MockAlchemist {
         return type(uint256).max;
     }
 
-    function totalSyntheticsIssued() external pure returns (uint256) {
-        return type(uint256).max / 1e20;
+    function totalSyntheticsIssued() external returns (uint256) {
+        if (syntheticsIssued > 0) {
+            return syntheticsIssued;
+        } else {
+            return type(uint256).max / 1e20;
+        }
     }
 
     function adjustTotalSyntheticsIssued(uint256 amount) external {
@@ -101,6 +110,34 @@ contract TransmuterTest is Test {
 
         vm.prank(address(0xbeef));
         alETH.approve(address(transmuter), type(uint256).max);
+    }
+
+    function testSetAdmin() public {
+        transmuter.setPendingAdmin(address(0xbeef));
+        
+        vm.prank(address(0xbeef));
+        transmuter.acceptAdmin();
+
+        assertEq(address(0xbeef), transmuter.admin());
+    }
+
+    function testSetAdminWrongAddress() public {
+        transmuter.setPendingAdmin(address(0xbeef));
+        
+        vm.startPrank(address(0xbeef123));
+        vm.expectRevert();
+        transmuter.acceptAdmin();
+        vm.stopPrank();
+    }
+
+
+    function testURI() public {
+        vm.prank(address(0xbeef));
+        transmuter.createRedemption(100e18);
+
+        Transmuter.StakingPosition memory position = transmuter.getPosition(1);
+
+        transmuter.tokenURI(1);
     }
 
     function testSetTransmutaitonFeeTooHigh() public {
@@ -156,6 +193,14 @@ contract TransmuterTest is Test {
 
     function testCreateRedemptionDepositCapReached() public {
         transmuter.setDepositCap(90e18);
+
+        vm.expectRevert(DepositCapReached.selector);
+        transmuter.createRedemption(100e18);
+    }
+
+    function testCreateRedemptionDepositCapReachedSynthetic() public {
+        transmuter.setDepositCap(110e18);
+        alchemist.setSyntheticsIssued(90e18);
 
         vm.expectRevert(DepositCapReached.selector);
         transmuter.createRedemption(100e18);
