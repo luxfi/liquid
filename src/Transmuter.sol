@@ -18,6 +18,7 @@ import "./base/TransmuterErrors.sol";
 /// @notice A contract which facilitates the exchange of alAssets to yield bearing assets.
 contract Transmuter is ITransmuter, ERC721 {
     using StakingGraph for mapping(uint256 => int256);
+    // using StakingGraph for StakingGraph.Graph;
     using SafeCast for int256;
     using SafeCast for uint256;
 
@@ -26,8 +27,10 @@ contract Transmuter is ITransmuter, ERC721 {
 
     uint256 public constant BPS = 10_000;
 
-    int256 public constant BLOCK_SCALING_FACTOR = 1e8;
+    uint256 public constant FIXED_POINT_SCALAR = 1e18;
 
+    int256 public constant BLOCK_SCALING_FACTOR = 1e8;
+    
     /// @inheritdoc ITransmuter
     uint256 public depositCap;
 
@@ -65,16 +68,19 @@ contract Transmuter is ITransmuter, ERC721 {
     address[] public alchemists;
 
     /// @dev Map of user positions data.
-    mapping(uint256 => StakingPosition) internal _positions;
+    mapping(uint256 => StakingPosition) private _positions;
 
     /// @dev Mapping used for staking graph.
-    mapping(uint256 => int256) internal _graph1;
+    mapping(uint256 => int256) private _graph1;
 
     /// @dev Mapping used for staking graph.
-    mapping(uint256 => int256) internal _graph2;
+    mapping(uint256 => int256) private _graph2;
+
+    // StakingGraph.Graph private _stakingGraph;
+
 
     /// @dev Nonce data used for minting of new nft positions.
-    uint256 internal _nonce;
+    uint256 private _nonce;
 
     modifier onlyAdmin() {
         _checkArgument(msg.sender == admin);
@@ -233,8 +239,16 @@ contract Transmuter is ITransmuter, ERC721 {
         // Remove untransmuted amount from the staking graph
         if (blocksLeft > 0) _updateStakingGraph(-position.amount.toInt256() * BLOCK_SCALING_FACTOR / transmutationTime.toInt256(), blocksLeft);
 
-        TokenUtils.safeTransfer(alchemist.yieldToken(), msg.sender, alchemist.convertDebtTokensToYield(claimAmount));
+        // Ratio of total synthetics issued by the alchemist / underlingying value of collateral stored in the alchemist
+        // If the system experiences bad debt we use this ratio to scale back the amount of yield tokens that are transmuted
+        uint256 badDebtRatio = alchemist.totalSyntheticsIssued() * 10**TokenUtils.expectDecimals(alchemist.yieldToken()) / alchemist.getTotalUnderlyingValue();
 
+        if (badDebtRatio > 1e18) {
+            claimAmount = claimAmount * FIXED_POINT_SCALAR / badDebtRatio;
+            feeAmount = feeAmount * FIXED_POINT_SCALAR / badDebtRatio;
+        }
+
+        TokenUtils.safeTransfer(alchemist.yieldToken(), msg.sender, alchemist.convertDebtTokensToYield(claimAmount));
         TokenUtils.safeTransfer(alchemist.yieldToken(), protocolFeeReceiver, alchemist.convertDebtTokensToYield(feeAmount));
 
         TokenUtils.safeTransfer(syntheticToken, msg.sender, syntheticReturned);
@@ -258,6 +272,8 @@ contract Transmuter is ITransmuter, ERC721 {
         if (queried == 0) return 0;
         // + 1 for rounding error
         return (queried / BLOCK_SCALING_FACTOR).toUint256() + 1;
+
+        // return _stakingGraph.queryStake(startBlock, endBlock).toUint256() / 1e8;
     }
 
     /// @dev Updates staking graphs
@@ -271,6 +287,8 @@ contract Transmuter is ITransmuter, ERC721 {
 
         _graph2.update(startBlock, graphSize, amount * (startBlock - 1).toInt256());
         _graph2.update(expirationBlock + 1, graphSize, -amount * expirationBlock.toInt256());
+
+        // _stakingGraph.addStake(amount, block.number, blocks);
     }
 
     /// @dev Checks an expression and reverts with an {IllegalArgument} error if the expression is {false}.

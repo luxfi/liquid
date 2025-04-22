@@ -16,6 +16,9 @@ import {Unauthorized, IllegalArgument, IllegalState, MissingInputData} from "./b
 import {IERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {IPriceFeedAdapter} from "./adapters/ETHUSDPriceFeedAdapter.sol";
 
+import {console} from "../../lib/forge-std/src/console.sol";
+
+
 /// @title  AlchemistV3
 /// @author Alchemix Finance
 contract AlchemistV3 is IAlchemistV3, Initializable {
@@ -116,7 +119,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     uint256 private _redemptionWeight;
 
-    uint256 private _collateralFeeWeight;
+    uint256 private _collateralWeight;
+
+    uint256 private _totalLocked;
 
     mapping(uint256 => Account) private _accounts;
 
@@ -367,7 +372,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         } else {
             _checkForValidAccountId(tokenId);
         }
+
         _accounts[tokenId].collateralBalance += amount;
+        _accounts[tokenId].freeCollateral += amount;
 
         // Transfer tokens from msg.sender now that the internal storage updates have been committed.
         TokenUtils.safeTransferFrom(yieldToken, msg.sender, address(this), amount);
@@ -387,9 +394,10 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         _sync(tokenId);
 
-        _checkArgument(_accounts[tokenId].collateralBalance >= amount);
+        _checkArgument(_accounts[tokenId].freeCollateral >= amount);
 
         _accounts[tokenId].collateralBalance -= amount;
+        _accounts[tokenId].freeCollateral -= amount;
 
         // Assure that the collateralization invariant is still held.
         _validate(tokenId);
@@ -554,10 +562,17 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     function redeem(uint256 amount) external onlyTransmuter {
         _earmark();
 
-        _redemptionWeight += PositionDecay.WeightIncrement(amount,cumulativeEarmarked);
+        _redemptionWeight += PositionDecay.WeightIncrement(amount, cumulativeEarmarked);
 
-        uint256 collateralPerDebt = (1e18 * 1e18) / convertDebtTokensToYield(1e18);
-        _collateralFeeWeight += (((protocolFee * amount / BPS) + amount) * collateralPerDebt) / totalDebt;
+        // Calculate current fee price price
+        uint256 collRedeemed = convertDebtTokensToYield(amount);
+        uint256 feeCollateral = collRedeemed * protocolFee / BPS;
+        uint256 totalOut = collRedeemed + feeCollateral;
+
+        // Update weight
+        uint256 old = _totalLocked;
+        _totalLocked = old - totalOut;
+        _collateralWeight += PositionDecay.WeightIncrement(totalOut, old);
 
         cumulativeEarmarked -= amount;
         totalDebt -= amount;
@@ -567,8 +582,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         _redemptions[block.number] = RedemptionInfo(cumulativeEarmarked, totalDebt, _earmarkWeight);
 
-        uint256 collateralToRedeem = convertDebtTokensToYield(amount);
-        TokenUtils.safeTransfer(yieldToken, transmuter, collateralToRedeem);
+        TokenUtils.safeTransfer(yieldToken, transmuter, collRedeemed);
+        TokenUtils.safeTransfer(yieldToken, protocolFeeReceiver, feeCollateral);
 
         emit Redemption(amount);
     }
@@ -692,7 +707,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
             debtAmount = liquidationAmount + feeInDebt;
             uint256 adjustedLiquidationAmount = convertDebtTokensToYield(liquidationAmount);
             feeInYield = convertDebtTokensToYield(feeInDebt);
-            // send liquidation amount - any fee to the transmuter. the transmuter only accepts yield tokens
+            // Send liquidation amount - any fee to the transmuter. the transmuter only accepts yield tokens
             TokenUtils.safeTransfer(yieldToken, transmuter, adjustedLiquidationAmount);
 
             // Update users debt
@@ -701,7 +716,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
             // Liquidate debt from earmarked amount of debt first
             account.earmarked -= liquidationAmount > account.earmarked ? account.earmarked : liquidationAmount;
 
-            // update user balance
+            // Update user balance
             account.collateralBalance = convertDebtTokensToYield(collateralInDebt);
 
             if (feeInYield > 0) {
@@ -710,13 +725,13 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
             }
 
             if (excessFee > 0) {
-                // need to convert excess fee to eth
+                // Need to convert excess fee to eth
                 uint256 excessFeeInUSD = IPriceFeedAdapter(ethUsdAdapter).underlyingTokenToUSD(excessFee);
                 uint256 excessFeeInETH = IPriceFeedAdapter(ethUsdAdapter).usdToETH(excessFeeInUSD);
                 uint256 ethBalance = address(alchemistETHVault).balance;
                 if (ethBalance > 0) {
                     feeInETH = ethBalance > excessFeeInETH ? excessFeeInETH : ethBalance;
-                    // send fee in eth to liquidator
+                    // Send fee in eth to liquidator
                     IAlchemistETHVault(alchemistETHVault).withdraw(msg.sender, feeInETH);
                 }
             }
@@ -733,6 +748,15 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         Account storage account = _accounts[tokenId];
         account.debt += amount;
         totalDebt += amount;
+
+        // Update collateral variables
+        uint256 toLock = convertDebtTokensToYield(amount) * minimumCollateralization / FIXED_POINT_SCALAR;
+
+        if (account.freeCollateral < toLock) revert Undercollateralized();
+        account.freeCollateral -= toLock;
+        account.rawLocked += toLock;
+        account.lastCollateralWeight = _collateralWeight;
+        _totalLocked += toLock;
     }
 
     /// @dev Increases the debt by `amount` for the account owned by `tokenId`.
@@ -742,6 +766,19 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         Account storage account = _accounts[tokenId];
         account.debt -= amount;
         totalDebt -= amount;
+
+        // Update collateral variables
+        uint256 toFree = convertDebtTokensToYield(amount) * minimumCollateralization / FIXED_POINT_SCALAR;
+
+        // For cases when someone above minimum LTV gets liquidated.
+        if (toFree > _totalLocked) {
+            toFree = _totalLocked;
+        }
+
+        _totalLocked     -= toFree;
+        account.rawLocked -= toFree;
+        account.freeCollateral += toFree;
+        account.lastCollateralWeight = _collateralWeight;
     }
 
     /// @dev Set the mint allowance for `spender` to `amount` for the account owned by `tokenId`.
@@ -838,9 +875,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         uint256 debtToEarmark = PositionDecay.ScaleByWeightDelta(account.debt - account.earmarked, _earmarkWeight - account.lastAccruedEarmarkWeight);
         uint256 earmarkedState = account.earmarked + debtToEarmark;
 
-        uint256 deltaWeight = _collateralFeeWeight - account.lastAccruedFeeWeight;
-        uint256 collateralFee = (account.debt * deltaWeight) / 1e18;
-
         // Recreate account state at last redemption block if the redemption was in the past
         uint256 earmarkToRedeem;
         uint256 earmarkPreviousState;
@@ -854,14 +888,17 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
             earmarkToRedeem = PositionDecay.ScaleByWeightDelta(earmarkedState, _redemptionWeight - account.lastAccruedRedemptionWeight);
         }
 
+        uint256 collateralToRedeem = PositionDecay.ScaleByWeightDelta(account.rawLocked, _collateralWeight - account.lastCollateralWeight);
+
         // Calculate how much of user earmarked amount has been redeemed and subtract it
         account.earmarked = earmarkedState - earmarkToRedeem;
         account.debt -= earmarkToRedeem;
         account.lastAccruedRedemptionWeight = _redemptionWeight;
         account.lastAccruedEarmarkWeight = _earmarkWeight;
-        account.lastAccruedFeeWeight = _collateralFeeWeight;
         // Redeem user collateral equal to value of debt tokens redeemed
-        account.collateralBalance -= collateralFee;
+        account.collateralBalance -= collateralToRedeem;
+        account.rawLocked -= collateralToRedeem;
+        account.lastCollateralWeight = _collateralWeight;
     }
 
     /// @dev Earmarks the debt for redemption.
@@ -904,9 +941,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         uint256 debtToEarmark = PositionDecay.ScaleByWeightDelta(account.debt - account.earmarked, earmarkWeightCopy - account.lastAccruedEarmarkWeight);
         uint256 earmarkedState = account.earmarked + debtToEarmark;
 
-        uint256 deltaWeight = _collateralFeeWeight - account.lastAccruedFeeWeight;
-        uint256 collateralFee = (account.debt * deltaWeight) / 1e18;
-
         // Recreate account state at last redemption block if the redemption was in the past
         uint256 earmarkedPreviousState;
         uint256 earmarkToRedeem;
@@ -920,7 +954,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
             earmarkToRedeem = PositionDecay.ScaleByWeightDelta(earmarkedState, _redemptionWeight - account.lastAccruedRedemptionWeight);
         }
 
-        return (account.debt - earmarkToRedeem, earmarkedState - earmarkToRedeem, account.collateralBalance - collateralFee);
+        uint256 collateralToRedeem = PositionDecay.ScaleByWeightDelta(account.rawLocked, _collateralWeight - account.lastCollateralWeight);
+
+        return (account.debt - earmarkToRedeem, earmarkedState - earmarkToRedeem, account.collateralBalance - collateralToRedeem);
     }
 
     /// @dev Checks that the account owned by `tokenId` is properly collateralized.

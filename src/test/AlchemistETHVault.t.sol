@@ -211,11 +211,11 @@ contract AlchemistETHVaultTest is Test {
         // Deposit ETH
         address(ethVault).call{value: amount};
 
+        vm.stopPrank();
+
         // Verify the user's ETH balance decreased
         assertEq(address(externalUser).balance, initialBalance - amount);
         assertEq(address(ethVault).balance, amount);
-
-        vm.stopPrank();
     }
 
     function testWithdrawETH() public {

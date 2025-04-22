@@ -17,8 +17,14 @@ contract MockAlchemist {
 
     uint256 public constant FIXED_POINT_SCALAR = 1e18;
 
+    uint256 public underlyingValue;
+
     constructor(AlEth _collateral) {
         collateral = _collateral;
+    }
+
+    function setUnderlyingValue(uint256 amount) public {
+        underlyingValue = amount;
     }
 
     function convertYieldTokensToUnderlying(uint256 amount) external pure returns (uint256) {
@@ -46,7 +52,7 @@ contract MockAlchemist {
     }
 
     function totalSyntheticsIssued() external pure returns (uint256) {
-        return type(uint256).max;
+        return type(uint256).max / 1e20;
     }
 
     function adjustTotalSyntheticsIssued(uint256 amount) external {
@@ -55,6 +61,14 @@ contract MockAlchemist {
 
     function yieldToken() external view returns (address) {
         return address(collateral);
+    }
+
+    function getTotalUnderlyingValue() external view returns (uint256) {
+        if (underlyingValue > 0) {
+            return underlyingValue;
+        } else {
+            return type(uint256).max / 1e20;
+        }
     }
 }
 
