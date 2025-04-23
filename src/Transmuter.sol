@@ -17,7 +17,7 @@ import "./base/TransmuterErrors.sol";
 ///
 /// @notice A contract which facilitates the exchange of alAssets to yield bearing assets.
 contract Transmuter is ITransmuter, ERC721 {
-    using StakingGraph for mapping(uint256 => int256);
+    using StakingGraph for StakingGraph.Graph;
     using SafeCast for int256;
     using SafeCast for uint256;
 
@@ -74,6 +74,8 @@ contract Transmuter is ITransmuter, ERC721 {
 
     /// @dev Mapping used for staking graph.
     mapping(uint256 => int256) private _graph2;
+
+    StakingGraph.Graph private _stakingGraph;
 
     /// @dev Nonce data used for minting of new nft positions.
     uint256 private _nonce;
@@ -262,25 +264,17 @@ contract Transmuter is ITransmuter, ERC721 {
 
     /// @inheritdoc ITransmuter
     function queryGraph(uint256 startBlock, uint256 endBlock) external view returns (uint256) {
-        int256 queried = ((endBlock.toInt256() * _graph1.query(endBlock)) - _graph2.query(endBlock))
-            - (((startBlock - 1).toInt256() * _graph1.query(startBlock - 1)) - _graph2.query(startBlock - 1));
+        int256 queried = _stakingGraph.queryStake(startBlock, endBlock);
 
         if (queried == 0) return 0;
         // + 1 for rounding error
         return (queried / BLOCK_SCALING_FACTOR).toUint256() + 1;
+        //return ((queried+(BLOCK_SCALING_FACTOR-1)) / BLOCK_SCALING_FACTOR).toUint256();
     }
 
     /// @dev Updates staking graphs
     function _updateStakingGraph(int256 amount, uint256 blocks) private {
-        // Start at block number + 1 in order to correctly log when funds are needed
-        uint256 startBlock = block.number + 1;
-        uint256 expirationBlock = block.number + blocks;
-
-        _graph1.update(startBlock, graphSize, amount);
-        _graph1.update(expirationBlock + 1, graphSize, -amount);
-
-        _graph2.update(startBlock, graphSize, amount * (startBlock - 1).toInt256());
-        _graph2.update(expirationBlock + 1, graphSize, -amount * expirationBlock.toInt256());
+        _stakingGraph.addStake(amount, block.number, blocks);
     }
 
     /// @dev Checks an expression and reverts with an {IllegalArgument} error if the expression is {false}.
