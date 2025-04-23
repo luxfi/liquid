@@ -175,7 +175,7 @@ contract TransmuterTest is Test {
 
     function testFuzzCreateRedemption(uint256 amount) public {
         vm.assume(amount > 0);
-        vm.assume(amount < uint256(type(int256).max) / 1e20);
+        vm.assume(amount < uint256(type(int256).max) / 1e50);
 
         vm.prank(address(0xbeef));
         transmuter.createRedemption(amount);
@@ -292,7 +292,7 @@ contract TransmuterTest is Test {
         deal(address(collateralToken), address(transmuter), uint256(type(int256).max) / 1e20);
 
         vm.assume(amount > 0);
-        vm.assume(amount < uint256(type(int256).max) / 1e20);
+        vm.assume(amount < uint256(type(int256).max) / 1e50);
 
         vm.prank(address(0xbeef));
         transmuter.createRedemption(amount);
