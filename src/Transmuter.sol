@@ -69,12 +69,7 @@ contract Transmuter is ITransmuter, ERC721 {
     /// @dev Map of user positions data.
     mapping(uint256 => StakingPosition) private _positions;
 
-    /// @dev Mapping used for staking graph.
-    mapping(uint256 => int256) private _graph1;
-
-    /// @dev Mapping used for staking graph.
-    mapping(uint256 => int256) private _graph2;
-
+    /// @dev Graph of transmuter positions.
     StakingGraph.Graph private _stakingGraph;
 
     /// @dev Nonce data used for minting of new nft positions.
