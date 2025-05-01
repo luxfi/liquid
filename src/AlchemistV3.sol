@@ -563,16 +563,15 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         _redemptionWeight += PositionDecay.WeightIncrement(amount, cumulativeEarmarked);
 
-        // Calculate current fee price price
+        // Calculate current fee price
         uint256 collRedeemed = convertDebtTokensToYield(amount);
         uint256 feeCollateral = collRedeemed * protocolFee / BPS;
         uint256 totalOut = collRedeemed + feeCollateral;
 
-        // Update weight
+        // Update weights and totals
         uint256 old = _totalLocked;
         _totalLocked = old - totalOut;
         _collateralWeight += PositionDecay.WeightIncrement(totalOut, old);
-
         cumulativeEarmarked -= amount;
         totalDebt -= amount;
         totalSyntheticsIssued -= amount;
@@ -847,7 +846,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         if (account.freeCollateral < toLock) revert Undercollateralized();
         account.freeCollateral -= toLock;
         account.rawLocked += toLock;
-        account.lastCollateralWeight = _collateralWeight;
         _totalLocked += toLock;
     }
 
@@ -870,7 +868,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         _totalLocked -= toFree;
         account.rawLocked -= toFree;
         account.freeCollateral += toFree;
-        account.lastCollateralWeight = _collateralWeight;
     }
 
     /// @dev Set the mint allowance for `spender` to `amount` for the account owned by `tokenId`.
