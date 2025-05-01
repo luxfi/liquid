@@ -236,6 +236,9 @@ contract IntegrationTest is Test {
         uint256 maxBorrow = alchemist.getMaxBorrowable(tokenId);
         alchemist.mint(tokenId, maxBorrow, address(0xbeef));
         IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
+
+        vm.roll(block.number + 1);
+        
         alchemist.repay(alchemist.convertDebtTokensToYield(maxBorrow), tokenId);
         vm.stopPrank();
 
@@ -418,6 +421,9 @@ contract IntegrationTest is Test {
         uint256 maxBorrow = alchemist.getMaxBorrowable(tokenId);
         alchemist.mint(tokenId, maxBorrow, address(0xbeef));
         IERC20(alUSD).approve(address(alchemist), maxBorrow);
+
+        vm.roll(block.number + 1);
+
         alchemist.burn(maxBorrow, tokenId);
         vm.stopPrank();
 
@@ -534,103 +540,4 @@ contract IntegrationTest is Test {
 
         assertEq(earmarked, 0);
     }
-
-    // function testPositionToFullMaturityTwoTransmuterPositions() external {
-    //     vm.startPrank(address(0xbeef));
-    //     IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
-    //     alchemist.deposit(100_000e6, address(0xbeef), 0);
-    //     uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
-    //     uint256 debtAmount = alchemist.getMaxBorrowable(tokenId);
-    //     alchemist.mint(tokenId, alchemist.getMaxBorrowable(tokenId), address(0xbeef));
-    //     vm.stopPrank();
-
-    //     vm.startPrank(address(0xdad));
-    //     IERC20(alUSD).approve(address(transmuterLogic), debtAmount);
-    //     transmuterLogic.createRedemption(debtAmount / 2);
-    //     vm.stopPrank();
-
-    //     // Go 1/4 through the first transmuter position and create a new one
-    //     vm.roll(block.number + 5_256_000 / 4);
-
-    //     vm.startPrank(address(0xdead));
-    //     IERC20(alUSD).approve(address(transmuterLogic), debtAmount);
-    //     transmuterLogic.createRedemption(debtAmount / 2);
-    //     vm.stopPrank();
-
-    //     // Collateral unchanged but debt has accrued some fee amount
-    //     (uint256 collateral, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
-    //     assertEq(collateral, 100_000e6);
-    //     assertApproxEqAbs(debt, debtAmount, 1);
-    //     // Earmarked should be transmuter position amount / 4
-    //     assertApproxEqAbs(earmarked, debtAmount / 2 / 4, 1);
-
-    //     vm.roll(block.number + 5_256_000 / 4);
-
-    //     (collateral, debt, earmarked) = alchemist.getCDP(tokenId);
-
-    //     assertEq(collateral, 100_000e6);
-    //     // Debt is starting debt + 1/2 transmutation period in fees
-    //     assertApproxEqAbs(debt, debtAmount, 1);
-    //     // Earmarked should be half of first position and quarter of second position
-    //     assertApproxEqAbs(earmarked, (3 * debtAmount / 8), 1);
-
-    //     vm.roll(block.number + 5_256_000 / 4);
-
-    //     (collateral, debt, earmarked) = alchemist.getCDP(tokenId);
-
-    //     assertEq(collateral, 100_000e6);
-    //     // Debt is starting debt + 3/4 transmutation period in fees
-    //     assertApproxEqAbs(debt, debtAmount, 1);
-    //     // Earmarked should be 3/4 of the first transmuter position and 1/2 of the second
-    //     assertApproxEqAbs(earmarked, 5 * debtAmount / 8, 1);
-
-    //     vm.roll(block.number + 5_256_000 / 4);
-
-    //     (collateral, debt, earmarked) = alchemist.getCDP(tokenId);
-
-    //     assertEq(collateral, 100_000e6);
-    //     // Debt is starting debt + 3/4 transmutation period in fees
-    //     assertApproxEqAbs(debt, debtAmount, 1);
-    //     // Earmarked should be all of the first transmuter position and 3/4 of the second
-    //     assertApproxEqAbs(earmarked, 7 * debtAmount / 8, 1);
-
-    //     // First position claims
-    //     vm.startPrank(address(0xdad));
-    //     transmuterLogic.claimRedemption(1);
-    //     vm.stopPrank();
-
-    //     (collateral, debt, earmarked) = alchemist.getCDP(tokenId);
-
-    //     // collateral should be missing 45% since they borrowed against 90% and half has been redeemed
-    //     assertEq(collateral, 100_000e6 * 5500 / 10_000);
-    //     // Same fee as before but half of their debt has been redeemed
-    //     assertApproxEqAbs(debt, debtAmount - (debtAmount) / 2, 1);
-    //     assertApproxEqAbs(earmarked, (7 * debtAmount / 8) - (debtAmount / 2), 1);
-
-    //     // vm.roll(block.number + 5_256_000 / 4);
-
-    //     // (collateral, debt, earmarked) = alchemist.getCDP(tokenId);
-
-    //     // // Collateral unchanged from before since position wasnt redeemed yet
-    //     // assertEq(collateral, 100_000e6 * 5500 / 10_000);
-    //     // assertApproxEqAbs(debt, debtAmount - (debtAmount / 2), 1);
-
-    //     // assertApproxEqAbs(earmarked, debtAmount / 2 , 1);
-
-    //     // // Second position claim
-    //     // vm.startPrank(address(0xdead));
-    //     // transmuterLogic.claimRedemption(2);
-    //     // vm.stopPrank();
-
-    //     // (collateral, debt, earmarked) = alchemist.getCDP(address(0xbeef));
-
-    //     // // Collateral unchanged from before since position wasnt redeemed yet
-    //     // assertEq(collateral, 100_000e6 * 5500 / 10_000);
-    //     // // Same fee as before but half of their debt has been redeemed
-    //     // assertApproxEqAbs(debt, (debtAmount + (debtAmount * 5256000 / 2600000 * 100 / 10000)) - debtAmount / 2, 1);
-
-    //     // assertApproxEqAbs(debt, debtAmount * 6570000 / 2600000 * 100 / 10000, 1);
-
-    //     // assertApproxEqAbs(earmarked, (7 * debtAmount / 8) - (debtAmount / 2), 1);
-    // }
 }

@@ -36,22 +36,24 @@ struct AlchemistInitializationParams {
 /// @notice A user account.
 /// @notice This account struct is included in the main contract, AlchemistV3.sol, to aid readability.
 struct Account {
-    /// @notice User's debt.
-    uint256 debt;
     /// @notice User's collateral.
     uint256 collateralBalance;
+    /// @notice User's debt.
+    uint256 debt;
     /// @notice User debt earmarked for redemption.
     uint256 earmarked;
+    /// @notice The amount of unlocked collateral.
+    uint256 freeCollateral;
     /// @notice Last weight of debt from most recent account sync.
     uint256 lastAccruedEarmarkWeight;
     /// @notice Last weight of debt from most recent account sync.
     uint256 lastAccruedRedemptionWeight;
     /// @notice Last weight of collateral from most recent account sync.
     uint256 lastCollateralWeight;
+    /// @notice Block of the most recent mint 
+    uint256 lastMintBlock;
     /// @notice The un-scaled locked collateral.
     uint256 rawLocked;
-    /// @notice The amount of unlocked collateral.
-    uint256 freeCollateral;
     /// @notice allowances for minting alAssets, per version.
     mapping(uint256 => mapping(address => uint256)) mintAllowances;
     /// @notice id used in the mintAllowances map which is incremented on reset.
@@ -780,6 +782,9 @@ interface IAlchemistV3Errors {
 
     /// @notice An error which is used to indicate that the token address for the AlchemistTokenVault does not match the underlyingToken
     error AlchemistVaultTokenMismatchError();
+
+    /// @notice An error which is used to indicate that a user is trying to repay on the same block they are minting
+    error CannotRepayOnMintBlock();
 }
 
 /// @title  IAlchemistV3

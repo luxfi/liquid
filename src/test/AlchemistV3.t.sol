@@ -1212,6 +1212,8 @@ contract AlchemistV3Test is Test {
 
         uint256 preRepayBalance = fakeYieldToken.balanceOf(address(0xbeef));
 
+        vm.roll(block.number + 1);
+
         alchemist.repay(100e18, tokenId);
         vm.stopPrank();
 
@@ -1226,6 +1228,23 @@ contract AlchemistV3Test is Test {
         assertEq(fakeYieldToken.balanceOf(address(0xbeef)), preRepayBalance - alchemist.convertDebtTokensToYield(amount / 2));
     }
 
+    function testRepaySameBlock() external {
+        uint256 amount = 100e18;
+
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
+        alchemist.deposit(amount, address(0xbeef), 0);
+        // a single position nft would have been minted to 0xbeef
+        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
+        alchemist.mint(tokenId, amount / 2, address(0xbeef));
+
+        uint256 preRepayBalance = fakeYieldToken.balanceOf(address(0xbeef));
+
+        vm.expectRevert(IAlchemistV3Errors.CannotRepayOnMintBlock.selector);
+        alchemist.repay(100e18, tokenId);
+        vm.stopPrank();
+    }
+
     function testRepayUnearmarkedDebtOnly_Variable_Amount(uint256 repayAmount) external {
         repayAmount = bound(repayAmount, FIXED_POINT_SCALAR, accountFunds / 2);
 
@@ -1237,6 +1256,8 @@ contract AlchemistV3Test is Test {
         alchemist.mint(tokenId, 100e18 / 2, address(0xbeef));
 
         uint256 preRepayBalance = fakeYieldToken.balanceOf(address(0xbeef));
+
+        vm.roll(block.number + 1);
 
         alchemist.repay(repayAmount, tokenId);
         vm.stopPrank();
@@ -1369,6 +1390,8 @@ contract AlchemistV3Test is Test {
         uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
         alchemist.mint(tokenId, amount / 2, address(0xbeef));
 
+        vm.roll(block.number + 1);
+
         SafeERC20.safeApprove(address(alToken), address(alchemist), amount / 2);
         alchemist.burn(amount / 2, tokenId);
         vm.stopPrank();
@@ -1376,6 +1399,23 @@ contract AlchemistV3Test is Test {
         (, uint256 userDebt,) = alchemist.getCDP(tokenId);
 
         assertEq(userDebt, 0);
+    }
+
+    function testBurnSameBlock() external {
+        uint256 amount = 100e18;
+
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
+        alchemist.deposit(amount, address(0xbeef), 0);
+        // a single position nft would have been minted to 0xbeef
+        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
+        alchemist.mint(tokenId, amount / 2, address(0xbeef));
+
+        SafeERC20.safeApprove(address(alToken), address(alchemist), amount / 2);
+        vm.expectRevert(IAlchemistV3Errors.CannotRepayOnMintBlock.selector);
+        alchemist.burn(amount / 2, tokenId);
+        vm.stopPrank();
+
     }
 
     function testBurn_variable_burn_amounts(uint256 burnAmount) external {
@@ -1389,6 +1429,8 @@ contract AlchemistV3Test is Test {
         // a single position nft would have been minted to 0xbeef
         uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
         alchemist.mint(tokenId, amount / 2, address(0xbeef));
+
+        vm.roll(block.number + 1);
 
         SafeERC20.safeApprove(address(alToken), address(alchemist), amount / 2);
         alchemist.burn(burnAmount, tokenId);
@@ -2428,6 +2470,9 @@ contract AlchemistV3Test is Test {
         uint256 tokenIdFor0xBeef = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
 
         alchemist.mint(tokenIdFor0xBeef, (amount / 2), address(0xbeef));
+        
+        vm.roll(block.number + 1);
+
         alchemist.repay(alchemist.convertDebtTokensToYield(amount / 2), tokenIdFor0xBeef);
         vm.stopPrank();
 

@@ -3,14 +3,16 @@ pragma solidity ^0.8.26;
 
 import {IAlchemistV3} from "./interfaces/IAlchemistV3.sol";
 import {ITransmuter} from "./interfaces/ITransmuter.sol";
-import {TokenUtils} from "./libraries/TokenUtils.sol";
-import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
+
+import {NFTMetadataGenerator} from "./libraries/NFTMetadataGenerator.sol";
 import {SafeCast} from "./libraries/SafeCast.sol";
 import {StakingGraph} from "./libraries/StakingGraph.sol";
+import {TokenUtils} from "./libraries/TokenUtils.sol";
+
 import {Unauthorized, IllegalArgument, IllegalState, InsufficientAllowance} from "./base/Errors.sol";
-import {NFTMetadataGenerator} from "./libraries/NFTMetadataGenerator.sol";
 import "./base/TransmuterErrors.sol";
 
 /// @title AlchemixV3 Transmuter
@@ -21,15 +23,13 @@ contract Transmuter is ITransmuter, ERC721 {
     using SafeCast for int256;
     using SafeCast for uint256;
 
-    /// @inheritdoc ITransmuter
-    string public constant version = "1.0.0";
-
     uint256 public constant BPS = 10_000;
-
     uint256 public constant FIXED_POINT_SCALAR = 1e18;
-
     int256 public constant BLOCK_SCALING_FACTOR = 1e8;
     
+    /// @inheritdoc ITransmuter
+    string public constant version = "3.0.0";
+
     /// @inheritdoc ITransmuter
     uint256 public depositCap;
 
@@ -80,7 +80,6 @@ contract Transmuter is ITransmuter, ERC721 {
         _;
     }
 
-    // TODO: Replace with upgradeable initializer
     constructor(ITransmuter.TransmuterInitializationParams memory params) ERC721("Alchemix V3 Transmuter", "TRNSMTR") {
         syntheticToken = params.syntheticToken;
         timeToTransmute = params.timeToTransmute;

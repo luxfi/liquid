@@ -26,12 +26,11 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     using SafeCast for int128;
     using SafeCast for uint128;
 
+    uint256 public constant BPS = 10_000;
+    uint256 public constant FIXED_POINT_SCALAR = 1e18;
+
     /// @inheritdoc IAlchemistV3Immutables
     string public constant version = "3.0.0";
-
-    uint256 public constant BPS = 10_000;
-
-    uint256 public constant FIXED_POINT_SCALAR = 1e18;
 
     /// @inheritdoc IAlchemistV3State
     address public admin;
@@ -111,16 +110,23 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @inheritdoc IAlchemistV3State
     mapping(address => bool) public guardians;
 
+    /// @dev Weight of earmarked amount / total unearmarked debt
     uint256 private _earmarkWeight;
 
+    /// @dev Weight of redemption amount / total earmarked debt
     uint256 private _redemptionWeight;
 
+    /// @dev Weight of redeemed collateral and fees / value of total collateral
     uint256 private _collateralWeight;
 
+    /// @dev Total locked collateral.
+    /// Locked collateral is the collateral that cannot be withdrawn due to LTV constraints
     uint256 private _totalLocked;
 
+    /// @dev User accounts
     mapping(uint256 => Account) private _accounts;
 
+    /// @dev Historic redemptions
     mapping(uint256 => RedemptionInfo) private _redemptions;
 
     modifier onlyAdmin() {
@@ -441,6 +447,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     function burn(uint256 amount, uint256 recipientId) external returns (uint256) {
         _checkArgument(amount > 0);
         _checkForValidAccountId(recipientId);
+        // Check that the user did not mint in this same block
+        // This is used to prevent flash loan repayments
+        if (block.number == _accounts[recipientId].lastMintBlock) revert CannotRepayOnMintBlock();
 
         // Query transmuter and earmark global debt
         _earmark();
@@ -480,6 +489,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         _checkArgument(amount > 0);
         _checkForValidAccountId(recipientTokenId);
         Account storage account = _accounts[recipientTokenId];
+        // Check that the user did not mint in this same block
+        // This is used to prevent flash loan repayments
+        if (block.number == account.lastMintBlock) revert CannotRepayOnMintBlock();
 
         // Query transmuter and earmark global debt
         _earmark();
@@ -705,6 +717,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         // Validate the tokenId's account to assure that the collateralization invariant is still held.
         _validate(tokenId);
+
+        _accounts[tokenId].lastMintBlock = block.number;
 
         // Mint the debt tokens to the recipient.
         TokenUtils.safeMint(debtToken, recipient, amount);
