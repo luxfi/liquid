@@ -1069,7 +1069,7 @@ contract AlchemistV3Test is Test {
         (collateral, userDebt,) = alchemist.getCDP(tokenId);
 
         assertEq(userDebt, 0);
-        assertApproxEqAbs(collateral, (amount / 2) - (amount / 2) * 100 / 10000, 1);
+        assertApproxEqAbs(collateral, (amount / 2) - (amount / 2) * 100 / 10_000, 1);
     }
 
     function testMintFeeOnDebtPartial() external {
@@ -1108,7 +1108,7 @@ contract AlchemistV3Test is Test {
         (collateral, userDebt,) = alchemist.getCDP(tokenId);
 
         assertEq(userDebt, amount / 4);
-        assertApproxEqAbs(collateral, (3 * amount / 4) - (amount / 4) * 100 / 10000, 1);
+        assertApproxEqAbs(collateral, (3 * amount / 4) - (amount / 4) * 100 / 10_000, 1);
     }
 
     function testMintFeeOnDebtMultipleUsers() external {
@@ -1149,10 +1149,10 @@ contract AlchemistV3Test is Test {
         (uint256 collateral2, uint256 userDebt2,) = alchemist.getCDP(tokenIdForExternalUser);
 
         assertEq(userDebt, amount / 4);
-        assertApproxEqAbs(collateral, (3 * amount / 4) - (amount / 4) * 100 / 10000, 1);
+        assertApproxEqAbs(collateral, (3 * amount / 4) - (amount / 4) * 100 / 10_000, 1);
 
         assertEq(userDebt2, amount / 4);
-        assertApproxEqAbs(collateral2, (3 * amount / 4) - (amount / 4) * 100 / 10000, 1);
+        assertApproxEqAbs(collateral2, (3 * amount / 4) - (amount / 4) * 100 / 10_000, 1);
     }
 
     function testMintFeeOnDebtPartialMultipleUsers() external {
@@ -1194,10 +1194,10 @@ contract AlchemistV3Test is Test {
         (uint256 collateral2, uint256 userDebt2,) = alchemist.getCDP(tokenIdForExternalUser);
 
         assertEq(userDebt, 3 * amount / 8);
-        assertApproxEqAbs(collateral, (7 * amount / 8) - (amount / 8) * 100 / 10000, 1);
+        assertApproxEqAbs(collateral, (7 * amount / 8) - (amount / 8) * 100 / 10_000, 1);
 
         assertEq(userDebt2, 3 * amount / 8);
-        assertApproxEqAbs(collateral2, (7 * amount / 8) - (amount / 8) * 100 / 10000, 1);
+        assertApproxEqAbs(collateral2, (7 * amount / 8) - (amount / 8) * 100 / 10_000, 1);
     }
 
     function testRepayUnearmarkedDebtOnly() external {
@@ -1415,7 +1415,6 @@ contract AlchemistV3Test is Test {
         vm.expectRevert(IAlchemistV3Errors.CannotRepayOnMintBlock.selector);
         alchemist.burn(amount / 2, tokenId);
         vm.stopPrank();
-
     }
 
     function testBurn_variable_burn_amounts(uint256 burnAmount) external {
@@ -1592,8 +1591,6 @@ contract AlchemistV3Test is Test {
     }
 
     function testLiquidate_Undercollateralized_Position() external {
-        // NOTE testing with --fork-block-number 20592882, totalSupply will change if this is not maintained
-
         uint256 amount = 200_000e18; // 200,000 yvdai
         vm.startPrank(someWhale);
         fakeYieldToken.mint(whaleSupply, someWhale);
@@ -1613,6 +1610,8 @@ contract AlchemistV3Test is Test {
         uint256 tokenIdFor0xBeef = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
         alchemist.mint(tokenIdFor0xBeef, alchemist.totalValue(tokenIdFor0xBeef) * FIXED_POINT_SCALAR / minimumCollateralization, address(0xbeef));
         vm.stopPrank();
+
+        uint256 transmuterPreviousBalance = IERC20(fakeYieldToken).balanceOf(address(transmuterLogic));
 
         // modify yield token price via modifying underlying token supply
         (uint256 prevCollateral, uint256 prevDebt,) = alchemist.getCDP(tokenIdFor0xBeef);
@@ -1668,11 +1667,16 @@ contract AlchemistV3Test is Test {
         vm.assertApproxEqAbs(liquidatorPostTokenBalance, liquidatorPrevTokenBalance + feeInYield, 1e18);
         vm.assertEq(liquidatorPostUnderlyingBalance, liquidatorPrevUnderlyingBalance + feeInUnderlying);
         vm.assertEq(alchemistFeeVault.totalDeposits(), 10_000 ether - feeInUnderlying);
+
+        // transmuter recieves the liquidation amount in yield token minus the fee
+        vm.assertApproxEqAbs(
+            IERC20(fakeYieldToken).balanceOf(address(transmuterLogic)),
+            transmuterPreviousBalance + expectedLiquidationAmountInYield - expectedBaseFeeInYield,
+            1e18
+        );
     }
 
     function testLiquidate_Undercollateralized_Position_All_Fees_From_Fee_Vault() external {
-        // NOTE testing with --fork-block-number 20592882, totalSupply will change if this is not maintained
-
         uint256 amount = 200_000e18; // 200,000 yvdai
         vm.startPrank(someWhale);
         fakeYieldToken.mint(whaleSupply, someWhale);
@@ -1740,8 +1744,6 @@ contract AlchemistV3Test is Test {
     }
 
     function testLiquidate_Full_Liquidation_Bad_Debt() external {
-        // NOTE testing with --fork-block-number 20592882, totalSupply will change if this is not maintained
-
         uint256 amount = 200_000e18; // 200,000 yvdai
         vm.startPrank(someWhale);
         fakeYieldToken.mint(whaleSupply, someWhale);
@@ -1889,8 +1891,6 @@ contract AlchemistV3Test is Test {
     }
 
     function testBatch_Liquidate_Undercollateralized_Position() external {
-        // NOTE testing with --fork-block-number 20592882, totalSupply will change if this is not maintained
-
         uint256 amount = 200_000e18; // 200,000 yvdai
         vm.startPrank(someWhale);
         fakeYieldToken.mint(whaleSupply, someWhale);
@@ -2126,7 +2126,6 @@ contract AlchemistV3Test is Test {
     }
 
     function testBatch_Liquidate_Undercollateralized_Position_And_Skip_Healthy_Position() external {
-        // NOTE testing with --fork-block-number 20592882, totalSupply will change if this is not maintained
         uint256 amount = 200_000e18; // 200,000 yvdai
 
         vm.startPrank(someWhale);
@@ -2234,7 +2233,6 @@ contract AlchemistV3Test is Test {
     }
 
     function testBatch_Liquidate_Undercollateralized_Position_And_Skip_Zero_Ids() external {
-        // NOTE testing with --fork-block-number 20592882, totalSupply will change if this is not maintained
         uint256 amount = 200_000e18; // 200,000 yvdai
         vm.startPrank(someWhale);
         fakeYieldToken.mint(whaleSupply, someWhale);
@@ -2470,7 +2468,7 @@ contract AlchemistV3Test is Test {
         uint256 tokenIdFor0xBeef = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
 
         alchemist.mint(tokenIdFor0xBeef, (amount / 2), address(0xbeef));
-        
+
         vm.roll(block.number + 1);
 
         alchemist.repay(alchemist.convertDebtTokensToYield(amount / 2), tokenIdFor0xBeef);
@@ -2555,6 +2553,8 @@ contract AlchemistV3Test is Test {
         transmuterLogic.createRedemption(mintAmount);
         vm.stopPrank();
 
+        uint256 transmuterPreviousBalance = IERC20(fakeYieldToken).balanceOf(address(transmuterLogic));
+
         // skip to a future block. Lets say 60% of the way through the transmutation period (5_256_000 blocks)
         vm.roll(block.number + (5_256_000 * 60 / 100));
 
@@ -2600,6 +2600,11 @@ contract AlchemistV3Test is Test {
         vm.assertApproxEqAbs(liquidatorPostTokenBalance, liquidatorPrevTokenBalance, 1e18);
         vm.assertEq(liquidatorPostUnderlyingBalance, liquidatorPrevUnderlyingBalance);
         vm.assertEq(alchemistFeeVault.totalDeposits(), 10_000 ether);
+
+        // transmuter recieves the liquidation amount in yield token minus the fee
+        vm.assertApproxEqAbs(
+            IERC20(fakeYieldToken).balanceOf(address(transmuterLogic)), transmuterPreviousBalance + alchemist.convertDebtTokensToYield(earmarked), 1e18
+        );
     }
 
     function testLiquidate_Undercollateralized_Position_With_Earmarked_Debt_Liquidation() external {
