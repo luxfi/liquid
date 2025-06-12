@@ -759,7 +759,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         account.collateralBalance -= creditToYield;
 
         // Transfer the repaid tokens from the account to the transmuter.
-        TokenUtils.safeTransfer(yieldToken, address(this), creditToYield);
+        TokenUtils.safeTransfer(yieldToken, address(transmuter), creditToYield);
         return creditToYield;
     }
 
@@ -982,7 +982,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         uint256 earmarkToRedeem;
         uint256 earmarkPreviousState;
         if (block.number > lastRedemptionBlock && _redemptionWeight != 0) {
-            debtToEarmark = PositionDecay.ScaleByWeightDelta(account.debt - account.earmarked, previousRedemption.earmarkWeight - account.lastAccruedEarmarkWeight);
+            debtToEarmark =
+                PositionDecay.ScaleByWeightDelta(account.debt - account.earmarked, previousRedemption.earmarkWeight - account.lastAccruedEarmarkWeight);
 
             earmarkPreviousState = account.earmarked + debtToEarmark;
             earmarkToRedeem = PositionDecay.ScaleByWeightDelta(earmarkPreviousState, _redemptionWeight - account.lastAccruedRedemptionWeight);
@@ -1047,7 +1048,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         uint256 earmarkedPreviousState;
         uint256 earmarkToRedeem;
         if (block.number > lastRedemptionBlock && _redemptionWeight != 0) {
-            debtToEarmark = PositionDecay.ScaleByWeightDelta(account.debt - account.earmarked, previousRedemption.earmarkWeight - account.lastAccruedEarmarkWeight);
+            debtToEarmark =
+                PositionDecay.ScaleByWeightDelta(account.debt - account.earmarked, previousRedemption.earmarkWeight - account.lastAccruedEarmarkWeight);
 
             earmarkedPreviousState = account.earmarked + debtToEarmark;
             earmarkToRedeem = PositionDecay.ScaleByWeightDelta(earmarkedPreviousState, _redemptionWeight - account.lastAccruedRedemptionWeight);
