@@ -811,7 +811,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
                 collateralInUnderlying, account.debt, minimumCollateralization, alchemistCurrentCollateralization, globalMinimumCollateralization, liquidatorFee
             );
 
-            uint256 feeBonus = debtToBurn * liquidatorFee / BPS;
+            uint256 feeBonusInDebtTokens = debtToBurn * liquidatorFee / BPS;
+            uint256 feeBonus = normalizeDebtTokensToUnderlying(feeBonusInDebtTokens);
             uint256 adjustedLiquidationAmount = convertDebtTokensToYield(liquidationAmount);
             uint256 adjustedDebtToBurn = convertDebtTokensToYield(debtToBurn);
             debtAmount = adjustedLiquidationAmount;
