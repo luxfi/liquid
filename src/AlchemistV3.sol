@@ -729,7 +729,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /**
      * @notice Force repays earmarked debt of the account owned by `accountId` using account's collateral balance.
      * @param accountId The tokenId of the account to repay from.
-     * @param amount The amount to repay in yield tokens.
+     * @param amount The amount to repay in debt tokens.
      * @return creditToYield The amount of yield tokens repaid.
      */
     function _forceRepay(uint256 accountId, uint256 amount) internal returns (uint256) {
@@ -748,14 +748,12 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         // Burning yieldTokens will pay off all types of debt
         _checkState((debt = account.debt) > 0);
 
-        uint256 yieldToDebt = convertYieldTokensToDebt(amount);
-        uint256 credit = yieldToDebt > debt ? debt : yieldToDebt;
+        uint256 credit = amount > debt ? debt : amount;
         uint256 creditToYield = convertDebtTokensToYield(credit);
         _subDebt(accountId, credit);
 
         // Repay debt from earmarked amount of debt first
         account.earmarked -= credit > account.earmarked ? account.earmarked : credit;
-
         account.collateralBalance -= creditToYield;
 
         // Transfer the repaid tokens from the account to the transmuter.
@@ -793,7 +791,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         // Try to repay earmarked debt if it exists
         uint256 repaidAmountInYield = 0;
         if (account.earmarked > 0) {
-            repaidAmountInYield = _forceRepay(accountId, convertDebtTokensToYield(account.earmarked));
+            repaidAmountInYield = _forceRepay(accountId, account.earmarked);
         }
         // If debt is fully cleared, return with only the repaid amount, no liquidation, no liquidation fees
         if (account.debt == 0) {
@@ -833,7 +831,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
             }
 
             // excess fee will be sent in underlying token to the liquidator.
-            // since debt token is 1 : 1 with underyling token
             if (feeBonus > 0) {
                 uint256 vaultBalance = IFeeVault(alchemistFeeVault).totalDeposits();
                 if (vaultBalance > 0) {
