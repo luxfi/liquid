@@ -1303,6 +1303,40 @@ contract AlchemistV3Test is Test {
         assertEq(earmarked, (amount / 2) - (amount / 4));
     }
 
+        function testRepayWithEarmarkedDebtWithFee() external {
+        vm.prank(alOwner);
+        // 1%
+        alchemist.setProtocolFee(100);
+
+        uint256 amount = 100e18;
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
+        alchemist.deposit(amount, address(0xbeef), 0);
+        // a single position nft would have been minted to 0xbeef
+        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
+        alchemist.mint(tokenId, (amount / 2), address(0xbeef));
+        vm.stopPrank();
+
+        vm.startPrank(address(0xdad));
+        SafeERC20.safeApprove(address(alToken), address(transmuterLogic), 50e18);
+        transmuterLogic.createRedemption(50e18);
+        vm.stopPrank();
+
+        vm.roll(block.number + 5_256_000);
+
+        vm.prank(address(0xbeef));
+        alchemist.repay(25e18, tokenId);
+
+        (, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
+
+        // All debt is earmarked at this point so these values should be the same
+        assertEq(debt, (amount / 2) - (amount / 4));
+
+        assertEq(earmarked, (amount / 2) - (amount / 4));
+
+        assertEq(IERC20(fakeYieldToken).balanceOf(address(10)), alchemist.convertYieldTokensToDebt(25e18) * 100 / 10_000);
+    }
+
     function testRepayWithEarmarkedDebtPartial() external {
         uint256 amount = 100e18;
         vm.startPrank(address(0xbeef));
