@@ -435,6 +435,7 @@ contract IntegrationTest is Test {
 
         assertEq(debt, 0);
         assertEq(collateral, 100_000e6  - alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10000);
+        assertEq(IERC20(EULER_USDC).balanceOf(receiver), alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10_000);
     }
 
     function testBurnWithEarmarkPartial() external {
