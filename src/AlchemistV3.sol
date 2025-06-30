@@ -473,7 +473,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         // Debt is subject to protocol fee similar to redemptions
         _accounts[recipientId].collateralBalance -= convertDebtTokensToYield(credit) * protocolFee / BPS;
-
+        TokenUtils.safeTransfer(yieldToken, protocolFeeReceiver, convertDebtTokensToYield(credit) * protocolFee / BPS);
+        
         // Update the recipient's debt.
         _subDebt(recipientId, credit);
 
