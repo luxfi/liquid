@@ -519,7 +519,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         // Transfer the repaid tokens to the transmuter.
         TokenUtils.safeTransferFrom(yieldToken, msg.sender, transmuter, creditToYield);
-        TokenUtils.safeTransfer(yieldToken, protocolFeeReceiver, creditToYield);
+        TokenUtils.safeTransfer(yieldToken, protocolFeeReceiver, creditToYield * protocolFee / BPS);
 
         emit Repay(msg.sender, amount, recipientTokenId, creditToYield);
 

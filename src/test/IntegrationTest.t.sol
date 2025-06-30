@@ -246,6 +246,7 @@ contract IntegrationTest is Test {
 
         assertApproxEqAbs(debt, 0, 9201);
         assertEq(collateral, 100_000e6 - alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10000);
+        assertEq(IERC20(EULER_USDC).balanceOf(receiver), alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10_000);
     }
 
     function testRepayEarmarkedFull() external {
@@ -285,6 +286,7 @@ contract IntegrationTest is Test {
         assertApproxEqAbs(earmarked, 0, 9201);
 
         assertApproxEqAbs(IERC20(alchemist.yieldToken()).balanceOf(address(transmuterLogic)), alchemist.convertDebtTokensToYield(maxBorrow), 1);
+        assertEq(IERC20(EULER_USDC).balanceOf(receiver), alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10_000);
     }
 
     function testRepayEarmarkedPartialEarmarked() external {
@@ -324,6 +326,7 @@ contract IntegrationTest is Test {
         assertApproxEqAbs(earmarked, 0, 9201);
 
         assertApproxEqAbs(IERC20(alchemist.yieldToken()).balanceOf(address(transmuterLogic)), alchemist.convertDebtTokensToYield(maxBorrow), 1);
+        assertEq(IERC20(EULER_USDC).balanceOf(receiver), alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10_000);
     }
 
     function testRepayEarmarkedPartialRepayment() external {
@@ -363,6 +366,7 @@ contract IntegrationTest is Test {
         assertApproxEqAbs(earmarked, 0, 9201);
 
         assertApproxEqAbs(IERC20(alchemist.yieldToken()).balanceOf(address(transmuterLogic)), alchemist.convertDebtTokensToYield(maxBorrow) / 2, 1);
+        assertEq(IERC20(EULER_USDC).balanceOf(receiver), (alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10_000) / 2);
     }
 
     function testRepayEarmarkedOverRepayment() external {
