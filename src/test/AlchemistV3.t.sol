@@ -2759,4 +2759,327 @@ contract AlchemistV3Test is Test {
         vm.assertApproxEqAbs(liquidatorPostUnderlyingBalance, liquidatorPrevUnderlyingBalance + expectedFeeInUnderlying, 1e18);
         vm.assertEq(alchemistFeeVault.totalDeposits(), 10_000 ether - expectedFeeInUnderlying);
     }
+
+    function testPoc_Invariant_TotalDebt_Vs_CumulativeEarmark_Broken_After_FullRepay() external {
+        uint256 debtAmountToMint = 50e18; // 0xbeef mints 50 alToken
+        uint256 transmuterRedemptionAmount = 30e18; // 0xdad creates redemption for 30 alToken
+        vm.startPrank(address(0xbeef));
+        uint256 yieldToDeposit = 100e18;
+        uint256 yieldToRepayFullDebt = alchemist.convertDebtTokensToYield(debtAmountToMint);
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), type(uint256).max); // Approve for
+        alchemist.deposit(100e18, address(0xbeef), 0);
+        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
+        alchemist.mint(tokenId, debtAmountToMint, address(0xbeef));
+        vm.stopPrank();
+        assertEq(alchemist.totalDebt(), debtAmountToMint, "Initial total debt mismatch");
+        uint256 initialCumulativeEarmarked = alchemist.cumulativeEarmarked(); // Should be 0 if no prior activity
+        // --- Setup: 0xdad creates redemption in Transmuter ---
+        deal(address(alToken), address(0xdad), transmuterRedemptionAmount);
+        vm.startPrank(address(0xdad));
+        SafeERC20.safeApprove(address(alToken), address(transmuterLogic), type(uint256).max);
+        transmuterLogic.createRedemption(transmuterRedemptionAmount);
+        vm.stopPrank();
+        // --- Advance time to allow earmarking ---
+        vm.roll(block.number + 100); // Advance some blocks
+        // --- 0xbeef fully repays debt ---
+        vm.startPrank(address(0xbeef));
+        uint256 preRepayBalance = fakeYieldToken.balanceOf(address(0xbeef));
+        alchemist.repay(yieldToRepayFullDebt, tokenId);
+        vm.stopPrank();
+        vm.roll(block.number + 1);
+        alchemist.poke(tokenId); //underflow in _earmark
+    }
+
+    function test_poc_badDebtRatioIncreaseFasterAtClaimRedemption() external {
+        uint256 amount = 200_000e18; // 200,000 yvdai
+        vm.startPrank(someWhale);
+        fakeYieldToken.mint(whaleSupply, someWhale);
+        vm.stopPrank();
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
+        alchemist.deposit(amount, address(0xbeef), 0);
+        // a single position nft would have been minted to 0xbeef
+        uint256 tokenIdFor0xBeef = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
+        alchemist.mint(tokenIdFor0xBeef, alchemist.totalValue(tokenIdFor0xBeef) * FIXED_POINT_SCALAR / minimumCollateralization, address(0xbeef));
+        // 0xbeef transfer some synthetic to 0xdad
+        uint256 amountToRedeem = 100_000e18;
+        uint256 amountToRedeem2 = 10_000e18;
+        alToken.transfer(address(0xdad), amountToRedeem + amountToRedeem2);
+        vm.stopPrank();
+        // 0xdad create redemption, here we create multiple redemptions to test the poc
+        vm.startPrank(address(0xdad));
+        SafeERC20.safeApprove(address(alToken), address(transmuterLogic), amountToRedeem + amountToRedeem2);
+        transmuterLogic.createRedemption(amountToRedeem);
+        transmuterLogic.createRedemption(amountToRedeem2);
+        vm.stopPrank();
+        // lets full mature the redemption
+        vm.roll(block.number + (5_256_000)+1);
+        // create global system bad debt
+        // modify yield token price via modifying underlying token supply
+        (uint256 prevCollateral, uint256 prevDebt,) = alchemist.getCDP(tokenIdFor0xBeef);
+        // ensure initial debt is correct
+        vm.assertApproxEqAbs(prevDebt, 180_000_000_000_000_000_018_000, minimumDepositOrWithdrawalLoss);
+        uint256 initialVaultSupply = IERC20(address(fakeYieldToken)).totalSupply();
+        fakeYieldToken.updateMockTokenSupply(initialVaultSupply);
+        // increasing yeild token suppy by 12% while keeping the unederlying supply unchanged
+        uint256 modifiedVaultSupply = (initialVaultSupply * 1200 / 10_000) + initialVaultSupply;
+        fakeYieldToken.updateMockTokenSupply(modifiedVaultSupply);
+        for (uint256 i = 1; i <= 2; i++) {
+        console.log("[*] redemption no: ", i);
+        // calculate bad debt ratio
+        uint256 currentBadDebt = alchemist.totalSyntheticsIssued() * 10**TokenUtils.expectDecimals(alchemist.yieldToken()) / alchemist.getTotalUnderlyingValue();
+        console.log("current bad debt ratio before redemption: ", currentBadDebt);
+        // 0xdad claim redemption
+        vm.startPrank(address(0xdad));
+        transmuterLogic.claimRedemption(i);
+        vm.stopPrank();
+        // calculate bad debt ratio
+        currentBadDebt = alchemist.totalSyntheticsIssued() * 10**TokenUtils.expectDecimals(alchemist.yieldToken()) / alchemist.getTotalUnderlyingValue();
+        console.log("current bad debt ratio after redemption: ", currentBadDebt);
+        }
+    }
+
+    function testClaimRdemtionNotDebtTokensburned() external {
+        //@audit medium 12
+        vm.prank(alOwner);
+        // 1%
+        alchemist.setProtocolFee(100);
+        uint256 amount = 100e18;
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
+        alchemist.deposit(amount, address(0xbeef), 0);
+        // a single position nft would have been minted to 0xbeef
+        uint256 tokenIdFor0xBeef = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
+        alchemist.mint(tokenIdFor0xBeef, (amount / 2), address(0xbeef));
+        vm.assertApproxEqAbs(IERC20(alToken).balanceOf(address(0xbeef)), (amount / 2), minimumDepositOrWithdrawalLoss);
+        vm.stopPrank();
+        vm.startPrank(externalUser);
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
+        alchemist.deposit(amount, externalUser, 0);
+        // a single position nft would have been minted to 0xbeef
+        uint256 tokenIdForExternalUser = AlchemistNFTHelper.getFirstTokenId(externalUser, address(alchemistNFT));
+        alchemist.mint(tokenIdForExternalUser, (amount / 2), externalUser);
+        vm.assertApproxEqAbs(IERC20(alToken).balanceOf(externalUser), (amount / 2), minimumDepositOrWithdrawalLoss);
+        vm.stopPrank();
+        vm.startPrank(address(0xdad));
+        SafeERC20.safeApprove(address(alToken), address(transmuterLogic), 50e18);
+        transmuterLogic.createRedemption(50e18);
+        vm.stopPrank();
+        vm.roll(block.number + 5_256_000 / 2);
+        uint256 synctectiAssetBefore = alchemist.totalSyntheticsIssued();
+        vm.startPrank(address(0xdad));
+        fakeYieldToken.transfer(address(transmuterLogic),amount );
+        transmuterLogic.claimRedemption(1);
+        vm.stopPrank();
+        uint256 synctectiAssetAfter = alchemist.totalSyntheticsIssued();
+        assertEq(synctectiAssetBefore - (25e18), synctectiAssetAfter);
+    }
+
+    function testCrashDueToWeightIncrementCheck() external {
+        bytes memory expectedError = "WeightIncrement: increment > total";
+        // 1. Create a position
+        uint256 amount = 100e18;
+        address user = address(0xbeef);
+        vm.startPrank(user);
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), type(uint256).max);
+        alchemist.deposit(amount, user, 0);
+        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(user, address(alchemistNFT));
+        uint256 borrowedAmount = amount / 2; // Arbitrary, can be fuzzed over.
+        alchemist.mint(tokenId, borrowedAmount, user);
+        vm.stopPrank();
+        // 2. Create a redemption
+        // This populates the queryGraph with values.
+        // After timeToTransmute has passed, the amount to pull with earmarking
+        vm.startPrank(address(0xdad));
+        SafeERC20.safeApprove(address(alToken), address(transmuterLogic), borrowedAmount);
+        transmuterLogic.createRedemption(borrowedAmount);
+        vm.stopPrank();
+        // 3. Repay any amount.
+        // This sends yield tokens to the transmuter and reduces total debt.
+        // It does not affect what is in the queryGraph.
+        vm.startPrank(user);
+        vm.roll(block.number + 1);
+        alchemist.repay(1, tokenId);
+        vm.stopPrank();
+        // 4. Let the claim mature.
+        vm.roll(block.number + 5_256_000);
+        // The AlchemistV3 will now revert on _earmark(). This is because the amount since last redemption is greater than
+        // the total debt - cumulativeEarmarked.
+        // In other words, the Alchemist believes it owes the Transmuter the full amount that has matured since the last
+        // redemption. But in fact, some of that debt has been repaid already.
+        // Hence, in `WeightIncrement()` total-increment is negative, which is invalid.
+        vm.startPrank(address(0xdad));
+        vm.expectRevert(expectedError); transmuterLogic.claimRedemption(1);
+        vm.stopPrank();
+        // All regular Alchemist operations now revert.
+        vm.startPrank(address(0xbeef));
+        vm.expectRevert(expectedError); alchemist.poke(tokenId);
+        vm.expectRevert(expectedError); alchemist.withdraw(1, user, tokenId);
+        vm.expectRevert(expectedError); alchemist.mint(tokenId, 1, user);
+        vm.expectRevert(expectedError); alchemist.repay(1, tokenId);
+        vm.expectRevert(expectedError); alchemist.burn(1, tokenId);
+        vm.expectRevert(expectedError); alchemist.liquidate(tokenId);
+        vm.stopPrank();
+        vm.expectRevert(expectedError);
+        alchemist.getCDP(tokenId);
+    }
+
+    function testDebtMintingRedemptionWithdraw() external {
+        uint256 amount = 100e18;
+        address debtor = address(0xbeef);
+        address redeemer = address(0xdad);
+        // Mint debt tokens
+        vm.startPrank(debtor);
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
+        alchemist.deposit(amount, debtor, 0);
+        uint256 tokenId = 1;
+        uint256 maxBorrowable = alchemist.getMaxBorrowable(tokenId);
+        alchemist.mint(tokenId, maxBorrowable, debtor);
+        vm.stopPrank();
+        // Create Redemption
+        vm.startPrank(redeemer);
+        SafeERC20.safeApprove(address(alToken), address(transmuterLogic), maxBorrowable);
+        transmuterLogic.createRedemption(maxBorrowable);
+        vm.stopPrank();
+        // Advance time to complete redemption
+        vm.roll(block.number + 5_256_000);
+        // Claim Redemption
+        vm.startPrank(redeemer);
+        transmuterLogic.claimRedemption(1);
+        vm.stopPrank();
+        // Check debt has been reduced to zero
+        (uint256 collateral, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
+        assertApproxEqAbs(debt, 0, 1);
+        assertApproxEqAbs(earmarked, 0, 1);
+        // Attempt to withdraw remaining collateral
+        assertTrue(collateral > 0);
+        console.log(collateral);
+        vm.prank(debtor);
+        alchemist.withdraw(collateral, debtor, tokenId);
+    }
+
+    function testIncrease_minimumCollateralization_DOS_Redemption() external {
+        //set fee to 10% to compensate for wrong deduction of _totalLocked in `redeem()`
+        vm.startPrank(alOwner);
+        alchemist.setProtocolFee(1000);
+        uint256 minimumCollateralizationBefore = alchemist.minimumCollateralization();
+        console.log("minimumCollateralization before", minimumCollateralizationBefore);
+        //deposit some tokens
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), 100e18);
+        alchemist.deposit(100e18, address(0xbeef), 0);
+        // a single position nft would have been minted to 0xbeef
+        uint256 tokenIdFor0xBeef = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
+        //mint some alTokens
+        alchemist.mint(tokenIdFor0xBeef, alchemist.totalValue(tokenIdFor0xBeef) * FIXED_POINT_SCALAR / minimumCollateralization, address(0xbeef));
+        vm.stopPrank();
+        //skip a block to be able to repay
+        vm.roll(block.number + 1);
+        //admit increase minimumCollateralization
+        vm.startPrank(alOwner);
+        alchemist.setMinimumCollateralization(uint256(FIXED_POINT_SCALAR * FIXED_POINT_SCALAR) / 88e16); // 88% collateralization
+        uint256 minimumCollateralizationAfter = alchemist.minimumCollateralization();
+        assertGt(minimumCollateralizationAfter, minimumCollateralizationBefore, "minimumCollateralization should be increased");
+        console.log("minimumCollateralization after", minimumCollateralizationAfter);
+        //try to repay
+        vm.startPrank(address(0xbeef));
+        uint256 alTokenBalanceBeef = alToken.balanceOf(address(0xbeef));
+        //give alowance to alchemist to burn
+        SafeERC20.safeApprove(address(alToken), address(alchemist), alTokenBalanceBeef/2);
+        alchemist.burn(alTokenBalanceBeef/2, tokenIdFor0xBeef);
+        //create a redemption request for 50% of the alToken balance
+        vm.startPrank(address(0xbeef));
+        //give alowance to transmuter to burn
+        alToken.approve(address(transmuterLogic), alTokenBalanceBeef/2);
+        transmuterLogic.createRedemption(alTokenBalanceBeef/2);
+        //make sure redemption can be claimed in full
+        vm.roll(block.number + 6_256_000);
+        //try to call claimRedemption => should revert
+        //expect to revert because of underflow (0x11)
+        vm.expectRevert(abi.encodeWithSignature("Panic(uint256)", 0x11));
+        transmuterLogic.claimRedemption(1);
+    }
+
+    function testSetTransmuterFail() external {
+        //@audit medium 1
+        // this is the user front runing the settrasmuter call
+        uint256 amount = 100e18;
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
+        alchemist.deposit(amount, address(0xbeef), 0);
+        // a single position nft would have been minted to 0xbeef
+        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
+        alchemist.mint(tokenId, (amount / 2), address(0xbeef));
+        vm.assertApproxEqAbs(IERC20(alToken).balanceOf(address(0xbeef)), (amount / 2), minimumDepositOrWithdrawalLoss);
+        vm.stopPrank();
+        vm.startPrank(address(0xdad));
+        SafeERC20.safeApprove(address(alToken), address(transmuterLogic), 50e18);
+        transmuterLogic.createRedemption(50e18);
+        vm.stopPrank();
+        vm.prank(alOwner);
+        alchemist.setTransmuter(address(0xbeef));
+    }
+
+    function testDepositCanBeDoSed() external {
+        // Initial setup - deposit and borrow
+        uint256 depositAmount = 1000e18;
+        uint256 borrowAmount = 900e18;
+        //Malicious user directly transfering token
+        address attacker = makeAddr("attacker");
+        uint depositCap = alchemist.depositCap();
+        deal(address(fakeYieldToken), attacker, depositCap);
+        vm.prank(attacker);
+        fakeYieldToken.transfer(address(alchemist), depositCap);
+        // User makes a deposit and borrows
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), depositAmount);
+        alchemist.deposit(depositAmount, address(0xbeef), 0);
+        vm.stopPrank();
+    }
+
+    function test_Burn() external {
+        uint256 depositAmount = 1_000e18; // Each user deposits 1,000
+        uint256 mintAmount = 500e18; // Each user mints 500
+        uint256 repayAmount = 500e18; // User2 repays 500
+        uint256 redemptionAmount = 500e18; // User3 creates redemption for 500
+        uint256 burnAmount = 400e18; // User1 tries to burn 400
+        // Step 1: User1 deposits and mints
+        console.log("Step 1: User1 deposits and mints");
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), depositAmount);
+        alchemist.deposit(depositAmount, address(0xbeef), 0);
+        uint256 tokenIdForUser1 = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
+        alchemist.mint(tokenIdForUser1, mintAmount, address(0xbeef));
+        vm.stopPrank();
+        // Step 2: User2 deposits and mints
+        console.log("Step 2: User2 deposits and mints");
+        vm.startPrank(address(0xdad));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), depositAmount);
+        alchemist.deposit(depositAmount, address(0xdad), 0);
+        uint256 tokenIdForUser2 = AlchemistNFTHelper.getFirstTokenId(address(0xdad), address(alchemistNFT));
+        alchemist.mint(tokenIdForUser2, mintAmount, address(0xdad));
+        vm.stopPrank();
+        // Step 3: User2 repays all debts
+        console.log("Step 3: User2 repays all debts");
+        vm.roll(block.number + 1_000); // Simulate time passing
+        vm.startPrank(address(0xdad));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), repayAmount);
+        alchemist.repay(repayAmount, tokenIdForUser2);
+        vm.stopPrank();
+        // Step 4: User3 creates redemption
+        // Now transmuter has enough yield tokens to cover the redemption
+        console.log("Step 4: User3 creates redemption");
+        vm.startPrank(anotherExternalUser);
+        SafeERC20.safeApprove(address(alToken), address(transmuterLogic), redemptionAmount);
+        transmuterLogic.createRedemption(redemptionAmount);
+        vm.stopPrank();
+        // Step 5: User1 tries to burn his debt
+        // This should succeed because transmuter has enough yield tokens to cover the redemption,
+        // However it fails
+        console.log("Step 5: User1 tries to burn his debt");
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(alToken), address(alchemist), burnAmount);
+        alchemist.burn(burnAmount, tokenIdForUser1);
+        vm.stopPrank();
+    }
 }

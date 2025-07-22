@@ -52,6 +52,8 @@ struct Account {
     uint256 lastCollateralWeight;
     /// @notice Block of the most recent mint 
     uint256 lastMintBlock;
+    /// @notice The block that the last redemption was synced to the account.
+    uint256 lastRedemptionSync;
     /// @notice The un-scaled locked collateral.
     uint256 rawLocked;
     /// @notice allowances for minting alAssets, per version.
@@ -261,6 +263,20 @@ interface IAlchemistV3Actions {
     ///
     /// @param amount The amount of tokens to redeem.
     function redeem(uint256 amount) external;
+
+    /// @notice Reduces syntheticTokensIssued by `amount`.
+    ///
+    /// @notice This function is only callable by the transmuter.
+    ///
+    /// @param amount The amount of tokens burned during redemption.
+    function reduceSyntheticsIssued(uint256 amount) external;
+
+    /// @notice Sets lastTransmuterTokenBalance to `amount`.
+    ///
+    /// @notice This function is only callable by the transmuter.
+    ///
+    /// @param amount The balance of the transmuter.
+    function setTransmuterTokenBalance(uint256 amount) external;
 
     /// @notice Resets all mint allowances by account managed by `tokenId`.
     ///
@@ -597,6 +613,8 @@ interface IAlchemistV3State {
     function lastEarmarkBlock() external view returns (uint256 block);
 
     function lastRedemptionBlock() external view returns (uint256 block);
+
+    function lastTransmuterTokenBalance() external view returns (uint256 balance);
 
     function totalDebt() external view returns (uint256 debt);
 
