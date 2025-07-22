@@ -6,7 +6,7 @@ import {ITokenAdapter} from "./interfaces/ITokenAdapter.sol";
 import {ITransmuter} from "./interfaces/ITransmuter.sol";
 import {IAlchemistV3Position} from "./interfaces/IAlchemistV3Position.sol";
 import {IAlchemistETHVault} from "./interfaces/IAlchemistETHVault.sol";
-import {IFeeVault} from "./interfaces/IFeeVault.sol";
+import {IVaultV2} from "../lib/vault-v2/src/interfaces/IVaultV2.sol";
 
 import "./libraries/PositionDecay.sol";
 import {TokenUtils} from "./libraries/TokenUtils.sol";
@@ -17,8 +17,8 @@ import {Unauthorized, IllegalArgument, IllegalState, MissingInputData} from "./b
 import {IERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {IPriceFeedAdapter} from "./adapters/ETHUSDPriceFeedAdapter.sol";
 import {IAlchemistTokenVault} from "./interfaces/IAlchemistTokenVault.sol";
+import "forge-std/console.sol";
 
-import {console} from "forge-std/console.sol";
 
 /// @title  AlchemistV3
 /// @author Alchemix Finance
@@ -207,7 +207,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     /// @inheritdoc IAlchemistV3AdminActions
     function setAlchemistFeeVault(address value) external onlyAdmin {
-        if (IFeeVault(value).token() != underlyingToken) {
+        if (IVaultV2(value).asset() != underlyingToken) {
             revert AlchemistVaultTokenMismatchError();
         }
         alchemistFeeVault = value;
@@ -407,7 +407,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         // Assure that the collateralization invariant is still held.
         _validate(tokenId);
-
         // Transfer the yield tokens to msg.sender
         TokenUtils.safeTransfer(yieldToken, recipient, amount);
         _yieldTokensDeposited -= amount;
@@ -859,15 +858,11 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         if (feeInYield > 0 && account.collateralBalance >= feeInYield) {
             TokenUtils.safeTransfer(yieldToken, msg.sender, feeInYield);
         }
-
-        // Handle outsourced fee from vault
-        if (outsourcedFee > 0) {
-            uint256 vaultBalance = IFeeVault(alchemistFeeVault).totalDeposits();
-            if (vaultBalance > 0) {
-                uint256 feeBonus = normalizeDebtTokensToUnderlying(outsourcedFee);
-                feeInUnderlying = vaultBalance > feeBonus ? feeBonus : vaultBalance;
-                IFeeVault(alchemistFeeVault).withdraw(msg.sender, feeInUnderlying);
-            }
+        if (outsourcedFee > 0 ) {
+            uint256 vaultBalance = IERC20(IVaultV2(alchemistFeeVault).asset()).balanceOf(alchemistFeeVault);
+            uint256 feeBonus = normalizeDebtTokensToUnderlying(outsourcedFee);
+            feeInUnderlying = vaultBalance > feeBonus ? feeBonus : vaultBalance;
+            TokenUtils.safeTransfer(yieldToken, msg.sender, feeInUnderlying);
         }
 
         return (amountLiquidated + repaidAmountInYield, feeInYield, feeInUnderlying);
@@ -1185,4 +1180,5 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         // gross collateral seize = net + fee
         grossCollateralToSeize = debtToBurn + fee;
     }
+
 }
