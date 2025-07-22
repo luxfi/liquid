@@ -6,7 +6,7 @@ import {ITokenAdapter} from "./interfaces/ITokenAdapter.sol";
 import {ITransmuter} from "./interfaces/ITransmuter.sol";
 import {IAlchemistV3Position} from "./interfaces/IAlchemistV3Position.sol";
 import {IAlchemistETHVault} from "./interfaces/IAlchemistETHVault.sol";
-import {IFeeVault} from "./interfaces/IFeeVault.sol";
+import {IVaultV2} from "../lib/vault-v2/src/interfaces/IVaultV2.sol";
 
 import "./libraries/PositionDecay.sol";
 import {TokenUtils} from "./libraries/TokenUtils.sol";
@@ -18,7 +18,8 @@ import {IERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20
 import {IPriceFeedAdapter} from "./adapters/ETHUSDPriceFeedAdapter.sol";
 import {IAlchemistTokenVault} from "./interfaces/IAlchemistTokenVault.sol";
 
-/// @title  AlchemistV3
+import "forge-std/console.sol";
+/// @title  AlchemistV3w
 /// @author Alchemix Finance
 contract AlchemistV3 is IAlchemistV3, Initializable {
     using SafeCast for int256;
@@ -193,7 +194,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     /// @inheritdoc IAlchemistV3AdminActions
     function setAlchemistFeeVault(address value) external onlyAdmin {
-        if (IFeeVault(value).token() != underlyingToken) {
+        if (IVaultV2(value).asset() != underlyingToken) {
             revert AlchemistVaultTokenMismatchError();
         }
         alchemistFeeVault = value;
@@ -397,7 +398,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         // Assure that the collateralization invariant is still held.
         _validate(tokenId);
-
         // Transfer the yield tokens to msg.sender
         TokenUtils.safeTransfer(yieldToken, recipient, amount);
 
@@ -834,10 +834,14 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
             // excess fee will be sent in underlying token to the liquidator.
             // since debt token is 1 : 1 with underyling token
             if (feeBonus > 0) {
-                uint256 vaultBalance = IFeeVault(alchemistFeeVault).totalDeposits();
+                assert(address(IVaultV2(alchemistFeeVault).asset()) == underlyingToken);
+                uint256 vaultBalance = IERC20(IVaultV2(alchemistFeeVault).asset()).balanceOf(alchemistFeeVault);
                 if (vaultBalance > 0) {
                     feeInUnderlying = vaultBalance > feeBonus ? feeBonus : vaultBalance;
-                    IFeeVault(alchemistFeeVault).withdraw(msg.sender, feeInUnderlying);
+
+                    //IVaultV2(alchemistFeeVault).withdraw(feeInUnderlying, msg.sender, msg.sender);
+                    //IERC20(IVaultV2(alchemistFeeVault).asset()).transferFrom(address(this), msg.sender, feeInUnderlying);
+                    TokenUtils.safeTransfer(yieldToken, msg.sender, feeInUnderlying);
                 }
             }
         }
