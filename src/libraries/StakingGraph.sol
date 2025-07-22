@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-pragma solidity 0.8.26;
+pragma solidity 0.8.28;
 
 /* Block-granular stake progression tracking for the Transmuter implemented
  * as a double, delta Fenwick tree.  By tracking stake size and range, this

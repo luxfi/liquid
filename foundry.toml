@@ -3,7 +3,7 @@ src = "src"
 out = 'out'
 libs = ['lib']
 remappings = []
-solc_version = "0.8.26"
+solc_version = "0.8.28"
 evm_version = "cancun"
 optimizer_runs = 800
 ignored_error_codes = [1878]
@@ -19,7 +19,7 @@ optimizer = true
 optimizer_runs = 800
 via_ir = false
 evm_version = "cancun"
-solc = "0.8.26"
+solc = "0.8.28"
 verbosity = 2
 ffi = true
 
@@ -36,7 +36,7 @@ optimizer = true
 optimizer_runs = 800
 via_ir = true
 evm_version = "cancun"
-solc = "0.8.26"
+solc = "0.8.28"
 verbosity = 2
 ffi = true
 
