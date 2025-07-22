@@ -18,6 +18,8 @@ import {IERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20
 import {IPriceFeedAdapter} from "./adapters/ETHUSDPriceFeedAdapter.sol";
 import {IAlchemistTokenVault} from "./interfaces/IAlchemistTokenVault.sol";
 
+import {console} from "forge-std/console.sol";
+
 /// @title  AlchemistV3
 /// @author Alchemix Finance
 contract AlchemistV3 is IAlchemistV3, Initializable {
@@ -58,6 +60,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
     /// @inheritdoc IAlchemistV3State
     uint256 public lastRedemptionBlock;
+
+    /// @inheritdoc IAlchemistV3State
+    uint256 public lastTransmuterTokenBalance;
 
     /// @inheritdoc IAlchemistV3State
     uint256 public minimumCollateralization;
@@ -122,6 +127,10 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @dev Total locked collateral.
     /// Locked collateral is the collateral that cannot be withdrawn due to LTV constraints
     uint256 private _totalLocked;
+
+    /// @dev Total yield tokens deposited
+    /// This is used to differentiate between tokens deposited into a CDP and balance of the contract
+    uint256 private _yieldTokensDeposited;
 
     /// @dev User accounts
     mapping(uint256 => Account) private _accounts;
@@ -358,7 +367,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         _checkArgument(recipient != address(0));
         _checkArgument(amount > 0);
         _checkState(!depositsPaused);
-        _checkState(IERC20(yieldToken).balanceOf(address(this)) + amount <= depositCap);
+        _checkState(_yieldTokensDeposited + amount <= depositCap);
         uint256 tokenId = recipientId;
 
         // Only mint a new position if the id is 0
@@ -374,6 +383,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         // Transfer tokens from msg.sender now that the internal storage updates have been committed.
         TokenUtils.safeTransferFrom(yieldToken, msg.sender, address(this), amount);
+        _yieldTokensDeposited += amount;
 
         emit Deposit(amount, tokenId);
 
@@ -400,6 +410,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         // Transfer the yield tokens to msg.sender
         TokenUtils.safeTransfer(yieldToken, recipient, amount);
+        _yieldTokensDeposited -= amount;
 
         emit Withdraw(amount, tokenId, recipient);
 
@@ -464,8 +475,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         uint256 credit = amount > debt ? debt : amount;
 
         // Must only burn enough tokens that the transmuter positions can still be fulfilled
-        if (credit > totalDebt - ITransmuter(transmuter).totalLocked()) {
-            revert BurnLimitExceeded(credit, totalDebt - ITransmuter(transmuter).totalLocked());
+        if (credit > totalSyntheticsIssued - ITransmuter(transmuter).totalLocked()) {
+            revert BurnLimitExceeded(credit, totalSyntheticsIssued - ITransmuter(transmuter).totalLocked());
         }
 
         // Burn the tokens from the message sender
@@ -474,6 +485,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         // Debt is subject to protocol fee similar to redemptions
         _accounts[recipientId].collateralBalance -= convertDebtTokensToYield(credit) * protocolFee / BPS;
         TokenUtils.safeTransfer(yieldToken, protocolFeeReceiver, convertDebtTokensToYield(credit) * protocolFee / BPS);
+        _yieldTokensDeposited -= convertDebtTokensToYield(credit) * protocolFee / BPS;
         
         // Update the recipient's debt.
         _subDebt(recipientId, credit);
@@ -512,6 +524,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         // Repay debt from earmarked amount of debt first
         uint256 earmarkToRemove = credit > account.earmarked ? account.earmarked : credit;
         account.earmarked -= earmarkToRemove;
+        uint256 earmarkPaidGlobal = cumulativeEarmarked > earmarkToRemove ? earmarkToRemove : cumulativeEarmarked;
+        cumulativeEarmarked -= earmarkPaidGlobal;
 
         // Debt is subject to protocol fee similar to redemptions
         account.collateralBalance -= creditToYield * protocolFee / BPS;
@@ -521,6 +535,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         // Transfer the repaid tokens to the transmuter.
         TokenUtils.safeTransferFrom(yieldToken, msg.sender, transmuter, creditToYield);
         TokenUtils.safeTransfer(yieldToken, protocolFeeReceiver, creditToYield * protocolFee / BPS);
+        _yieldTokensDeposited -= creditToYield * protocolFee / BPS;
 
         emit Repay(msg.sender, amount, recipientTokenId, creditToYield);
 
@@ -587,7 +602,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         _collateralWeight += PositionDecay.WeightIncrement(totalOut, old);
         cumulativeEarmarked -= amount;
         totalDebt -= amount;
-        totalSyntheticsIssued -= amount;
 
         lastRedemptionBlock = block.number;
 
@@ -595,8 +609,19 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         TokenUtils.safeTransfer(yieldToken, transmuter, collRedeemed);
         TokenUtils.safeTransfer(yieldToken, protocolFeeReceiver, feeCollateral);
+        _yieldTokensDeposited -= collRedeemed + feeCollateral;
 
         emit Redemption(amount);
+    }
+
+    ///@inheritdoc IAlchemistV3Actions
+    function reduceSyntheticsIssued(uint256 amount) external onlyTransmuter {
+        totalSyntheticsIssued -= amount;
+    }
+
+    ///@inheritdoc IAlchemistV3Actions
+    function setTransmuterTokenBalance(uint256 amount) external onlyTransmuter {
+        lastTransmuterTokenBalance = amount;
     }
 
     /// @inheritdoc IAlchemistV3Actions
@@ -760,7 +785,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         account.collateralBalance -= creditToYield;
 
         // Transfer the repaid tokens from the account to the transmuter.
-        TokenUtils.safeTransfer(yieldToken, address(this), creditToYield);
+        TokenUtils.safeTransfer(yieldToken, address(transmuter), creditToYield);
+        _yieldTokensDeposited -= creditToYield;
+
         return creditToYield;
     }
 
@@ -826,10 +853,12 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
             // send liquidation amount - any fee to the transmuter. the transmuter only accepts yield tokens
             TokenUtils.safeTransfer(yieldToken, transmuter, adjustedDebtToBurn);
+            _yieldTokensDeposited -= adjustedDebtToBurn;
 
             if (feeInYield > 0) {
                 // send base fee in yield tokens to liquidator
                 TokenUtils.safeTransfer(yieldToken, msg.sender, feeInYield);
+                _yieldTokensDeposited -= feeInYield;
             }
 
             // excess fee will be sent in underlying token to the liquidator.
@@ -982,7 +1011,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         // Recreate account state at last redemption block if the redemption was in the past
         uint256 earmarkToRedeem;
         uint256 earmarkPreviousState;
-        if (block.number > lastRedemptionBlock && _redemptionWeight != 0) {
+        if (block.number > lastRedemptionBlock && lastRedemptionBlock > account.lastRedemptionSync &&_redemptionWeight != 0) {
             debtToEarmark = PositionDecay.ScaleByWeightDelta(account.debt - account.earmarked, previousRedemption.earmarkWeight - account.lastAccruedEarmarkWeight);
 
             earmarkPreviousState = account.earmarked + debtToEarmark;
@@ -998,10 +1027,12 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         account.debt -= earmarkToRedeem;
         account.lastAccruedRedemptionWeight = _redemptionWeight;
         account.lastAccruedEarmarkWeight = _earmarkWeight;
+        account.lastRedemptionSync = block.number;
         // Redeem user collateral equal to value of debt tokens redeemed
         account.collateralBalance -= collateralToRemove;
-        account.rawLocked -= collateralToRemove;
+        account.rawLocked -= collateralToRemove * minimumCollateralization / FIXED_POINT_SCALAR;
         account.lastCollateralWeight = _collateralWeight;
+        account.freeCollateral = account.collateralBalance - account.rawLocked;
     }
 
     /// @dev Earmarks the debt for redemption.
@@ -1009,7 +1040,11 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         if (totalDebt == 0) return;
 
         if (block.number > lastEarmarkBlock) {
+            // Check what the transmuter will cover and subtract this from what is needed from earmarks
+            uint256 transmuterCurrentBalance = TokenUtils.safeBalanceOf(yieldToken, address(transmuter));
+            uint256 transmuterDifference = transmuterCurrentBalance < lastTransmuterTokenBalance ? 0 : transmuterCurrentBalance - lastTransmuterTokenBalance;
             uint256 amount = ITransmuter(transmuter).queryGraph(lastEarmarkBlock + 1, block.number);
+            amount = amount < convertYieldTokensToDebt(transmuterDifference) ? amount : amount - convertYieldTokensToDebt(transmuterDifference);
             if (amount > 0) {
                 _earmarkWeight += PositionDecay.WeightIncrement(amount, totalDebt - cumulativeEarmarked);
                 cumulativeEarmarked += amount;

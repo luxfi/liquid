@@ -64,7 +64,11 @@ contract MockAlchemist {
         }
     }
 
-    function adjustTotalSyntheticsIssued(uint256 amount) external {
+    function reduceSyntheticsIssued(uint256 amount) external {
+        
+    }
+
+    function setTransmuterTokenBalance(uint256 amount) external {
 
     }
 
@@ -231,8 +235,8 @@ contract TransmuterTest is Test {
     }
 
     function testClaimRedemptionBadDebt() public {
-        deal(address(collateralToken), address(transmuter), uint256(type(int256).max) / 1e20);
-
+        deal(address(collateralToken), address(transmuter), 200e18);
+        alchemist.setSyntheticsIssued(1200e18);
         vm.prank(address(0xbeef));
         transmuter.createRedemption(100e18);
 
@@ -241,7 +245,7 @@ contract TransmuterTest is Test {
         assertEq(collateralToken.balanceOf(address(0xbeef)), 0);
         assertEq(alETH.balanceOf(address(transmuter)), 100e18);
 
-        alchemist.setUnderlyingValue((type(uint256).max / 1e20) / 2);
+        alchemist.setUnderlyingValue(200e18);
 
         vm.prank(address(0xbeef));
         transmuter.claimRedemption(1);
@@ -452,5 +456,16 @@ contract TransmuterTest is Test {
         uint256 treeQuery = transmuter.queryGraph(block.number - (5_256_000 / 2) + 1, block.number);
 
         assertApproxEqAbs(treeQuery, 50e18, 1);
+    }
+
+    function testClaimRedemption_division() public {
+        deal(address(collateralToken), address(transmuter), uint256(type(int256).max) / 1e20);
+        vm.prank(address(0xbeef));
+        transmuter.createRedemption(100e18);
+        vm.roll(block.number + 5_256_000); // Mature the staking position
+        alchemist.setUnderlyingValue(0); // Simulate all users exiting with 0 underlying left
+        emit log_named_uint("total token there",alchemist.getTotalUnderlyingValue());
+        vm.prank(address(0xbeef));
+        transmuter.claimRedemption(1);
     }
 }

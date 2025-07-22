@@ -545,4 +545,49 @@ contract IntegrationTest is Test {
 
         assertEq(earmarked, 0);
     }
+
+    function testAudit_Sync_IncorrectEarmarkWeightUpdate() external {
+        uint256 bn = block.number;
+        // 1. Add collateral and mints 10,000 alUSD as debt
+        vm.startPrank(address(0xbeef));
+        IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
+        alchemist.deposit(1e5 * 1e6, address(0xbeef), 0);
+        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
+        alchemist.mint(tokenId, 1e4 * 1e6, address(0xbeef));
+        vm.stopPrank();
+        // 2. Create a redemption for 1,000 alUSD
+        vm.startPrank(address(0xdad));
+        IERC20(alUSD).approve(address(transmuterLogic), 1e3 * 1e6);
+        transmuterLogic.createRedemption(1e3 * 1e6);
+        vm.stopPrank();
+        vm.roll(bn += 5_256_000);
+        // 3. Claim redemption
+        vm.prank(address(0xdad));
+        transmuterLogic.claimRedemption(1);
+        vm.roll(bn += 1);
+        // 4. Update debt and earmark
+        vm.prank(address(0xbeef));
+        alchemist.poke(tokenId);
+        (, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
+        assertEq(debt, 9e3 * 1e6); // 10,000 - 1,000
+        assertEq(earmarked, 0);
+        // 5. Create another redemption for 1,000 alUSD
+        vm.startPrank(address(0xdad));
+        IERC20(alUSD).approve(address(transmuterLogic), 1e3 * 1e6);
+        transmuterLogic.createRedemption(1e3 * 1e6);
+        vm.stopPrank();
+        vm.roll(bn += 5_256_000);
+        // 6. Update debt and earmark
+        vm.prank(address(0xbeef));
+        alchemist.poke(tokenId);
+        // 7. Create another redemption for 1,000 alUSD
+        vm.startPrank(address(0xdad));
+        IERC20(alUSD).approve(address(transmuterLogic), 1e3 * 1e6);
+        transmuterLogic.createRedemption(1e3 * 1e6);
+        vm.stopPrank();
+        vm.roll(bn += 5_256_000);
+        // 8. Update debt and earmark
+        vm.prank(address(0xbeef));
+        alchemist.poke(tokenId);
+    }
 }
