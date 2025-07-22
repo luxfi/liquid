@@ -1,4 +1,4 @@
-pragma solidity 0.8.26;
+pragma solidity 0.8.28;
 
 import {Base64} from "@openzeppelin/contracts/utils/Base64.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
