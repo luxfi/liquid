@@ -28,6 +28,8 @@ import {IAlchemistV3Position} from "../interfaces/IAlchemistV3Position.sol";
 import {AggregatorV3Interface} from "../../lib/chainlink-brownie-contracts/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {TokenUtils} from "../libraries/TokenUtils.sol";
 import {AlchemistTokenVault} from "../AlchemistTokenVault.sol";
+import {VaultV2Factory} from "../../lib/vault-v2/src/VaultV2Factory.sol";
+import {IVaultV2} from "../../lib/vault-v2/src/interfaces/IVaultV2.sol";
 
 contract AlchemistV3Test is Test {
     // ----- [SETUP] Variables for setting up a minimal CDP -----
@@ -36,7 +38,7 @@ contract AlchemistV3Test is Test {
     AlchemistV3 alchemist;
     Transmuter transmuter;
     AlchemistV3Position alchemistNFT;
-    AlchemistTokenVault alchemistFeeVault;
+    IVaultV2 alchemistFeeVault;
 
     // // Proxy variables
     TransparentUpgradeableProxy proxyAlchemist;
@@ -52,6 +54,18 @@ contract AlchemistV3Test is Test {
     // Token addresses
     TestERC20 fakeUnderlyingToken;
     TestYieldToken fakeYieldToken;
+
+    VaultV2Factory vaultFactory;
+
+    // Total minted debt
+    uint256 public minted;
+
+    // Total debt burned
+    uint256 public burned;
+
+    // Total tokens sent to transmuter
+    uint256 public sentToTransmuter;
+
 
     // Parameters for AlchemicTokenV2
     string public _name;
@@ -191,8 +205,11 @@ contract AlchemistV3Test is Test {
         alchemistNFT = new AlchemistV3Position(address(alchemist));
         alchemist.setAlchemistPositionNFT(address(alchemistNFT));
 
-        alchemistFeeVault = new AlchemistTokenVault(address(fakeUnderlyingToken), address(alchemist), alOwner);
-        alchemistFeeVault.setAuthorization(address(alchemist), true);
+
+        vaultFactory = new VaultV2Factory();
+        alchemistFeeVault = IVaultV2(vaultFactory.createVaultV2(address(alchemist), address(fakeUnderlyingToken), bytes32("salt")));
+        // TODO gate the vault withdraw to alchemist
+        // alchemistFeeVault.setAuthorization(address(alchemist), true);
         alchemist.setAlchemistFeeVault(address(alchemistFeeVault));
         vm.stopPrank();
 
@@ -475,11 +492,35 @@ contract AlchemistV3Test is Test {
         assertEq(alchemist.loansPaused(), false);
     }
 
+    function testDeployNewFeeVaultSameToken() external {
+            address proxyOwner = address(this);
+            AlchemistInitializationParams memory params = AlchemistInitializationParams({
+                    admin: alOwner,
+                    debtToken: address(alToken),
+                    underlyingToken: address(fakeUnderlyingToken),
+                    yieldToken: address(fakeYieldToken),
+                    blocksPerYear: 2_600_000,
+                    depositCap: type(uint256).max,
+                    minimumCollateralization: minimumCollateralization,
+                    collateralizationLowerBound: 1_052_631_578_950_000_000, // 1.05 collateralization
+                    globalMinimumCollateralization: 1_111_111_111_111_111_111, // 1.1
+                    tokenAdapter: address(fakeYieldToken),
+                    transmuter: address(transmuterLogic),
+                    protocolFee: 0,
+                    protocolFeeReceiver: address(10),
+                    liquidatorFee: liquidatorFeeBPS
+            });
+
+            bytes memory alchemParams = abi.encodeWithSelector(AlchemistV3.initialize.selector, params);
+            proxyAlchemist = new TransparentUpgradeableProxy(address(alchemistLogic), proxyOwner, alchemParams);
+            alchemist = AlchemistV3(address(proxyAlchemist));
+    }
+    
     function testDeposit_New_Position(uint256 amount) external {
-        amount = bound(amount, FIXED_POINT_SCALAR, 1000e18);
-        vm.startPrank(address(0xbeef));
-        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
-        alchemist.deposit(amount, address(0xbeef), 0);
+            amount = bound(amount, FIXED_POINT_SCALAR, 1000e18);
+            vm.startPrank(address(0xbeef));
+            SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
+            alchemist.deposit(amount, address(0xbeef), 0);
 
         // a single position nft would have been minted to address(0xbeef)
         uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
