@@ -45,7 +45,7 @@ contract PermissionedProxy {
         emit AddedPermissionedCall(sig);
     }
 
-    function proxy(address vault, bytes memory data) external onlyAdmin {
+    function proxy(address vault, bytes memory data) external payable onlyAdmin {
         bytes4 selector;
         require(data.length >= 4, "SEL");
         assembly {
@@ -53,7 +53,7 @@ contract PermissionedProxy {
         }
         require(!permissionedCalls[selector], "PD");
 
-        (bool success, ) = vault.delegatecall(data);
+        (bool success, ) = vault.call{value: msg.value}(data);
         require(success, "failed");
     }
 }
