@@ -24,11 +24,11 @@ library StakingGraph {
     uint256 private constant PRODUCT_BITS = 256-DELTA_BITS;
 
     //MIN/MAX constants for DELTA and PRODUCT
-    int256 private constant DELTA_MAX = int256(2**DELTA_BITS)-1;
-    int256 private constant DELTA_MIN = -int256(2**DELTA_BITS);
-    int256 private constant PRODUCT_MAX = int256(2**PRODUCT_BITS)-1;
-    int256 private constant PRODUCT_MIN = -int256(2**PRODUCT_BITS);
-
+    int256 private constant DELTA_MAX = int256(2**DELTA_BITS - 1)-1;
+    int256 private constant DELTA_MIN = -int256(2**DELTA_BITS - 1);
+    int256 private constant PRODUCT_MAX = int256(2**PRODUCT_BITS - 1)-1;
+    int256 private constant PRODUCT_MIN = -int256(2**PRODUCT_BITS - 1);
+    
     //Maximum graph size as per bit-split, 32-bit for 112 DELTA_BITS
     uint256 private constant GRAPH_MAX = 2**(PRODUCT_BITS-DELTA_BITS);
 

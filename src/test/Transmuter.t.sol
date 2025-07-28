@@ -7,6 +7,8 @@ import {StdCheats} from "forge-std/StdCheats.sol";
 import {AlchemistV3} from "../AlchemistV3.sol";
 import {AlEth} from "../external/AlEth.sol";
 import {Transmuter} from "../Transmuter.sol";
+import {StakingGraph} from "../libraries/StakingGraph.sol";
+import {console} from "../../lib/forge-std/src/console.sol";
 
 import "../interfaces/ITransmuter.sol";
 
@@ -86,12 +88,16 @@ contract MockAlchemist {
 }
 
 contract TransmuterTest is Test {
+    using StakingGraph for StakingGraph.Graph;
+
     AlEth public alETH;
     AlEth public collateralToken;
     AlEth public underlyingToken;
     Transmuter public transmuter;
 
     MockAlchemist public alchemist;
+
+    StakingGraph.Graph private graph;
 
     function setUp() public {
         alETH = new AlEth();
@@ -467,5 +473,17 @@ contract TransmuterTest is Test {
         emit log_named_uint("total token there",alchemist.getTotalUnderlyingValue());
         vm.prank(address(0xbeef));
         transmuter.claimRedemption(1);
+    }
+
+    function test_delta_overflow() public {
+        int256 amount = (2**111) - 1;
+        uint32 start = 1000;
+        uint32 duration = 10;
+
+        graph.addStake(amount, start, duration);
+        
+        int256 result = graph.queryStake(start, start + duration);
+
+        assertEq(result, amount);
     }
 }

@@ -213,7 +213,8 @@ contract Transmuter is ITransmuter, ERC721 {
 
         uint256 transmutationTime = position.maturationBlock - position.startBlock;
         uint256 blocksLeft = position.maturationBlock > block.number ? position.maturationBlock - block.number : 0;
-        uint256 amountNottransmuted = blocksLeft > 0 ? position.amount * blocksLeft / transmutationTime : 0;
+        uint256 rounded = position.amount * blocksLeft / transmutationTime + (position.amount * blocksLeft % transmutationTime == 0 ? 0 : 1);
+        uint256 amountNottransmuted = blocksLeft > 0 ? rounded : 0;
         uint256 amountTransmuted = position.amount - amountNottransmuted;
 
         if (_requireOwned(id) != msg.sender) {
@@ -274,7 +275,6 @@ contract Transmuter is ITransmuter, ERC721 {
         if (queried == 0) return 0;
         // + 1 for rounding error
         return (queried / BLOCK_SCALING_FACTOR).toUint256() + 1;
-        //return ((queried+(BLOCK_SCALING_FACTOR-1)) / BLOCK_SCALING_FACTOR).toUint256();
     }
 
     /// @dev Updates staking graphs

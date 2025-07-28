@@ -363,12 +363,11 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     }
 
     /// @inheritdoc IAlchemistV3Actions
-    function deposit(uint256 amount, address recipient, uint256 recipientId) external returns (uint256) {
+    function deposit(uint256 amount, address recipient, uint256 tokenId) external returns (uint256) {
         _checkArgument(recipient != address(0));
         _checkArgument(amount > 0);
         _checkState(!depositsPaused);
         _checkState(_yieldTokensDeposited + amount <= depositCap);
-        uint256 tokenId = recipientId;
 
         // Only mint a new position if the id is 0
         if (tokenId == 0) {
@@ -598,7 +597,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         // Update weights and totals
         uint256 old = _totalLocked;
-        _totalLocked = old - totalOut;
+        _totalLocked = totalOut > old ? 0 : old - totalOut;
         _collateralWeight += PositionDecay.WeightIncrement(totalOut, old);
         cumulativeEarmarked -= amount;
         totalDebt -= amount;

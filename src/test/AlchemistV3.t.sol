@@ -3082,4 +3082,85 @@ contract AlchemistV3Test is Test {
         alchemist.burn(burnAmount, tokenIdForUser1);
         vm.stopPrank();
     }
+
+    function testBDR_fundsNotTransferred() external {
+        uint256 amount = 1e18;
+        address debtor = address(0xbeef);
+        address alice = address(0xdad);
+        vm.startPrank(address(someWhale));
+        fakeYieldToken.mint(amount * 2, address(someWhale));
+        vm.stopPrank();
+        // Mint debt tokens to debtor
+        vm.startPrank(debtor);
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount*2);
+        alchemist.deposit(amount, debtor, 0);
+        uint256 tokenDebtor = 1;
+        uint256 maxBorrowable = alchemist.getMaxBorrowable(tokenDebtor);
+        alchemist.mint(tokenDebtor, maxBorrowable, debtor);
+        vm.stopPrank();
+        (, uint256 debt,) = alchemist.getCDP(tokenDebtor);
+        // Create Redemption
+        vm.startPrank(alice);
+        uint256 redemption = debt / 2;
+        SafeERC20.safeApprove(address(alToken), address(transmuterLogic), amount);
+        transmuterLogic.createRedemption(redemption);
+        uint256 aliceId = 1;
+        vm.stopPrank();
+        address admin = transmuterLogic.admin();
+        vm.startPrank(admin);
+        transmuterLogic.setTransmutationFee(0);
+        vm.stopPrank();
+        // Advance time to complete redemption
+        vm.roll(block.number + 5_256_000);
+
+        // transfer out tokens to mimick bad debt
+        vm.startPrank(address(alchemist));
+        fakeYieldToken.transfer(address(0xdad), 5e17);
+        vm.stopPrank();
+
+        // Check balances after claim
+        uint256 alchemistYTBefore = fakeYieldToken.balanceOf(address(alchemist));
+        vm.startPrank(alice);
+        SafeERC20.safeApprove(address(alToken), address(transmuterLogic), amount);
+        transmuterLogic.claimRedemption(aliceId);
+        vm.stopPrank();
+        uint256 alchemistYTAfter = fakeYieldToken.balanceOf(address(alchemist));
+        assertEq(alchemistYTAfter, alchemistYTBefore - redemption * 1e18 / 1.8e18);
+    }
+
+    function testClaimRedemptionRoundUp() external {
+        uint256 amount = 100e18;
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), 99999e18);
+        alchemist.deposit(amount, address(0xbeef), 0);
+        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
+        alchemist.mint(tokenId, 80e18, address(0xbeef));
+        SafeERC20.safeApprove(address(alToken), address(transmuterLogic), 9999e18);
+        for (uint256 i = 1; i < 4; i++) {
+        transmuterLogic.createRedemption(1e18);
+        }
+        vm.roll(block.number + 1);
+        for (uint256 i = 1; i < 4; i++) {
+        transmuterLogic.claimRedemption(i);
+        }
+        vm.stopPrank();
+    }
+
+    function testRepayWithEarmarkedDebt_MultiplePoke_Broken() external {
+        uint256 amount = 100e18;
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), amount + 100e18);
+        alchemist.deposit(amount, address(0xbeef), 0);
+        // a single position nft would have been minted to 0xbeef
+        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
+        alchemist.mint(tokenId, (amount / 2), address(0xbeef));
+        SafeERC20.safeApprove(address(alToken), address(transmuterLogic), 50e18);
+        transmuterLogic.createRedemption(50e18);
+        vm.stopPrank();
+        vm.roll(block.number + 1);
+        alchemist.poke(tokenId);
+        vm.roll(block.number + 5_256_000);
+        vm.prank(address(0xbeef));
+        alchemist.repay(25e18, tokenId);
+    }
 }
