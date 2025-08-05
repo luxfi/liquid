@@ -731,7 +731,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
      * @return creditToYield The amount of yield tokens repaid.
      */
     function _forceRepay(uint256 accountId, uint256 amount) internal returns (uint256) {
-        _checkArgument(amount > 0);
+        if (amount == 0) {
+            return 0;
+        }
         _checkForValidAccountId(accountId);
         Account storage account = _accounts[accountId];
 
