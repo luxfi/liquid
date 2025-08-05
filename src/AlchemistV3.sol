@@ -749,13 +749,24 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         uint256 credit = amount > debt ? debt : amount;
         uint256 creditToYield = convertDebtTokensToYield(credit);
         _subDebt(accountId, credit);
-
         // Repay debt from earmarked amount of debt first
         account.earmarked -= credit > account.earmarked ? account.earmarked : credit;
+        creditToYield = creditToYield > account.collateralBalance ? account.collateralBalance : creditToYield;
         account.collateralBalance -= creditToYield;
 
-        // Transfer the repaid tokens from the account to the transmuter.
-        TokenUtils.safeTransfer(yieldToken, address(transmuter), creditToYield);
+        uint256 protocolFeeTotal = creditToYield * protocolFee / BPS;
+
+        if (account.collateralBalance > protocolFeeTotal) {
+            account.collateralBalance -= protocolFeeTotal;
+            // Transfer the protocol fee to the protocol fee receiver
+            TokenUtils.safeTransfer(yieldToken, protocolFeeReceiver, protocolFeeTotal);
+        }
+
+        if (creditToYield > 0) {
+            // Transfer the repaid tokens from the account to the transmuter.
+            TokenUtils.safeTransfer(yieldToken, address(transmuter), creditToYield);
+        }
+
         return creditToYield;
     }
 
@@ -802,7 +813,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         if (collateralizationRatio <= collateralizationLowerBound) {
             uint256 alchemistCurrentCollateralization = normalizeUnderlyingTokensToDebt(_getTotalUnderlyingValue()) * FIXED_POINT_SCALAR / totalDebt;
-
             (uint256 liquidationAmount, uint256 debtToBurn, uint256 baseFee) = calculateLiquidation(
                 collateralInUnderlying, account.debt, minimumCollateralization, alchemistCurrentCollateralization, globalMinimumCollateralization, liquidatorFee
             );
