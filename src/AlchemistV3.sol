@@ -788,6 +788,11 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
             return (0, 0, 0);
         }
 
+        // If the rare scenario where the price is 0, return 0
+        if (ITokenAdapter(tokenAdapter).price() == 0) {
+            return (0, 0, 0);
+        }
+
         // Calculate initial collateralization ratio
         uint256 collateralInUnderlying = totalValue(accountId);
         uint256 collateralizationRatio = collateralInUnderlying * FIXED_POINT_SCALAR / account.debt;
