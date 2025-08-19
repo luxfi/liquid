@@ -3,8 +3,9 @@
 pragma solidity 0.8.28;
 import {IVaultV2} from "../lib/vault-v2/src/interfaces/IVaultV2.sol";
 import {PermissionedProxy} from "./utils/PermissionedProxy.sol";
+import { IAllocator } from "./interfaces/IAllocator.sol";
 
-contract AlchemistAllocator is PermissionedProxy {
+contract AlchemistAllocator is PermissionedProxy, IAllocator {
     IVaultV2 immutable vault;
 
     constructor(address _vault, address _admin, address _operator)  PermissionedProxy(_admin, _operator) {
@@ -17,8 +18,6 @@ contract AlchemistAllocator is PermissionedProxy {
         permissionedCalls[0x4b219d16] = true;
     }
 
-    event Allocate(address indexed vault, uint256 indexed amount, address adapter);
-    event Deallocate(address indexed vault, uint256 indexed amount, address adapter);
 
     // Overriden vault actions
     function allocate(bytes32 id, address adapter, bytes memory data, uint256 amount) external {
