@@ -31,6 +31,8 @@ struct AlchemistInitializationParams {
     address protocolFeeReceiver;
     // Fee paid to liquidators.
     uint256 liquidatorFee;
+    // Fee paid to liquidators forcing an account earmarked debt repayment.
+    uint256 repaymentFee;
 }
 
 /// @notice A user account.
@@ -50,7 +52,7 @@ struct Account {
     uint256 lastAccruedRedemptionWeight;
     /// @notice Last weight of collateral from most recent account sync.
     uint256 lastCollateralWeight;
-    /// @notice Block of the most recent mint 
+    /// @notice Block of the most recent mint
     uint256 lastMintBlock;
     /// @notice The un-scaled locked collateral.
     uint256 rawLocked;
@@ -359,6 +361,15 @@ interface IAlchemistV3AdminActions {
     /// @param fee The new liquidator fee.
     function setLiquidatorFee(uint256 fee) external;
 
+    /// @notice Set a new repayment fee.
+
+    /// @notice `msg.sender` must be the admin or this call will revert with an {Unauthorized} error.
+    ///
+    /// @notice Emits a {RepaymentFeeUpdated} event.
+    ///
+    /// @param fee The new repayment fee.
+    function setRepaymentFee(uint256 fee) external;
+
     /// @notice Set a new transmuter to `value`.
     ///
     /// @notice `msg.sender` must be the admin or this call will revert with an {Unauthorized} error.
@@ -539,6 +550,11 @@ interface IAlchemistV3Events {
     /// @param fee  The new liquidator fee.
     event LiquidatorFeeUpdated(uint256 fee);
 
+    /// @notice Emitted when the repayment fee is updated.
+    ///
+    /// @param fee  The new repayment fee.
+    event RepaymentFeeUpdated(uint256 fee);
+
     /// @notice Emitted when the fee receiver is updated.
     ///
     /// @param receiver   The address of the new receiver.
@@ -605,6 +621,8 @@ interface IAlchemistV3State {
     function protocolFee() external view returns (uint256 fee);
 
     function liquidatorFee() external view returns (uint256 fee);
+
+    function repaymentFee() external view returns (uint256 fee);
 
     function underlyingConversionFactor() external view returns (uint256 factor);
 
@@ -692,6 +710,7 @@ interface IAlchemistV3State {
     /// @return grossCollateralToSeize  Total collateral to take (fee + net)
     /// @return debtToBurn              Amount of debt to erase (sent to protocol)
     /// @return fee                     Amount of collateral paid to liquidator
+    /// @return outsourcedFee           Amount of fee paid to liquidator in underlying tokens in the event that account funds are insufficient to cover the fee
     function calculateLiquidation(
         uint256 collateral,
         uint256 debt,
@@ -699,7 +718,7 @@ interface IAlchemistV3State {
         uint256 alchemistCurrentCollateralization,
         uint256 alchemistMinimumCollateralization,
         uint256 feeBps
-    ) external view returns (uint256 grossCollateralToSeize, uint256 debtToBurn, uint256 fee);
+    ) external view returns (uint256 grossCollateralToSeize, uint256 debtToBurn, uint256 fee, uint256 outsourcedFee);
 
     /// @dev Normalizes underlying tokens to debt tokens.
     /// @notice This is to handle decimal conversion in the case where underlying tokens have < 18 decimals.
