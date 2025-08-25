@@ -29,7 +29,7 @@ interface IMYTStrategy {
 
     /// @dev override this function to handle wrapping/allocation/moving funds to
     /// the respective protocol of this strategy
-    function allocate(uint256 amount) external returns (uint256);
+    function allocate(uint256 amount) external payable returns (uint256);
 
     /// @dev override this function to handle unwrapping/deallocation/moving funds from
     /// the respective protocol of this strategy
