@@ -26,7 +26,7 @@ contract MYTStrategy is IMYTStrategy, Ownable {
 
     /// @notice call this function to handle wrapping/allocation/moving funds to
     /// the respective protocol of this strategy
-    function allocate(uint256 amount) public returns (uint256 ret) {
+    function allocate(uint256 amount) public payable returns (uint256 ret) {
         // TODO additional access control needed?
         require(whitelistedAllocators[msg.sender], "PD");
         ret = _allocate(amount);
@@ -44,11 +44,11 @@ contract MYTStrategy is IMYTStrategy, Ownable {
 
     /// @dev override this function to handle wrapping/allocation/moving funds to
     /// the respective protocol of this strategy
-    function _allocate(uint256 amount) public virtual returns (uint256) {}
+    function _allocate(uint256 amount) internal virtual returns (uint256) {}
 
     /// @dev override this function to handle unwrapping/deallocation/moving funds from
     /// the respective protocol of this strategy
-    function _deallocate(uint256 amount) public virtual returns (uint256) {}
+    function _deallocate(uint256 amount) internal virtual returns (uint256) {}
 
     /// @notice can be called by anyone to recalculate the
     /// estimated yields of this strategy based on external price
