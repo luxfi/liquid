@@ -3,11 +3,10 @@ pragma solidity ^0.8.28;
 
 import "forge-std/Test.sol";
 import {PerpetualGauge} from "../PerpetualGauge.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
+import {IERC20Metadata} from "@openzeppelin/contracts/interfaces/IERC20Metadata.sol";
 // --- Mock contracts ---
 
-contract MockERC20 is IERC20 {
+contract MockERC20 is IERC20Metadata {
     string public name = "Mock Token";
     string public symbol = "MCK";
     uint8 public decimals = 18;
@@ -80,6 +79,60 @@ contract MockAllocatorProxy {
     }
 }
 
+contract MockERC20Test is Test {
+    MockERC20 public mockERC20;
+    address alice = address(0xA11CE);
+    address bob = address(0xB0B);
+    address charlie = address(0x0C0);
+
+    function setUp() public {
+        mockERC20 = new MockERC20();
+        mockERC20.transfer(alice, 1000e18);
+        mockERC20.transfer(bob, 500e18);
+    }
+
+    function testMockERC20TransferFunctionSignature() public {
+        // Test that the transfer function has the correct selector
+        bytes4 expectedSelector = bytes4(keccak256("transfer(address,uint256)"));
+        bytes4 actualSelector = mockERC20.transfer.selector;
+        assertEq(actualSelector, expectedSelector);
+    }
+
+    function testMockERC20ApproveFunctionSignature() public {
+        // Test that the approve function has the correct selector
+        bytes4 expectedSelector = bytes4(keccak256("approve(address,uint256)"));
+        bytes4 actualSelector = mockERC20.approve.selector;
+        assertEq(actualSelector, expectedSelector);
+    }
+
+    function testMockERC20TransferFromFunctionSignature() public {
+        // Test that the transferFrom function has the correct selector
+        bytes4 expectedSelector = bytes4(keccak256("transferFrom(address,address,uint256)"));
+        bytes4 actualSelector = mockERC20.transferFrom.selector;
+        assertEq(actualSelector, expectedSelector);
+    }
+
+    function testMockERC20IERC20Compliance() public {
+        // Test that MockERC20 implements IERC20Metadata interface
+        IERC20Metadata ierc20 = IERC20Metadata(address(mockERC20));
+        // Test basic token properties
+        assertEq(ierc20.name(), "Mock Token");
+        assertEq(ierc20.symbol(), "MCK");
+        assertEq(ierc20.decimals(), 18);
+
+        // Test interface functions
+        assertEq(ierc20.totalSupply(), 1e24);
+        assertEq(ierc20.balanceOf(alice), 1000e18);
+        assertEq(ierc20.allowance(alice, bob), 0);
+
+        vm.startPrank(alice);
+        assertTrue(ierc20.approve(bob, 100e18));
+        assertTrue(ierc20.transfer(charlie, 10e18));
+        assertTrue(ierc20.transferFrom(alice, bob, 10e18));
+        vm.stopPrank();
+    }
+}
+
 // --- Test Suite ---
 
 contract PerpetualGaugeTest is Test {
@@ -96,19 +149,15 @@ contract PerpetualGaugeTest is Test {
         classifier = new MockStrategyClassifier();
         allocator = new MockAllocatorProxy();
 
-        gauge = new PerpetualGauge(
-            address(classifier),
-            address(allocator),
-            address(token)
-        );
+        gauge = new PerpetualGauge(address(classifier), address(allocator), address(token));
 
         // Give tokens to Alice and Bob
         token.transfer(alice, 1e21);
         token.transfer(bob, 1e21);
 
         // Setup classifier caps
-        classifier.setIndivCap(1, 5_000); // 50% cap
-        classifier.setGlobalCap(1, 8_000); // 80% for risk group 1
+        classifier.setIndivCap(1, 5000); // 50% cap
+        classifier.setGlobalCap(1, 8000); // 80% for risk group 1
         classifier.setRisk(1, 1);
     }
 
