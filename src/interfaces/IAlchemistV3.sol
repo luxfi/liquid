@@ -639,6 +639,7 @@ interface IAlchemistV3State {
 
     function underlyingToken() external view returns (address token);
 
+    /// @notice This is a MYT token (Morpho v2 ERC4626) as of v3
     function yieldToken() external view returns (address token);
 
     function depositsPaused() external view returns (bool isPaused);

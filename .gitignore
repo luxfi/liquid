@@ -20,3 +20,4 @@ docs/
 
 # Dotenv file
 .env
+.aider*
