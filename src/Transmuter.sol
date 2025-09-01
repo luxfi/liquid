@@ -225,13 +225,14 @@ contract Transmuter is ITransmuter, ERC721 {
         _burn(id);
         
         // Ratio of total synthetics issued by the alchemist / underlingying value of collateral stored in the alchemist
-        // If the system experiences bad debt we use this ratio to scale back the amount of yield tokens that are transmuted
+        // If the system experiences bad debt we use this ratio to scale back the value of yield tokens that are transmuted
         uint256 yieldTokenBalance = TokenUtils.safeBalanceOf(alchemist.yieldToken(), address(this));
         // Avoid divide by 0
         uint256 denominator = alchemist.getTotalUnderlyingValue() + alchemist.convertYieldTokensToUnderlying(yieldTokenBalance) > 0 ? alchemist.getTotalUnderlyingValue() + alchemist.convertYieldTokensToUnderlying(yieldTokenBalance) : 1;
         uint256 badDebtRatio = alchemist.totalSyntheticsIssued() * 10**TokenUtils.expectDecimals(alchemist.yieldToken()) / denominator;
 
         uint256 scaledTransmuted = amountTransmuted;
+
         if (badDebtRatio > 1e18) {
             scaledTransmuted = amountTransmuted * FIXED_POINT_SCALAR / badDebtRatio;
         }
@@ -239,6 +240,7 @@ contract Transmuter is ITransmuter, ERC721 {
         // If the contract has a balance of yield tokens from alchemist repayments then we only need to redeem partial or none from Alchemist earmarked
         uint256 debtValue = alchemist.convertYieldTokensToDebt(yieldTokenBalance);
         uint256 amountToRedeem = scaledTransmuted > debtValue ? scaledTransmuted - debtValue : 0;
+
         if (amountToRedeem > 0) alchemist.redeem(amountToRedeem);
 
         uint256 feeAmount = scaledTransmuted * transmutationFee / BPS;
@@ -270,6 +272,7 @@ contract Transmuter is ITransmuter, ERC721 {
 
     /// @inheritdoc ITransmuter
     function queryGraph(uint256 startBlock, uint256 endBlock) external view returns (uint256) {
+        console.log(_stakingGraph.size);
         int256 queried = _stakingGraph.queryStake(startBlock, endBlock);
 
         if (queried == 0) return 0;
