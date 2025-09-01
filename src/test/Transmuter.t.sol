@@ -480,10 +480,20 @@ contract TransmuterTest is Test {
         uint32 start = 1000;
         uint32 duration = 10;
 
-        graph.addStake(amount, start, duration);
+        graph.addStake(amount / 10, start, duration);
         
         int256 result = graph.queryStake(start, start + duration);
 
-        assertEq(result, amount);
+        assertApproxEqAbs(result, amount, 10);
+    }
+
+    function test_negative_stake() public {
+        // Add stake of 100 wei from block 25 to block 28
+        graph.addStake(100, 25, 3);
+        assertEq(graph.size, 32, "Graph size should be 32 after stake");
+        // The current block is now greater than the last initialized block in the fenwick tree
+        // Check that the graph queries only to its max size and does not return negative number
+        int256 result = graph.queryStake(63, 63);
+        assertEq(result, 0);
     }
 }

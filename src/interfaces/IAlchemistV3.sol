@@ -375,15 +375,6 @@ interface IAlchemistV3AdminActions {
     /// @param fee The new liquidator fee.
     function setLiquidatorFee(uint256 fee) external;
 
-    /// @notice Set a new transmuter to `value`.
-    ///
-    /// @notice `msg.sender` must be the admin or this call will revert with an {Unauthorized} error.
-    ///
-    /// @notice Emits a {ProtocolFeeReceiverUpdated} event.
-    ///
-    /// @param value The address of the new fee transmuter.
-    function setTransmuter(address value) external;
-
     /// @notice Set the global minimum collateralization ratio.
     ///
     /// @notice `msg.sender` must be the admin or this call will revert with an {Unauthorized} error.

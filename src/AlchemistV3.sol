@@ -272,17 +272,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     }
 
     /// @inheritdoc IAlchemistV3AdminActions
-    function setTransmuter(address value) external onlyAdmin {
-        _checkArgument(value != address(0));
-
-        // Check that old transmuter has enough funds to cover all future transmutations before allowing a swap
-        require(convertYieldTokensToDebt(TokenUtils.safeBalanceOf(yieldToken, transmuter)) >= ITransmuter(transmuter).totalLocked());
-
-        transmuter = value;
-        emit TransmuterUpdated(value);
-    }
-
-    /// @inheritdoc IAlchemistV3AdminActions
     function setGuardian(address guardian, bool isActive) external onlyAdmin {
         _checkArgument(guardian != address(0));
 
@@ -378,7 +367,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         }
 
         _accounts[tokenId].collateralBalance += amount;
-        _accounts[tokenId].freeCollateral += amount;
 
         // Transfer tokens from msg.sender now that the internal storage updates have been committed.
         TokenUtils.safeTransferFrom(yieldToken, msg.sender, address(this), amount);
@@ -399,10 +387,10 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         _sync(tokenId);
 
-        _checkArgument(_accounts[tokenId].freeCollateral >= amount);
+        uint256 lockedCollateral = convertDebtTokensToYield( _accounts[tokenId].debt) * minimumCollateralization / FIXED_POINT_SCALAR;
+        _checkArgument(_accounts[tokenId].collateralBalance - lockedCollateral >= amount);
 
         _accounts[tokenId].collateralBalance -= amount;
-        _accounts[tokenId].freeCollateral -= amount;
 
         // Assure that the collateralization invariant is still held.
         _validate(tokenId);
@@ -588,7 +576,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     function redeem(uint256 amount) external onlyTransmuter {
         _earmark();
 
-        _redemptionWeight += PositionDecay.WeightIncrement(amount, cumulativeEarmarked);
+        // If amount is greater than cumulative earmarked it is due to rounding down the price of tokens held by the transmuter
+        // This underpricing leads to the transmuter requesting more tokens than the alchemist has earmarked in some cases
+        _redemptionWeight += PositionDecay.WeightIncrement(amount > cumulativeEarmarked ? cumulativeEarmarked : amount, cumulativeEarmarked);
 
         // Calculate current fee price
         uint256 collRedeemed = convertDebtTokensToYield(amount);
@@ -598,7 +588,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         // Update weights and totals
         uint256 old = _totalLocked;
         _totalLocked = totalOut > old ? 0 : old - totalOut;
-        _collateralWeight += PositionDecay.WeightIncrement(totalOut, old);
+        // Same rounding behavior as above
+        _collateralWeight += PositionDecay.WeightIncrement(totalOut > old ? old : totalOut, old);
         cumulativeEarmarked -= amount;
         totalDebt -= amount;
 
@@ -772,17 +763,19 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         // Burning yieldTokens will pay off all types of debt
         _checkState((debt = account.debt) > 0);
-
         uint256 yieldToDebt = convertYieldTokensToDebt(amount);
         uint256 credit = yieldToDebt > debt ? debt : yieldToDebt;
         uint256 creditToYield = convertDebtTokensToYield(credit);
         _subDebt(accountId, credit);
 
         // Repay debt from earmarked amount of debt first
-        account.earmarked -= credit > account.earmarked ? account.earmarked : credit;
+        uint256 earmarkToRemove = credit > account.earmarked ? account.earmarked : credit;
+        account.earmarked -= earmarkToRemove;
+        uint256 earmarkPaidGlobal = cumulativeEarmarked > earmarkToRemove ? earmarkToRemove : cumulativeEarmarked;
+        cumulativeEarmarked -= earmarkPaidGlobal;
 
         account.collateralBalance -= creditToYield;
-
+        
         // Transfer the repaid tokens from the account to the transmuter.
         TokenUtils.safeTransfer(yieldToken, address(transmuter), creditToYield);
         _yieldTokensDeposited -= creditToYield;
@@ -880,16 +873,16 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @param amount  The amount to increase the debt by.
     function _addDebt(uint256 tokenId, uint256 amount) internal {
         Account storage account = _accounts[tokenId];
-        account.debt += amount;
-        totalDebt += amount;
 
         // Update collateral variables
         uint256 toLock = convertDebtTokensToYield(amount) * minimumCollateralization / FIXED_POINT_SCALAR;
+        uint256 lockedCollateral = convertDebtTokensToYield(account.debt) * minimumCollateralization / FIXED_POINT_SCALAR;
 
-        if (account.freeCollateral < toLock) revert Undercollateralized();
-        account.freeCollateral -= toLock;
-        account.rawLocked += toLock;
+        if (account.collateralBalance - lockedCollateral < toLock) revert Undercollateralized();
+        account.rawLocked = lockedCollateral + toLock;
         _totalLocked += toLock;
+        account.debt += amount;
+        totalDebt += amount;
     }
 
     /// @dev Increases the debt by `amount` for the account owned by `tokenId`.
@@ -897,20 +890,20 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @param amount  The amount to increase the debt by.
     function _subDebt(uint256 tokenId, uint256 amount) internal {
         Account storage account = _accounts[tokenId];
-        account.debt -= amount;
-        totalDebt -= amount;
 
         // Update collateral variables
         uint256 toFree = convertDebtTokensToYield(amount) * minimumCollateralization / FIXED_POINT_SCALAR;
+        uint256 lockedCollateral = convertDebtTokensToYield(account.debt) * minimumCollateralization / FIXED_POINT_SCALAR;
 
         // For cases when someone above minimum LTV gets liquidated.
         if (toFree > _totalLocked) {
             toFree = _totalLocked;
         }
 
+        account.debt -= amount;
+        totalDebt -= amount;
         _totalLocked -= toFree;
-        account.rawLocked -= toFree;
-        account.freeCollateral += toFree;
+        account.rawLocked = lockedCollateral - toFree;
     }
 
     /// @dev Set the mint allowance for `spender` to `amount` for the account owned by `tokenId`.
@@ -1029,9 +1022,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         account.lastRedemptionSync = block.number;
         // Redeem user collateral equal to value of debt tokens redeemed
         account.collateralBalance -= collateralToRemove;
-        account.rawLocked -= collateralToRemove * minimumCollateralization / FIXED_POINT_SCALAR;
+        account.rawLocked = convertDebtTokensToYield(account.debt) * minimumCollateralization / FIXED_POINT_SCALAR;
         account.lastCollateralWeight = _collateralWeight;
-        account.freeCollateral = account.collateralBalance - account.rawLocked;
     }
 
     /// @dev Earmarks the debt for redemption.
@@ -1134,8 +1126,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @dev Calculates the total value of the alchemist in the underlying token.
     /// @return totalUnderlyingValue The total value of the alchemist in the underlying token.
     function _getTotalUnderlyingValue() internal view returns (uint256 totalUnderlyingValue) {
-        uint256 yieldTokenTVL = IERC20(yieldToken).balanceOf(address(this));
-        uint256 yieldTokenTVLInUnderlying = convertYieldTokensToUnderlying(yieldTokenTVL);
+        uint256 yieldTokenTVLInUnderlying = convertYieldTokensToUnderlying(_yieldTokensDeposited);
         totalUnderlyingValue = yieldTokenTVLInUnderlying;
     }
 }

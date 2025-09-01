@@ -116,6 +116,8 @@ library StakingGraph {
             start--;
             require (start <= GRAPH_MAX); //catch overflow and underflow
 
+            end = end > g.size ? g.size : end;
+
             (begDelta,begProd) = query(g.g, start);
             (endDelta,endProd) = query(g.g, end);
 
