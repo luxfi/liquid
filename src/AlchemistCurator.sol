@@ -19,6 +19,6 @@ contract AlchemistCurator is PermissionedProxy {
     // TODO add risk level as parameter and set mapping accordingly from StrategyClassifier
     function setIsAdapter(address account, bool newIsAdapter) external onlyOperator {
         require(msg.sender != admin, "PD"); // in case roles are mixed
-        vault.setIsAdapter(account, newIsAdapter);
+        // vault.setIsAdapter(account, newIsAdapter);
     }
 }

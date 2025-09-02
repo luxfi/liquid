@@ -9,6 +9,11 @@ contract MYTStrategy is IMYTStrategy, Ownable {
 
     StrategyParams public params;
 
+    uint256 public lastSnapshotTime;
+    uint256 public lastIndex;
+    uint256 public estApr;
+    uint256 public estApy;
+
     /// @notice This value is true when the underlying protocol is known to
     /// experience issues or security incidents. In this case the allocation step is simply
     /// bypassed without reverts (to keep external allocators from reverting).
@@ -42,6 +47,17 @@ contract MYTStrategy is IMYTStrategy, Ownable {
         emit Deallocate(amount);
     }
 
+    /// @notice call this function to handle strategies with withdrawal queue NFT
+    function claimWithdrawalQueue(uint256 positionId) public virtual returns (uint256 ret) {
+
+    }
+
+    /// @notice call this function to claim all available rewards from the respective
+    /// protocol of this strategy
+    function claimRewards() public virtual returns (uint256) {
+
+    }
+
     /// @dev override this function to handle wrapping/allocation/moving funds to
     /// the respective protocol of this strategy
     function _allocate(uint256 amount) internal virtual returns (uint256) {}
@@ -49,6 +65,13 @@ contract MYTStrategy is IMYTStrategy, Ownable {
     /// @dev override this function to handle unwrapping/deallocation/moving funds from
     /// the respective protocol of this strategy
     function _deallocate(uint256 amount) internal virtual returns (uint256) {}
+
+    /// @dev override this function to handle strategies with withdrawal queue NFT
+    function _claimWithdrawalQueue(uint256 positionId) internal virtual returns (uint256) {}
+
+    /// @dev override this function to claim all available rewards from the respective
+    /// protocol of this strategy
+    function _claimRewards() internal virtual returns (uint256){}
 
     /// @notice can be called by anyone to recalculate the
     /// estimated yields of this strategy based on external price
