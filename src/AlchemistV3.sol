@@ -360,6 +360,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     function totalValue(uint256 tokenId) public view returns (uint256) {
         uint256 totalUnderlying;
         (,, uint256 collateral) = _calculateUnrealizedDebt(tokenId);
+        console.log("collateral is %d", collateral);
         if (collateral > 0) totalUnderlying += convertYieldTokensToUnderlying(collateral);
         return normalizeUnderlyingTokensToDebt(totalUnderlying);
     }
@@ -395,9 +396,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         _checkArgument(recipient != address(0));
         _checkForValidAccountId(tokenId);
         _checkArgument(amount > 0);
+        console.log("sender is %a", msg.sender);
         _checkAccountOwnership(IAlchemistV3Position(alchemistPositionNFT).ownerOf(tokenId), msg.sender);
         _earmark();
-
         _sync(tokenId);
 
         uint256 lockedCollateral = convertDebtTokensToYield( _accounts[tokenId].debt) * minimumCollateralization / FIXED_POINT_SCALAR;
@@ -423,7 +424,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         _checkArgument(amount > 0);
         _checkState(!loansPaused);
         _checkAccountOwnership(IAlchemistV3Position(alchemistPositionNFT).ownerOf(tokenId), msg.sender);
-
         // Query transmuter and earmark global debt
         _earmark();
 
@@ -669,18 +669,23 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     }
 
     /// @inheritdoc IAlchemistV3State
-    function convertYieldTokensToUnderlying(uint256 amount) public view returns (uint256) {
+    function convertYieldTokensToUnderlying(uint256 amount) public view returns (uint256 ret) {
         uint8 decimals = TokenUtils.expectDecimals(yieldToken);
-        return (amount * ITokenAdapter(tokenAdapter).price()) / 10 ** decimals;
+        uint256 vaultSupply = IERC20(yieldToken).totalSupply();
+        if (vaultSupply == 0) return amount * 10 ** decimals;
+        uint256 vaultPrice = TokenUtils.safeBalanceOf(underlyingToken, yieldToken)/vaultSupply;
+        ret = (amount * 1e4 * vaultPrice) / 1e4;
+        console.log("convertYieldTokensToUnderlying -> %d", ret);
     }
 
     /// @inheritdoc IAlchemistV3State
     function convertUnderlyingTokensToYield(uint256 amount) public view returns (uint256) {
         uint8 decimals = TokenUtils.expectDecimals(yieldToken);
-        if (ITokenAdapter(tokenAdapter).price() == 0) {
-            return 0;
-        }
-        return amount * 10 ** decimals / ITokenAdapter(tokenAdapter).price();
+        uint256 vaultSupply = IERC20(yieldToken).totalSupply();
+        if (vaultSupply == 0) return amount;
+        uint256 vaultPrice = TokenUtils.safeBalanceOf(underlyingToken, yieldToken)/vaultSupply * 10000;
+        if (vaultPrice == 0) return amount;
+        return amount * 1e4 / vaultPrice / 1e4;
     }
 
     /// @inheritdoc IAlchemistV3State
