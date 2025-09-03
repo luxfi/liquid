@@ -36,6 +36,8 @@ interface IMainRewarder is IBaseRewarder {
     // full withdraw that can optionally claim extras too
     function withdraw(address account, uint256 amount, bool claim) external;
 
+    function stake(address account, uint256 amount) external; 
+
     // claim to a recipient; toggle whether to also pull from linked extra rewarders
     function getReward(address account, address recipient, bool claimExtras) external;
 
