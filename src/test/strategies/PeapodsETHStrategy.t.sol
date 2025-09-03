@@ -6,24 +6,11 @@ import "forge-std/Test.sol";
 // Adjust these imports to your layout  // <<<
 import {PeapodsETHStrategy, WETH, IERC4626} from "src/strategies/PeapodsETH.sol";
 import {MYTStrategy} from "src/MYTStrategy.sol";
+import {IMYTStrategy} from "src/interfaces/IMYTStrategy.sol";
 
 interface IERC20 {
     function approve(address spender, uint256 amount) external returns (bool);
     function balanceOf(address a) external view returns (uint256);
-}
-
-// Harness: exposes internal _allocate/_deallocate 
-contract PeapodsETHStrategyHarness is PeapodsETHStrategy {
-    constructor(address myt, MYTStrategy.StrategyParams memory p, address peapodsEth_, address weth_)
-        PeapodsETHStrategy(myt, p, peapodsEth_, weth_) {}
-
-    function allocateEx(uint256 amount) external payable returns (uint256) {
-        return _allocate(amount);
-    }
-
-    function deallocateEx(uint256 shares) external returns (uint256) {
-        return _deallocate(shares);
-    }
 }
 
 contract PeapodsETHStrategyTest is Test {
@@ -32,66 +19,90 @@ contract PeapodsETHStrategyTest is Test {
 
     WETH public weth;
     IERC4626 public vault;
-    PeapodsETHStrategyHarness public strat;
+    PeapodsETHStrategy public strat;
 
     address public constant MYT = address(0xbeef);
 
+    uint256 private _forkId;
+
     function setUp() public {
+        string memory rpc = vm.envString("MAINNET_RPC_URL");
+        _forkId = vm.createFork(rpc, 22089302);
+        vm.selectFork(_forkId);
+
         weth  = WETH(WETH_ADDRESS);
         vault = IERC4626(vaultAddr);
 
-        MYTStrategy.StrategyParams memory params;
+        IMYTStrategy.StrategyParams memory params = IMYTStrategy.StrategyParams({
+            owner: address(this),
+            name: "peapodsETH",
+            protocol: "peapods",
+            riskClass: IMYTStrategy.RiskClass.HIGH,
+            cap: type(uint256).max,
+            globalCap: type(uint256).max,
+            estimatedYield: 0,
+            additionalIncentives: false
+        });
 
-        strat = new PeapodsETHStrategyHarness(
+        strat = new PeapodsETHStrategy(
             MYT,
             params,
             vaultAddr,
             WETH_ADDRESS
         );
 
+        strat.setWhitelistedAllocator(address(0xbeef), true);
+
         vm.prank(address(strat));
         IERC20(WETH_ADDRESS).approve(vaultAddr, type(uint256).max);
+
+        vm.makePersistent(address(strat));
     }
 
     function testAllocate() public {
         uint256 ethAmt = 0.2 ether;
-        vm.deal(address(this), ethAmt);
+        vm.deal(address(0xbeef), ethAmt);
 
-        // call internal allocate via harness (payable)
-        uint256 sharesOut = strat.allocateEx{value: ethAmt}(ethAmt);
+        vm.startPrank(address(0xbeef));
+        uint256 sharesOut = strat.allocate{value: ethAmt}(ethAmt);
 
         // vault mints shares to the external caller (receiver = msg.sender in _allocate)
         assertGt(sharesOut, 0, "no shares minted");
-        assertEq(IERC20(address(vault)).balanceOf(address(this)), sharesOut, "shares not received by caller");
+        assertEq(IERC20(address(vault)).balanceOf(address(0xbeef)), sharesOut, "shares not received by caller");
     }
 
     function testDeallocate() public {
         uint256 ethAmt = 0.15 ether;
-        vm.deal(address(this), ethAmt);
+        vm.deal(address(0xbeef), ethAmt);
 
-        uint256 shares = strat.allocateEx{value: ethAmt}(ethAmt);
+        vm.startPrank(address(0xbeef));
+        uint256 shares = strat.allocate{value: ethAmt}(ethAmt);
         assertGt(shares, 0, "allocate failed");
 
-        // ERC-4626 redeem(owner) requires allowance when msg.sender != owner
         IERC20(address(vault)).approve(address(strat), shares);
 
-        uint256 beforeBal = address(this).balance;
-        uint256 assetsOut = strat.deallocateEx(shares);
+        uint256 beforeBal = address(0xbeef).balance; 
+        uint256 assetsOut = strat.deallocate(shares);
+        vm.stopPrank();
 
         // redeem amount should be > 0 and ETH returned to caller by strategy’s unwrap
         assertGt(assetsOut, 0, "redeem returned 0");
-        assertEq(address(this).balance, beforeBal + assetsOut, "ETH not returned to caller");
+        assertEq(address(0xbeef).balance, beforeBal + assetsOut, "ETH not returned to caller");
         assertEq(IERC20(address(vault)).balanceOf(address(this)), 0, "shares not burned");
     }
 
     function testSnapshotYield() public {
+        uint256 ethAmt = 0.2 ether;
+        vm.deal(address(0xbeef), ethAmt);
+
+        vm.startPrank(address(0xbeef));
+        strat.allocate{value: ethAmt}(ethAmt);
+
         // First snapshot seeds lastIndex; first return commonly 0
         uint256 first = strat.snapshotYield();
         assertEq(first, 0, "first snapshot should be 0");
 
-        // Advance the fork to a later block where PPS realistically changed
-        uint256 blockB = vm.envUint("BLOCK_B");
-        vm.rollFork(blockB);
+        vm.rollFork(23281065);
 
         // Second snapshot should now reflect PPS drift (usually > 0)
         uint256 second = strat.snapshotYield();

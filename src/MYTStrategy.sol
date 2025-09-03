@@ -4,8 +4,13 @@ pragma solidity 0.8.28;
 import {IVaultV2} from "../lib/vault-v2/src/interfaces/IVaultV2.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import {IMYTStrategy} from "./interfaces/IMYTStrategy.sol";
+
+import "forge-std/console.sol";
+
 contract MYTStrategy is IMYTStrategy, Ownable {
     IVaultV2 public immutable MYT;
+    uint256 public constant SECONDS_PER_YEAR = 365 days;
+    uint256 public constant FIXED_POINT_SCALAR = 1e18;
 
     StrategyParams public params;
 
@@ -22,11 +27,12 @@ contract MYTStrategy is IMYTStrategy, Ownable {
     mapping (address => bool) public whitelistedAllocators;
 
     constructor(address _myt, StrategyParams memory _params) Ownable(_params.owner) {
-        require(params.owner != address(0));
+        require(_params.owner != address(0));
         require(_myt != address(0));
         MYT = IVaultV2(_myt);
         params = _params;
         // TODO add the strategy to the perpetual gauge in an authenticated manner
+        // TODO perhap take initial snapshot now to set up start block
     }
 
     /// @notice call this function to handle wrapping/allocation/moving funds to
@@ -49,13 +55,13 @@ contract MYTStrategy is IMYTStrategy, Ownable {
 
     /// @notice call this function to handle strategies with withdrawal queue NFT
     function claimWithdrawalQueue(uint256 positionId) public virtual returns (uint256 ret) {
-
+        _claimWithdrawalQueue(positionId);
     }
 
     /// @notice call this function to claim all available rewards from the respective
     /// protocol of this strategy
     function claimRewards() public virtual returns (uint256) {
-
+        _claimRewards();
     }
 
     /// @dev override this function to handle wrapping/allocation/moving funds to
@@ -76,7 +82,61 @@ contract MYTStrategy is IMYTStrategy, Ownable {
     /// @notice can be called by anyone to recalculate the
     /// estimated yields of this strategy based on external price
     /// oracles and protocol heuristics.
-    function snapshotYield() public virtual returns (uint256) {}
+    function snapshotYield() public virtual returns (uint256) {
+        uint256 currentTime = block.timestamp;
+
+        // todo decide to implement this
+        // if (lastSnapshotTime != 0 && currentTime - lastSnapshotTime < MIN_SNAPSHOT_INTERVAL) {
+        //     return estApy;
+        // }
+
+        // Base rate of strategy
+        (uint256 baseRatePerSec, uint256 newIndex) = _computeBaseRatePerSecond();
+
+        // Add incentives to calculation if applicable 
+        uint256 rewardsRatePerSec; 
+        if (params.additionalIncentives == true) rewardsRatePerSec = _computeRewardsRatePerSecond();
+
+        // Combine rates
+        uint256 totalRatePerSec = baseRatePerSec + rewardsRatePerSec;
+        uint256 apr = totalRatePerSec * SECONDS_PER_YEAR; // simple annualization (APR)
+        uint256 apy = _approxAPY(totalRatePerSec);
+
+        // Smoothing factor
+        // TODO need to figure out how to ramp this up
+        // Since first call is 0 the second call will be skewed
+        // perhaps no smoothing on second pass
+        uint256 alpha = 7e17; // 0.7
+        estApr = _lerp(estApr, apr, alpha);
+        estApy = _lerp(estApy, apy, alpha);
+
+        lastSnapshotTime = uint64(currentTime);
+        lastIndex = newIndex;
+
+        emit YieldUpdated(estApy);
+
+        return estApy;
+    }
+
+    /// @dev override this function to handle strategy specific base rate calculation
+    // TODO this one is only different by how we get the asset price
+    // may be good to move this logic here and host only the price in the adapter
+    function _computeBaseRatePerSecond() internal virtual returns (uint256 ratePerSec, uint256 newIndex) {}
+
+    /// @dev override this function to handle strategy specific reward rate calculation   
+    function _computeRewardsRatePerSecond() internal virtual returns (uint256) {}
+
+    // Helper for yield snapshot calculation
+    function _approxAPY(uint256 ratePerSecWad) internal pure returns (uint256) {
+        uint256 apr = ratePerSecWad * SECONDS_PER_YEAR;
+        uint256 aprSq = apr * apr / FIXED_POINT_SCALAR;
+        return apr + aprSq / (2 * SECONDS_PER_YEAR);
+    }
+
+    // Helper for yield snapshot calculation
+    function _lerp(uint256 oldVal, uint256 newVal, uint256 alpha) internal pure returns (uint256) {
+        return alpha * oldVal / FIXED_POINT_SCALAR + (FIXED_POINT_SCALAR - alpha) * newVal / FIXED_POINT_SCALAR;
+    }
 
     /// @notice recategorize this strategy to a different risk class
     function setRiskClass(RiskClass newClass) public onlyOwner {
