@@ -17,6 +17,8 @@ contract TestYieldToken is ITestYieldToken, ERC20 {
     uint256 public slippage;
     uint256 public mockedSupply;
 
+    event TestYieldTokenLogEvent(string message, uint256 amount, address recipient);
+
     constructor(address _underlyingToken) ERC20("Yield Token", "Yield Token") {
         underlyingToken = _underlyingToken;
         _decimals = TokenUtils.expectDecimals(_underlyingToken);
@@ -43,7 +45,6 @@ contract TestYieldToken is ITestYieldToken, ERC20 {
         assert(amount > 0);
 
         uint256 shares = _issueSharesForAmount(recipient, amount);
-
         TokenUtils.safeTransferFrom(underlyingToken, msg.sender, address(this), amount);
 
         return shares;
