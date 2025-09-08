@@ -159,7 +159,8 @@ contract IntegrationTest is Test {
             transmuter: address(transmuterLogic),
             protocolFee: 100,
             protocolFeeReceiver: receiver,
-            liquidatorFee: 300 // in bps? 3%
+            liquidatorFee: 300, // in bps? 3%
+            repaymentFee: 100
         });
 
         bytes memory alchemParams = abi.encodeWithSelector(AlchemistV3.initialize.selector, params);
@@ -238,7 +239,7 @@ contract IntegrationTest is Test {
         IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
 
         vm.roll(block.number + 1);
-        
+
         alchemist.repay(alchemist.convertDebtTokensToYield(maxBorrow), tokenId);
         vm.stopPrank();
 
@@ -270,7 +271,7 @@ contract IntegrationTest is Test {
 
         (uint256 collateral, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
 
-        assertApproxEqAbs(debt, maxBorrow , 1);
+        assertApproxEqAbs(debt, maxBorrow, 1);
         assertEq(collateral, 100_000e6);
         assertApproxEqAbs(earmarked, maxBorrow, 1);
 
@@ -282,7 +283,7 @@ contract IntegrationTest is Test {
         (collateral, debt, earmarked) = alchemist.getCDP(tokenId);
 
         assertApproxEqAbs(debt, 0, 9201);
-        assertEq(collateral, 100_000e6  - alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10000);
+        assertEq(collateral, 100_000e6 - alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10_000);
         assertApproxEqAbs(earmarked, 0, 9201);
 
         assertApproxEqAbs(IERC20(alchemist.yieldToken()).balanceOf(address(transmuterLogic)), alchemist.convertDebtTokensToYield(maxBorrow), 1);
@@ -322,7 +323,7 @@ contract IntegrationTest is Test {
         (collateral, debt, earmarked) = alchemist.getCDP(tokenId);
 
         assertApproxEqAbs(debt, 0, 9201);
-        assertApproxEqAbs(collateral, 100_000e6 - alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10000, 1);
+        assertApproxEqAbs(collateral, 100_000e6 - alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10_000, 1);
         assertApproxEqAbs(earmarked, 0, 9201);
 
         assertApproxEqAbs(IERC20(alchemist.yieldToken()).balanceOf(address(transmuterLogic)), alchemist.convertDebtTokensToYield(maxBorrow), 1);
@@ -350,7 +351,7 @@ contract IntegrationTest is Test {
 
         (uint256 collateral, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
 
-        assertApproxEqAbs(debt, maxBorrow , 1);
+        assertApproxEqAbs(debt, maxBorrow, 1);
         assertApproxEqAbs(collateral, 100_000e6, 1);
         assertApproxEqAbs(earmarked, maxBorrow / 2, 1);
 
@@ -362,7 +363,7 @@ contract IntegrationTest is Test {
         (collateral, debt, earmarked) = alchemist.getCDP(tokenId);
 
         assertApproxEqAbs(debt, (maxBorrow / 2), 9201);
-        assertApproxEqAbs(collateral, 100_000e6  - (alchemist.convertDebtTokensToYield(maxBorrow) / 2) * 100 / 10000, 1);
+        assertApproxEqAbs(collateral, 100_000e6 - (alchemist.convertDebtTokensToYield(maxBorrow) / 2) * 100 / 10_000, 1);
         assertApproxEqAbs(earmarked, 0, 9201);
 
         assertApproxEqAbs(IERC20(alchemist.yieldToken()).balanceOf(address(transmuterLogic)), alchemist.convertDebtTokensToYield(maxBorrow) / 2, 1);
@@ -407,7 +408,7 @@ contract IntegrationTest is Test {
 
         // Loss of precision. Small, but consider using LTV rather than minimum collateralization
         assertApproxEqAbs(debt, 0, 1);
-        assertEq(collateral, 100_000e6 - alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10000);
+        assertEq(collateral, 100_000e6 - alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10_000);
         assertApproxEqAbs(earmarked, 0, 9201);
 
         // Overpayment sent back to user and transmuter received what was credited
@@ -434,7 +435,7 @@ contract IntegrationTest is Test {
         (uint256 collateral, uint256 debt,) = alchemist.getCDP(tokenId);
 
         assertEq(debt, 0);
-        assertEq(collateral, 100_000e6  - alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10000);
+        assertEq(collateral, 100_000e6 - alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10000);
         assertEq(IERC20(EULER_USDC).balanceOf(receiver), alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10_000);
     }
 
@@ -538,7 +539,7 @@ contract IntegrationTest is Test {
         (collateral, debt, earmarked) = alchemist.getCDP(tokenId);
 
         // 10% remaining since 90% was borrowed against initially
-        assertApproxEqAbs(collateral, 100_000e5 - alchemist.convertDebtTokensToYield(debtAmount * 100 / 10000), 1);
+        assertApproxEqAbs(collateral, 100_000e5 - alchemist.convertDebtTokensToYield(debtAmount * 100 / 10_000), 1);
 
         // Only remaining debt should be from the fees paid on debt
         assertApproxEqAbs(debt, 0, 1);

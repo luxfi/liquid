@@ -160,7 +160,8 @@ contract InvariantsTest is Test {
             transmuter: address(transmuterLogic),
             protocolFee: 0,
             protocolFeeReceiver: address(10),
-            liquidatorFee: 300 // in bps? 3%
+            liquidatorFee: 300, // in bps? 3%
+            repaymentFee: 100
         });
 
         bytes memory alchemParams = abi.encodeWithSelector(AlchemistV3.initialize.selector, params);
