@@ -3277,4 +3277,67 @@ contract AlchemistV3Test is Test {
         transmuterLogic.claimRedemption(1);
         vm.stopPrank();
     }
+
+    function testRedeemTwiceBetweenSync() external {
+        vm.startPrank(address(0xbeef));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), type(uint256).max);
+        alchemist.deposit(100_000e18, address(0xbeef), 0);
+        uint256 tokenIdFor0xBeef = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
+        alchemist.mint(tokenIdFor0xBeef, 8500e18, address(0xbeef));
+        alchemist.mint(tokenIdFor0xBeef, 1000e18, address(0xaaaa));
+        alchemist.mint(tokenIdFor0xBeef, 500e18, address(0xbbbb));
+        SafeERC20.safeApprove(address(alToken), address(transmuterLogic), type(uint256).max);
+        transmuterLogic.createRedemption(3500e18);
+        vm.stopPrank();
+
+        vm.startPrank(address(0xaaaa));
+        SafeERC20.safeApprove(address(alToken), address(transmuterLogic), type(uint256).max);
+        transmuterLogic.createRedemption(1000e18);
+        vm.stopPrank();
+
+        vm.startPrank(address(0xbbbb));
+        SafeERC20.safeApprove(address(alToken), address(transmuterLogic), type(uint256).max);
+        transmuterLogic.createRedemption(500e18);
+        vm.stopPrank();
+
+        vm.startPrank(address(0xdad));
+        SafeERC20.safeApprove(address(fakeYieldToken), address(alchemist), type(uint256).max);
+        alchemist.deposit(100_000e18, address(0xdad), 0);
+        uint256 tokenIdFor0xdad = AlchemistNFTHelper.getFirstTokenId(address(0xdad), address(alchemistNFT));
+        alchemist.mint(tokenIdFor0xdad, 100e18, address(0xdad));
+        vm.stopPrank();
+
+        vm.roll(block.number + 5_256_000 * 2 / 5);
+        
+        alchemist.poke(tokenIdFor0xdad);
+        alchemist.poke(tokenIdFor0xBeef);
+
+        (uint256 collateral, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenIdFor0xdad);
+        (uint256 collateralBeef, uint256 debtBeef, uint256 earmarkedBeef) = alchemist.getCDP(tokenIdFor0xBeef);
+
+        assertEq(earmarked + earmarkedBeef, alchemist.cumulativeEarmarked());
+        assertEq(debt + debtBeef, alchemist.totalDebt());
+
+        // The first redemption
+        vm.startPrank(address(0xaaaa));
+        transmuterLogic.claimRedemption(2);
+        vm.stopPrank();
+
+        vm.roll(block.number + 5_256_000 / 10);
+        
+        // The second redemption
+        vm.startPrank(address(0xbbbb));
+        transmuterLogic.claimRedemption(3);
+        vm.stopPrank();
+        
+        alchemist.poke(tokenIdFor0xdad);
+        alchemist.poke(tokenIdFor0xBeef);
+
+        (collateral, debt, earmarked) = alchemist.getCDP(tokenIdFor0xdad);
+        (collateralBeef, debtBeef, earmarkedBeef) = alchemist.getCDP(tokenIdFor0xBeef);
+
+        
+        assertEq(earmarked + earmarkedBeef, alchemist.cumulativeEarmarked());
+        assertEq(debt + debtBeef, alchemist.totalDebt());
+    }
 }
