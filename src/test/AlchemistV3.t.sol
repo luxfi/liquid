@@ -253,7 +253,7 @@ contract AlchemistV3Test is Test {
         uint8 decimals = TokenUtils.expectDecimals(address(yieldToken));
         uint256 vaultSupply = yieldToken.totalSupply();
         if (vaultSupply == 0) return 10 ** decimals;
-        return IERC20(address(yieldToken.asset())).balanceOf(address(yieldToken))/vaultSupply;
+        return IERC20(address(yieldToken.asset())).balanceOf(address(yieldToken)) * 1e4 / vaultSupply / 1e4;
     }
 
     function testSetV3PositionNFTAlreadySetRevert() public {
@@ -577,7 +577,6 @@ contract AlchemistV3Test is Test {
         vm.stopPrank();
 
         assertEq(alchemist.getTotalDeposited(), (amount * 2));
-
         assertEq(
             alchemist.getMaxBorrowable(tokenId),
             alchemist.normalizeUnderlyingTokensToDebt(
@@ -657,7 +656,6 @@ contract AlchemistV3Test is Test {
 
         assertApproxEqAbs(deposited, amount / 2, 1);
         assertApproxEqAbs(userDebt, 0, 1);
-        // FIXME broken
         assertApproxEqAbs(
             alchemist.getMaxBorrowable(tokenId),
             alchemist.normalizeUnderlyingTokensToDebt(yieldTokenPrice() * amount / 2 / FIXED_POINT_SCALAR) * FIXED_POINT_SCALAR
@@ -1744,10 +1742,11 @@ contract AlchemistV3Test is Test {
         // modify yield token price via modifying underlying token supply
         (uint256 prevCollateral, uint256 prevDebt,) = alchemist.getCDP(tokenIdFor0xBeef);
         uint256 initialVaultSupply = IERC20(address(yieldToken)).totalSupply();
-        // yieldToken.updateMockTokenSupply(initialVaultSupply); FIXME
         // increasing yeild token suppy by 59 bps or 5.9%  while keeping the unederlying supply unchanged
         uint256 modifiedVaultSupply = (initialVaultSupply * 590 / 10_000) + initialVaultSupply;
-        // yieldToken.updateMockTokenSupply(modifiedVaultSupply); FIXME
+        deal(address(yieldToken), address(0xdead), initialVaultSupply * 590 / 10_000, true);
+        assertEq(IERC20(address(yieldToken)).totalSupply(), modifiedVaultSupply);
+
 
         // ensure initial debt is correct
         vm.assertApproxEqAbs(prevDebt, 180_000_000_000_000_000_018_000, minimumDepositOrWithdrawalLoss);
@@ -1900,9 +1899,9 @@ contract AlchemistV3Test is Test {
         uint256 initialVaultSupply = IERC20(address(yieldToken)).totalSupply();
         // yieldToken.updateMockTokenSupply(initialVaultSupply); FIXME
         // increasing yeild token suppy by 4000 bps or 40%  while keeping the unederlying supply unchanged
-        uint256 modifiedVaultSupply = (initialVaultSupply * 4000 / 10_000) + initialVaultSupply;
-        // yieldToken.updateMockTokenSupply(modifiedVaultSupply); FIXME
-
+        uint256 modifiedVaultSupply = (initialVaultSupply * 590 / 10_000) + initialVaultSupply;
+        deal(address(yieldToken), address(0xdead), initialVaultSupply * 590 / 10_000, true);
+        assertEq(IERC20(address(yieldToken)).totalSupply(), modifiedVaultSupply);
         // ensure initial debt is correct
         vm.assertApproxEqAbs(prevDebt, 180_000_000_000_000_000_018_000, minimumDepositOrWithdrawalLoss);
 
@@ -1978,7 +1977,8 @@ contract AlchemistV3Test is Test {
         // yieldToken.updateMockTokenSupply(initialVaultSupply); FIXME
         // increasing yeild token suppy by 1200 bps or 12%  while keeping the unederlying supply unchanged
         uint256 modifiedVaultSupply = (initialVaultSupply * 1200 / 10_000) + initialVaultSupply;
-        // yieldToken.updateMockTokenSupply(modifiedVaultSupply); FIXME
+        deal(address(yieldToken), address(0xdead), initialVaultSupply * 590 / 10_000, true);
+        assertEq(IERC20(address(yieldToken)).totalSupply(), modifiedVaultSupply);
 
         // let another user liquidate the previous user position
         vm.startPrank(alice);
@@ -2059,7 +2059,8 @@ contract AlchemistV3Test is Test {
         // yieldToken.updateMockTokenSupply(initialVaultSupply); FIXME
         // increasing yeild token suppy by 59 bps or 5.9%  while keeping the unederlying supply unchanged
         uint256 modifiedVaultSupply = (initialVaultSupply * 590 / 10_000) + initialVaultSupply;
-        // yieldToken.updateMockTokenSupply(modifiedVaultSupply); FIXME
+        deal(address(yieldToken), address(0xdead), initialVaultSupply * 590 / 10_000, true);
+        assertEq(IERC20(address(yieldToken)).totalSupply(), modifiedVaultSupply);
 
         // let another user liquidate the previous user position
         vm.startPrank(alice);
