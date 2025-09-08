@@ -2366,10 +2366,9 @@ contract AlchemistV3Test is Test {
 
         // modify yield token price via modifying underlying token supply
         uint256 initialVaultSupply = IERC20(address(yieldToken)).totalSupply();
-        // yieldToken.updateMockTokenSupply(initialVaultSupply); FIXME
         // increasing yeild token suppy by 59 bps or 5.9%  while keeping the unederlying supply unchanged
         uint256 modifiedVaultSupply = (initialVaultSupply * 590 / 10_000) + initialVaultSupply;
-        // yieldToken.updateMockTokenSupply(modifiedVaultSupply); FIXME
+        deal(address(yieldToken), address(0xdead), initialVaultSupply * 590 / 10_000, true);
 
         // ensure initial debt is correct
         vm.assertApproxEqAbs(prevDebt, 180_000_000_000_000_000_018_000, minimumDepositOrWithdrawalLoss);
@@ -2832,11 +2831,9 @@ contract AlchemistV3Test is Test {
 
         // modify yield token price via modifying underlying token supply
         uint256 initialVaultSupply = IERC20(address(yieldToken)).totalSupply();
-        // yieldToken.updateMockTokenSupply(initialVaultSupply); FIXME
         // increasing yeild token suppy by 59 bps or 5.9%  while keeping the unederlying supply unchanged
         uint256 modifiedVaultSupply = (initialVaultSupply * 590 / 10_000) + initialVaultSupply;
-        // yieldToken.updateMockTokenSupply(modifiedVaultSupply); FIXME
-
+        deal(address(yieldToken), address(0xdead), initialVaultSupply * 590 / 10_000, true);
         // ensure initial debt is correct
         vm.assertApproxEqAbs(prevDebt, 180_000_000_000_000_000_018_000, minimumDepositOrWithdrawalLoss);
 

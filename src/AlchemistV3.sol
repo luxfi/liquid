@@ -361,8 +361,12 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     function totalValue(uint256 tokenId) public view returns (uint256) {
         uint256 totalUnderlying;
         (,, uint256 collateral) = _calculateUnrealizedDebt(tokenId);
-        console.log("collateral is %d", collateral);
-        if (collateral > 0) totalUnderlying += convertYieldTokensToUnderlying(collateral);
+        if (collateral > 0) {
+            uint256 underlyingValue = convertYieldTokensToUnderlying(collateral);
+            if (underlyingValue > 0) {
+                totalUnderlying += underlyingValue;
+            }
+        }
         return normalizeUnderlyingTokensToDebt(totalUnderlying);
     }
 
