@@ -662,59 +662,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         emit MintAllowancesReset(tokenId);
     }
 
-    /// @inheritdoc IAlchemistV3State
-    function calculateLiquidation(
-        uint256 collateral,
-        uint256 debt,
-        uint256 targetCollateralization,
-        uint256 alchemistCurrentCollateralization,
-        uint256 alchemistMinimumCollateralization,
-        uint256 feeBps
-    ) public pure returns (uint256 grossCollateralToSeize, uint256 debtToBurn, uint256 fee) {
-        // Step 1: Check for bad debt (debt >= collateral)
-        if (debt >= collateral) {
-            return (debt, debt, 0);
-        }
-
-        // Step 2: Check for global undercollateralization
-        if (alchemistCurrentCollateralization < alchemistMinimumCollateralization) {
-            return (debt, debt, 0);
-        }
-
-        // Step 3: Calculate liquidation fee from surplus
-        uint256 surplus = collateral - debt;
-        fee = (surplus * feeBps) / BPS;
-
-        // Step 4: Calculate adjusted collateral after fee
-        uint256 adjustedCollateral = collateral - fee;
-
-        // Step 5: Calculate target collateral value needed
-        uint256 targetCollateralValue = (targetCollateralization * debt) / FIXED_POINT_SCALAR;
-
-        // Step 6: Check if position is already adequately collateralized
-        if (targetCollateralValue <= adjustedCollateral) {
-            return (0, 0, fee);
-        }
-
-        // Step 7: Calculate deficit that needs to be covered
-        uint256 deficit = targetCollateralValue - adjustedCollateral;
-
-        // Step 8: Calculate denominator for liquidation formula
-        uint256 denominator = targetCollateralization - FIXED_POINT_SCALAR;
-
-        // Step 9: Calculate debt to burn using ceiling division
-        uint256 numerator = deficit * FIXED_POINT_SCALAR;
-        debtToBurn = (numerator + denominator - 1) / denominator;
-
-        // Step 10: Calculate gross collateral to seize
-        grossCollateralToSeize = debtToBurn + fee;
-
-        // Step 11: Ensure we don't liquidate more than available collateral
-        if (grossCollateralToSeize > collateral) {
-            grossCollateralToSeize = collateral;
-            debtToBurn = collateral - fee;
-        }
-    }
 
     /// @inheritdoc IAlchemistV3State
     function convertYieldTokensToDebt(uint256 amount) public view returns (uint256) {
