@@ -13,12 +13,7 @@ contract AlchemistCurator is PermissionedProxy {
         vault = IVaultV2(_vault);
 
         // setIsAdapter(address account, bool newIsAdapter)
-        permissionedCalls[0xb332ebf2] = true;
+        //permissionedCalls[0xb332ebf2] = true;
     }
 
-    // TODO add risk level as parameter and set mapping accordingly from StrategyClassifier
-    function setIsAdapter(address account, bool newIsAdapter) external onlyOperator {
-        require(msg.sender != admin, "PD"); // in case roles are mixed
-        vault.setIsAdapter(account, newIsAdapter);
-    }
 }
