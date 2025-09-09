@@ -902,7 +902,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     {
         Account storage account = _accounts[accountId];
 
-<<<<<<< HEAD
         (uint256 liquidationAmount, uint256 debtToBurn, uint256 baseFee, uint256 outsourcedFee) = calculateLiquidation(
             collateralInUnderlying,
             account.debt,
@@ -931,52 +930,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
             uint256 feeBonus = normalizeDebtTokensToUnderlying(outsourcedFee);
             feeInUnderlying = vaultBalance > feeBonus ? feeBonus : vaultBalance;
             TokenUtils.safeTransfer(yieldToken, msg.sender, feeInUnderlying);
-=======
-            // If we have earmarked debt, we need to ensure we liquidate enough to cover it
-            if (account.earmarked > 0 && liquidationAmount == 0) {
-                // Force liquidation of at least the earmarked amount
-                liquidationAmount = account.earmarked;
-                debtToBurn = account.earmarked;
-                baseFee = 0;
-            }
-
-            uint256 feeBonus = debtToBurn * liquidatorFee / BPS;
-            uint256 adjustedLiquidationAmount = convertDebtTokensToYield(liquidationAmount);
-            uint256 adjustedDebtToBurn = convertDebtTokensToYield(debtToBurn);
-            debtAmount = adjustedLiquidationAmount;
-            feeInYield = convertDebtTokensToYield(baseFee);
-            // update user balance (denominated in yield tokens)
-            account.collateralBalance = account.collateralBalance > adjustedLiquidationAmount ? account.collateralBalance - adjustedLiquidationAmount : 0;
-
-            // Update users debt (denominated in debt tokens)
-            _subDebt(accountId, debtToBurn);
-            console.log("------------- debug ---------------");
-
-            // send liquidation amount - any fee to the transmuter. the transmuter only accepts yield tokens
-            // Use the actual balance available in the contract
-            uint256 availableBalance = TokenUtils.safeBalanceOf(yieldToken, address(this));
-            uint256 transferAmount = adjustedDebtToBurn > availableBalance ? availableBalance : adjustedDebtToBurn;
-            TokenUtils.safeTransfer(yieldToken, transmuter, transferAmount);
-
-            if (feeInYield > 0) {
-                // send base fee in yield tokens to liquidator
-                TokenUtils.safeTransfer(yieldToken, msg.sender, feeInYield);
-            }
-
-            // excess fee will be sent in underlying token to the liquidator.
-            // since debt token is 1 : 1 with underyling token
-            if (feeBonus > 0) {
-                assert(address(IVaultV2(alchemistFeeVault).asset()) == underlyingToken);
-                uint256 vaultBalance = IERC20(IVaultV2(alchemistFeeVault).asset()).balanceOf(alchemistFeeVault);
-                if (vaultBalance > 0) {
-                    feeInUnderlying = vaultBalance > feeBonus ? feeBonus : vaultBalance;
-
-                    //IVaultV2(alchemistFeeVault).withdraw(feeInUnderlying, msg.sender, msg.sender);
-                    //IERC20(IVaultV2(alchemistFeeVault).asset()).transferFrom(address(this), msg.sender, feeInUnderlying);
-                    TokenUtils.safeTransfer(IVaultV2(alchemistFeeVault).asset(), msg.sender, feeInUnderlying);
-                }
-            }
->>>>>>> 054b7d7 (vault inflation trough storage)
         }
 
         return (amountLiquidated + repaidAmountInYield, feeInYield, feeInUnderlying);
