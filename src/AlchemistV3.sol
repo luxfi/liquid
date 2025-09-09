@@ -528,7 +528,12 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         cumulativeEarmarked -= earmarkPaidGlobal;
 
         // Debt is subject to protocol fee similar to redemptions
-        account.collateralBalance -= creditToYield * protocolFee / BPS;
+        uint256 feeAmount = creditToYield * protocolFee / BPS;
+        if (feeAmount > account.collateralBalance) {
+            revert("Not enough collateral to pay for debt fee");
+        } else {
+            account.collateralBalance -= creditToYield * protocolFee / BPS;
+        }
 
         _subDebt(recipientTokenId, credit);
 
@@ -892,6 +897,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         uint256 lockedCollateral = convertDebtTokensToYield(account.debt) * minimumCollateralization / FIXED_POINT_SCALAR;
 
         if (account.collateralBalance - lockedCollateral < toLock) revert Undercollateralized();
+
         account.rawLocked = lockedCollateral + toLock;
         _totalLocked += toLock;
         account.debt += amount;
@@ -1008,45 +1014,34 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @dev Update the user's earmarked and redeemed debt amounts.
     function _sync(uint256 tokenId) internal {
         Account storage account = _accounts[tokenId];
+        RedemptionInfo memory previousRedemption = _redemptions[lastRedemptionBlock];
 
-        // ----- 1) Earmark progression (from live, unearmarked debt) -----
-        uint256 dE = _earmarkWeight - account.lastAccruedEarmarkWeight;
-        uint256 unearmarked0 = account.debt - account.earmarked;                 // invariant: >= 0
-        uint256 newlyEarmarked = (dE == 0 || unearmarked0 == 0)
-            ? 0
-            : PositionDecay.ScaleByWeightDelta(unearmarked0, dE);
+        uint256 debtToEarmark = PositionDecay.ScaleByWeightDelta(account.debt - account.earmarked, _earmarkWeight - account.lastAccruedEarmarkWeight);
+        uint256 earmarkedState = account.earmarked + debtToEarmark;
 
-        uint256 earmarkedState = account.earmarked + newlyEarmarked;
-        account.lastAccruedEarmarkWeight = _earmarkWeight;
+        // Recreate account state at last redemption block if the redemption was in the past
+        uint256 earmarkToRedeem;
+        uint256 earmarkPreviousState;
+        if (block.number > lastRedemptionBlock && lastRedemptionBlock > account.lastRedemptionSync &&_redemptionWeight != 0) {
+            debtToEarmark = PositionDecay.ScaleByWeightDelta(account.debt - account.earmarked, previousRedemption.earmarkWeight - account.lastAccruedEarmarkWeight);
 
-        // ----- 2) Redemption progression (strictly from the post-earmark base) -----
-        uint256 dR = _redemptionWeight - account.lastAccruedRedemptionWeight;
-        uint256 redeemedDebt = (dR == 0 || earmarkedState == 0)
-            ? 0
-            : PositionDecay.ScaleByWeightDelta(earmarkedState, dR);
-
-        if (redeemedDebt != 0) {
-            // Consume earmark and debt 1:1 (keeps earmarked ≤ debt inherently)
-            account.debt       -= redeemedDebt;
-            account.earmarked   = earmarkedState - redeemedDebt;
-
-            // Redeem user collateral equal to the redeemed debt’s value
-            uint256 redeemedCollateral = convertDebtTokensToYield(redeemedDebt);
-            account.collateralBalance -= redeemedCollateral;
-
-            account.lastAccruedRedemptionWeight = _redemptionWeight;
-            account.lastRedemptionSync = lastRedemptionBlock; // redemption weights are always updated on earmark update
+            earmarkPreviousState = account.earmarked + debtToEarmark;
+            earmarkToRedeem = PositionDecay.ScaleByWeightDelta(earmarkPreviousState, _redemptionWeight - account.lastAccruedRedemptionWeight);
         } else {
-            // No redemption delta; just carry the earmark forward
-            account.earmarked = earmarkedState;
+            earmarkToRedeem = PositionDecay.ScaleByWeightDelta(earmarkedState, _redemptionWeight - account.lastAccruedRedemptionWeight);
         }
 
-        // ----- 3) Locked collateral is a pure function of current debt (no clamping, no extra weight) -----
-        // Exact “required lock” for the new debt; ceil to avoid 1-wei debt/lock drift
-        uint256 requiredLock = (convertDebtTokensToYield(account.debt) * minimumCollateralization + (FIXED_POINT_SCALAR - 1)) / FIXED_POINT_SCALAR;
-        account.rawLocked = requiredLock;
+        uint256 collateralToRemove = PositionDecay.ScaleByWeightDelta(account.rawLocked, _collateralWeight - account.lastCollateralWeight);
 
-        // We consider collateral “weight” irrelevant for redemption; we still advance the marker to avoid future deltas.
+        // Calculate how much of user earmarked amount has been redeemed and subtract it
+        account.earmarked = earmarkedState - earmarkToRedeem;
+        account.debt -= earmarkToRedeem;
+        account.lastAccruedRedemptionWeight = _redemptionWeight;
+        account.lastAccruedEarmarkWeight = _earmarkWeight;
+        account.lastRedemptionSync = block.number;
+        // Redeem user collateral equal to value of debt tokens redeemed
+        account.collateralBalance -= collateralToRemove;
+        account.rawLocked = convertDebtTokensToYield(account.debt) * minimumCollateralization / FIXED_POINT_SCALAR;
         account.lastCollateralWeight = _collateralWeight;
     }
 
@@ -1055,7 +1050,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         if (totalDebt == 0) return;
         if (block.number <= lastEarmarkBlock) return;
 
-        // How much the transmuter can cover directly since the last earmark
+        // Yield the transmuter accumulated since last earmark (cover)
         uint256 transmuterCurrentBalance = TokenUtils.safeBalanceOf(yieldToken, address(transmuter));
         uint256 transmuterDifference = transmuterCurrentBalance > lastTransmuterTokenBalance
             ? transmuterCurrentBalance - lastTransmuterTokenBalance
@@ -1063,14 +1058,14 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         uint256 amount = ITransmuter(transmuter).queryGraph(lastEarmarkBlock + 1, block.number);
 
-        // Saturating subtract: if cover >= amount, nothing needs to be earmarked
+        // Proper saturating subtract in DEBT units
         uint256 coverInDebt = convertYieldTokensToDebt(transmuterDifference);
         amount = amount > coverInDebt ? amount - coverInDebt : 0;
 
         if (amount > 0) {
+            // Only earmark against live unearmarked debt
             uint256 liveUnearmarked = totalDebt - cumulativeEarmarked;
             if (liveUnearmarked != 0) {
-                // Never earmark more than what is still unearmarked live debt
                 uint256 toEarmark = amount > liveUnearmarked ? liveUnearmarked : amount;
                 _earmarkWeight += PositionDecay.WeightIncrement(toEarmark, liveUnearmarked);
                 cumulativeEarmarked += toEarmark;
@@ -1084,79 +1079,42 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     ///
     /// @param tokenId The id of the account owner.
     ///
-    /// @return projectedDebt The amount of debt that the account owned by `owner` will have after an update.
-    /// @return projectedEarmarked The amount of debt which is currently earmarked fro redemption.
-    /// @return projectedCollateralBalance The amount of collateral that has yet to be redeemed.
-    function _calculateUnrealizedDebt(uint256 tokenId)
-        internal
-        view
-        returns (uint256 projectedDebt, uint256 projectedEarmarked, uint256 projectedCollateralBalance)
-    {
+    /// @return The amount of debt that the account owned by `owner` will have after an update.
+    /// @return The amount of debt which is currently earmarked fro redemption.
+    /// @return The amount of collateral that has yet to be redeemed.
+    function _calculateUnrealizedDebt(uint256 tokenId) internal view returns (uint256, uint256, uint256) {
         Account storage account = _accounts[tokenId];
         RedemptionInfo memory previousRedemption = _redemptions[lastRedemptionBlock];
 
-        // ---- 1) Simulate the earmark-weight update that would happen "now" ----
-        uint256 earmarkWeightNow = _earmarkWeight;
+        uint256 amount;
+        uint256 earmarkWeightCopy = _earmarkWeight;
 
+        // If earmark was not this block then simulate, earmark, and store temporary variables for proper debt calculation
         if (block.number > lastEarmarkBlock) {
-            uint256 amount = ITransmuter(transmuter).queryGraph(lastEarmarkBlock + 1, block.number);
+            amount = ITransmuter(transmuter).queryGraph(lastEarmarkBlock + 1, block.number);
             if (amount > 0) {
-                // NOTE: denominator is *live* debt share: totalDebt - cumulativeEarmarked
-                earmarkWeightNow += PositionDecay.WeightIncrement(amount, totalDebt - cumulativeEarmarked);
+                earmarkWeightCopy += PositionDecay.WeightIncrement(amount, totalDebt - cumulativeEarmarked);
             }
         }
 
-        // ---- 2) Semantic projection to keep state on the invariant manifold (not a clamp for safety) ----
-        uint256 earmarked0 = account.earmarked <= account.debt ? account.earmarked : account.debt;
-        uint256 unearmarked0 = account.debt - earmarked0;
+        uint256 debtToEarmark = PositionDecay.ScaleByWeightDelta(account.debt - account.earmarked, earmarkWeightCopy - account.lastAccruedEarmarkWeight);
+        uint256 earmarkedState = account.earmarked + debtToEarmark;
 
-        // ---- 3) Earmark progression to the effective (simulated) E weight ----
-        uint256 dE = earmarkWeightNow - account.lastAccruedEarmarkWeight;
-        uint256 newlyEarmarked = (dE == 0 || unearmarked0 == 0)
-            ? 0
-            : PositionDecay.ScaleByWeightDelta(unearmarked0, dE);
+        // Recreate account state at last redemption block if the redemption was in the past
+        uint256 earmarkedPreviousState;
+        uint256 earmarkToRedeem;
+        if (block.number > lastRedemptionBlock && _redemptionWeight != 0) {
+            debtToEarmark = PositionDecay.ScaleByWeightDelta(account.debt - account.earmarked, previousRedemption.earmarkWeight - account.lastAccruedEarmarkWeight);
 
-        uint256 earmarkedState = earmarked0 + newlyEarmarked;
-
-        // ---- 4) If a redemption happened since this account last processed redemption,
-        //         redeem from the earmark *as reconstructed at that redemption’s E anchor*. ----
-        bool redemptionPending =
-            (lastRedemptionBlock > account.lastRedemptionSync) &&
-            (_redemptionWeight > account.lastAccruedRedemptionWeight);
-
-        uint256 baseForRedemption;
-        if (redemptionPending) {
-            // Rebuild earmark at the redemption’s anchor E-weight.
-            uint256 dE_anchor = previousRedemption.earmarkWeight - account.lastAccruedEarmarkWeight;
-            uint256 earmarkAtAnchor = (dE_anchor == 0 || unearmarked0 == 0)
-                ? earmarked0
-                : earmarked0 + PositionDecay.ScaleByWeightDelta(unearmarked0, dE_anchor);
-            baseForRedemption = earmarkAtAnchor;
+            earmarkedPreviousState = account.earmarked + debtToEarmark;
+            earmarkToRedeem = PositionDecay.ScaleByWeightDelta(earmarkedPreviousState, _redemptionWeight - account.lastAccruedRedemptionWeight);
         } else {
-            // Otherwise redeem from the current (simulated) earmark state.
-            baseForRedemption = earmarkedState;
+            earmarkToRedeem = PositionDecay.ScaleByWeightDelta(earmarkedState, _redemptionWeight - account.lastAccruedRedemptionWeight);
         }
 
-        // ---- 5) Redemption progression to the current R weight ----
-        // (No R simulation here; by design, R only updates in/after an E update, which we reconstructed above.)
-        uint256 dR = _redemptionWeight - account.lastAccruedRedemptionWeight;
-        uint256 earmarkToRedeem = (dR == 0 || baseForRedemption == 0)
-            ? 0
-            : PositionDecay.ScaleByWeightDelta(baseForRedemption, dR);
+        uint256 collateralToRemove = PositionDecay.ScaleByWeightDelta(account.rawLocked, _collateralWeight - account.lastCollateralWeight);
 
-        // ---- 6) Collateral decay to current collateral weight (no redemption pull here) ----
-        uint256 dC = _collateralWeight - account.lastCollateralWeight;
-        uint256 collateralToRemove = (dC == 0 || account.rawLocked == 0)
-            ? 0
-            : PositionDecay.ScaleByWeightDelta(account.rawLocked, dC);
-
-        // ---- 7) Return the post-sync projections (what _sync would set, without mutating) ----
-        projectedDebt = account.debt - earmarkToRedeem;
-        projectedEarmarked = earmarkedState - earmarkToRedeem;
-
-        // "amount of collateral that has yet to be redeemed" = balance after collateral decay only.
-        // (Actual redemption outflow happens when Transmuter claims, not here.)
-        projectedCollateralBalance = account.collateralBalance - collateralToRemove;
+        return (account.debt - earmarkToRedeem, earmarkedState - earmarkToRedeem, account.collateralBalance - collateralToRemove);
     }
 
     /// @dev Checks that the account owned by `tokenId` is properly collateralized.
