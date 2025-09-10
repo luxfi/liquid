@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {IVaultV2} from "../../lib/vault-v2/src/interfaces/IVaultV2.sol";
-import {IMYTAdapter} from "../MYTAdapter.sol";
+import {IVaultV2} from "../../../lib/vault-v2/src/interfaces/IVaultV2.sol";
+import {IMYTAdapter} from "./IMYTAdapter.sol";
 
 interface IMYTVault {
     // Events
