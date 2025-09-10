@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import {IVaultV2} from "../lib/vault-v2/src/interfaces/IVaultV2.sol";
+import {IVaultV2} from "../../lib/vault-v2/src/interfaces/IVaultV2.sol";
 import {IMYTVault} from "./interfaces/IMYTVault.sol";
 import {IMYTAdapter} from "./MYTAdapter.sol";
 
@@ -30,37 +30,6 @@ contract MYTVault is IMYTVault, Ownable {
         //  adapterId = keccak256(abi.encode("this", address(this)));
         // TODO add the strategy to the perpetual gauge in an authenticated manner
     }
-    /* 
-    /// @notice call this function to handle wrapping/allocation/moving funds to
-    /// the respective protocol of this strategy
-    function allocate(uint256 amount) public payable returns (uint256 ret) {
-        // TODO additional access control needed?
-        require(whitelistedAllocators[msg.sender], "PD");
-        ret = _allocate(amount);
-        emit Allocate(amount);
-    } */
-
-    /// @notice call this function to handle wrapping/allocation/moving funds to
-    /// the respective protocol of this strategy
-    /*     function allocate(address adapter, bytes memory data, uint256 assets) external
-        returns (uint256){
-        // TODO additional access control needed?
-        require(whitelistedAllocators[msg.sender], "PD");
-        emit LogEvent("myt vault allocate, msg.sender : ", msg.sender);
-        MYT.allocate(adapter, data, assets);
-        return assets;
-    }
-
-    /// @notice call this function to handle unwrapping/deallocation/moving funds from
-    /// the respective protocol of this strategy
-    function deallocate(address adapter, bytes memory data, uint256 assets)
-        external
-        returns (uint256){
-        // TODO additional access control needed?
-        require(whitelistedAllocators[msg.sender], "PD");
-        MYT.deallocate(adapter, data,assets);
-        return assets;
-    } */
 
     /// @notice can be called by anyone to recalculate the
     /// estimated yields of this strategy based on external price

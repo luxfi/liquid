@@ -2,61 +2,21 @@
 
 pragma solidity 0.8.28;
 
-import {IAdapter} from "../lib/vault-v2/src/interfaces/IAdapter.sol";
+import {IAdapter} from "../../lib/vault-v2/src/interfaces/IAdapter.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IMYTVault} from "./interfaces/IMYTVault.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {IMYTAdapter} from "./interfaces/IMYTAdapter.sol";
 
 /**
  * @title MYTAdapter
- * @notice This contract is used to allocate and deallocate funds to a single strategy
+ * @notice This contract is a wrapper around a single MYT strategy. It is used to allocate and deallocate funds to a single strategy.
  * @dev Workflow for creating new adapters :
  *     1) Deploy adapter
- *     2) Add adapter via setIsAdapter() on Morpho V2 Vault(timelocked)
+ *     2) Add adapter via setIsAdapter() on Morpho V2 Vault(timelocked), via the myt curator proxy
  *     3) Set absolute cap via increaseAbsoluteCap() on Morpho V2 Vault(timelocked)
  *     4) Only then can allocations happen
  */
-interface IMYTAdapter is IAdapter {
-    enum RiskClass {
-        LOW,
-        MEDIUM,
-        HIGH
-    }
-
-    function ids() external view returns (bytes32[] memory);
-    function snapshotYield() external returns (uint256);
-
-    struct StrategyParams {
-        address owner;
-        string name;
-        string protocol;
-        RiskClass riskClass;
-        uint256 cap;
-        uint256 globalCap;
-        uint256 estimatedYield;
-        bool additionalIncentives;
-    }
-
-    function adapterId() external view returns (bytes32);
-    function getIdData() external view returns (bytes memory);
-    function getCap() external view returns (uint256);
-    function getGlobalCap() external view returns (uint256);
-    function getEstimatedYield() external view returns (uint256);
-    function getParams() external view returns (StrategyParams memory);
-    function setRiskClass(RiskClass newClass) external;
-    function setAdditionalIncentives(bool newValue) external;
-    function setKillSwitch(bool val) external;
-
-    // Events
-    event Allocate(uint256 indexed amount);
-    event Deallocate(uint256 indexed amount);
-    event YieldUpdated(uint256 indexed yield);
-    event RiskClassUpdated(RiskClass indexed class);
-    event IncentivesUpdated(bool indexed enabled);
-    event Emergency(bool indexed isEmergency);
-    event KillSwitchUpdated(bool indexed isEmergency);
-}
-
 contract MYTAdapter is IMYTAdapter, Ownable {
     ERC20 public immutable yieldToken;
     address public immutable myt;
@@ -64,15 +24,13 @@ contract MYTAdapter is IMYTAdapter, Ownable {
     StrategyParams public params;
     bool public killSwitch;
 
-    event LogMYTAdapterEvent(string message, uint256 value);
-
     constructor(address _myt, address _yieldToken, StrategyParams memory _params) Ownable(_params.owner) {
         require(_myt != address(0));
         require(_yieldToken != address(0));
         require(_params.owner != address(0));
         myt = _myt;
         yieldToken = ERC20(_yieldToken);
-        adapterId = keccak256(abi.encode("MytStrategy", address(this)));
+        adapterId = keccak256(abi.encode(_params.protocol, address(this)));
         params = _params;
     }
 
@@ -93,7 +51,7 @@ contract MYTAdapter is IMYTAdapter, Ownable {
     }
 
     function getIdData() external view returns (bytes memory) {
-        return abi.encode("MytStrategy", address(this));
+        return abi.encode(params.protocol, address(this));
     }
 
     function allocate(bytes memory data, uint256 assets, bytes4 selector, address sender)
@@ -102,11 +60,12 @@ contract MYTAdapter is IMYTAdapter, Ownable {
         onlyVault
         returns (bytes32[] memory strategyIds, int256 change)
     {
+        // lets decode the old allocation from the data
+        uint256 oldAllocation = abi.decode(data, (uint256));
         uint256 amountAllocated = _allocate(assets);
-        emit LogMYTAdapterEvent("allocate amountAllocated", amountAllocated);
-        emit LogMYTAdapterEvent("allocate assets", assets);
-
-        return (ids(), int256(amountAllocated));
+        uint256 newAllocation = oldAllocation + amountAllocated;
+        emit Allocate(amountAllocated, address(this), address(IMYTVault(myt).MYT()));
+        return (ids(), int256(newAllocation) - int256(oldAllocation));
     }
 
     function deallocate(bytes memory data, uint256 assets, bytes4 selector, address sender)
@@ -115,8 +74,11 @@ contract MYTAdapter is IMYTAdapter, Ownable {
         onlyVault
         returns (bytes32[] memory strategyIds, int256 change)
     {
+        uint256 oldAllocation = abi.decode(data, (uint256));
         uint256 amountDeallocated = _deallocate(assets);
-        return (ids(), int256(amountDeallocated));
+        uint256 newAllocation = oldAllocation - amountDeallocated;
+        emit Deallocate(amountDeallocated, address(this), address(IMYTVault(myt).MYT()));
+        return (ids(), int256(newAllocation) - int256(oldAllocation));
     }
 
     function _allocate(uint256 assets) internal virtual returns (uint256) {}
