@@ -15,16 +15,6 @@ interface IMYTVault {
 
     // Functions
 
-    /*     /// @dev override this function to handle wrapping/allocation/moving funds to
-    /// the respective protocol of this strategy
-    function allocate(address adapter, bytes memory data, uint256 assets) external
-        returns (uint256);
-    /// @dev override this function to handle unwrapping/deallocation/moving funds from
-    /// the respective protocol of this strategy
-    function deallocate(address adapter, bytes memory data, uint256 assets)
-        external
-        returns (uint256); */
-
     /// @notice can be called by anyone to recalculate the
     /// estimated yields of this strategy based on external price
     /// oracles and protocol heuristics.

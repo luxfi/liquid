@@ -9,9 +9,6 @@ import {IMYTAdapter} from "./MYTAdapter.sol";
 
 contract MYTVault is IMYTVault, Ownable {
     IVaultV2 public immutable MYT;
-
-    IMYTAdapter.StrategyParams public params;
-
     /// @notice This value is true when the underlying protocol is known to
     /// experience issues or security incidents. In this case the allocation step is simply
     /// bypassed without reverts (to keep external allocators from reverting).
