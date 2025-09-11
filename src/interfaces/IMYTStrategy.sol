@@ -35,6 +35,13 @@ interface IMYTStrategy {
     /// the respective protocol of this strategy
     function deallocate(uint256 amount) external returns (uint256);
 
+    /// @dev override this function to handle strategies with withdrawal queue NFT
+    function claimWithdrawalQueue(uint256 positionId) external returns(uint256);
+
+    /// @dev override this function to claim all available rewards from the respective
+    /// protocol of this strategy
+    function claimRewards() external returns (uint256);
+
     /// @notice can be called by anyone to recalculate the
     /// estimated yields of this strategy based on external price
     /// oracles and protocol heuristics.

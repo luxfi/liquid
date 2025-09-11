@@ -20,7 +20,8 @@ import {IAlchemistTokenVault} from "./interfaces/IAlchemistTokenVault.sol";
 import "forge-std/console.sol";
 
 
-/// @title  AlchemistV3
+import "forge-std/console.sol";
+/// @title  AlchemistV3w
 /// @author Alchemix Finance
 contract AlchemistV3 is IAlchemistV3, Initializable {
     using SafeCast for int256;
@@ -820,6 +821,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         collateralInUnderlying = totalValue(accountId);
         collateralizationRatio = collateralInUnderlying * FIXED_POINT_SCALAR / account.debt;
 
+
         // If position is now healthy after repaying earmarked debt and no more liquidation is needed, return with only the repaid amount
         if (collateralizationRatio > collateralizationLowerBound && account.earmarked == 0) {
             return (repaidAmountInYield, 0, 0);
@@ -1144,6 +1146,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         uint256 yieldTokenTVLInUnderlying = convertYieldTokensToUnderlying(_yieldTokensDeposited);
         totalUnderlyingValue = yieldTokenTVLInUnderlying;
     }
+
 
     /// @inheritdoc IAlchemistV3State
     function calculateLiquidation(

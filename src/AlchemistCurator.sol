@@ -13,7 +13,7 @@ contract AlchemistCurator is PermissionedProxy {
         vault = IVaultV2(_vault);
 
         // setIsAdapter(address account, bool newIsAdapter)
+
         //permissionedCalls[0xb332ebf2] = true;
     }
-
 }
