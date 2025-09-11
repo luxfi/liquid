@@ -9,6 +9,7 @@ import {MockMYTStrategy} from "../mocks/MockMYTStrategy.sol";
 import {IMYTAdapter} from "../../myt/interfaces/IMYTAdapter.sol";
 import {MockMYTVault} from "../mocks/MockMYTVault.sol";
 import {SfrxETHStrategy} from "../../myt/strategies/SfrxETHStrategy.sol";
+import {MYTTestHelper} from "../libraries/MYTTestHelper.sol";
 
 contract MockSfrxETHStrategy is SfrxETHStrategy {
     constructor(address _myt, StrategyParams memory _params, address _sfrxEth, address _fraxMinter, address _redemptionQueue)
@@ -25,10 +26,11 @@ contract SfrxETHStrategyTest is Test {
     address public redemptionQueue = address(0xfDC69e6BE352BD5644C438302DE4E311AAD5565b);
     address public WETH = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     address public admin = address(0x1111111111111111111111111111111111111111);
+    address public curator = address(0x2222222222222222222222222222222222222222);
 
     function setUp() public {
         vm.startPrank(admin);
-        vault = new VaultV2(admin, WETH);
+        vault = MYTTestHelper._setupVault(WETH, admin, curator);
         mytVault = new MockMYTVault(address(vault));
         IMYTAdapter.StrategyParams memory params = IMYTAdapter.StrategyParams({
             owner: address(this),
