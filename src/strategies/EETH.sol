@@ -31,4 +31,5 @@ contract EETHMYTStrategy is MYTStrategy {
         // TODO calculate & snapshot yield
     }
 
+
 }
