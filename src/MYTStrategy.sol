@@ -56,6 +56,7 @@ contract MYTStrategy is IMYTStrategy, Ownable {
     function allocate(uint256 amount) public payable returns (uint256 ret) {
         // TODO additional access control needed?
         require(whitelistedAllocators[msg.sender], "PD");
+        require(!killSwitch, "emergency");
         ret = _allocate(amount);
         emit Allocate(amount);
     }
@@ -65,6 +66,7 @@ contract MYTStrategy is IMYTStrategy, Ownable {
     function deallocate(uint256 amount) public virtual returns (uint256 ret) {
         // TODO additional access control needed?
         require(whitelistedAllocators[msg.sender], "PD");
+        require(!killSwitch, "emergency");
         ret = _deallocate(amount);
         emit Deallocate(amount);
     }
