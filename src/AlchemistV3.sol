@@ -102,9 +102,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     address public yieldToken;
 
     /// @inheritdoc IAlchemistV3State
-    address public tokenAdapter;
-
-    /// @inheritdoc IAlchemistV3State
     address public transmuter;
 
     /// @inheritdoc IAlchemistV3State
@@ -180,7 +177,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         globalMinimumCollateralization = params.globalMinimumCollateralization;
         collateralizationLowerBound = params.collateralizationLowerBound;
         admin = params.admin;
-        tokenAdapter = params.tokenAdapter;
         transmuter = params.transmuter;
         protocolFee = params.protocolFee;
         protocolFeeReceiver = params.protocolFeeReceiver;
@@ -275,14 +271,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         repaymentFee = fee;
         emit RepaymentFeeUpdated(fee);
-    }
-
-    /// @inheritdoc IAlchemistV3AdminActions
-    function setTokenAdapter(address value) external onlyAdmin {
-        _checkArgument(value != address(0));
-
-        tokenAdapter = value;
-        emit TokenAdapterUpdated(value);
     }
 
     /// @inheritdoc IAlchemistV3AdminActions
@@ -791,8 +779,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
             return (0, 0, 0);
         }
 
-        // In the rare scenario where the price is 0, return 0
-        if (ITokenAdapter(tokenAdapter).price() == 0) {
+        uint256 price = IVaultV2(yieldToken).convertToAssets(10**IVaultV2(yieldToken).decimals());
+        if (price == 0) {
             return (0, 0, 0);
         }
 
