@@ -5,7 +5,18 @@ import {IVaultV2} from "../lib/vault-v2/src/interfaces/IVaultV2.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import {IMYTStrategy} from "./interfaces/IMYTStrategy.sol";
 import "forge-std/console.sol";
+import {ISettlerActions} from './external/interfaces/ISettlerActions.sol';
+import {IVelodromePair} from './external/interfaces/IVelodromePair.sol';
+import {ISignatureTransfer} from '../lib/permit2/src/interfaces/ISignatureTransfer.sol';
+import {IERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {ZeroXSwapVerifier} from './utils/ZeroXSwapVerifier.sol';
 
+interface IERC721Tiny {
+    function ownerOf(uint256 tokenId) external view returns (address);
+}
+interface IDeployerTiny is IERC721Tiny {
+    function prev(uint128 featureId) external view returns (address);
+}
 contract MYTStrategy is IMYTStrategy, Ownable {
     IVaultV2 public immutable MYT;
     uint256 public constant SECONDS_PER_YEAR = 365 days;
@@ -24,6 +35,12 @@ contract MYTStrategy is IMYTStrategy, Ownable {
     bool public killSwitch;
 
     mapping (address => bool) public whitelistedAllocators;
+
+    IDeployerTiny constant ZERO_EX_DEPLOYER =
+    IDeployerTiny(0x00000000000004533Fe15556B1E086BB1A72cEae);
+
+    error CounterfeitSettler(address);
+
 
     constructor(address _myt, StrategyParams memory _params) Ownable(_params.owner) {
         require(_params.owner != address(0));
@@ -50,6 +67,25 @@ contract MYTStrategy is IMYTStrategy, Ownable {
         require(whitelistedAllocators[msg.sender], "PD");
         ret = _deallocate(amount);
         emit Deallocate(amount);
+    }
+
+    /// @notice call this function to handle unwrapping/deallocation/moving funds from
+    /// the respective protocol of this strategy in case we want to bypass
+    /// a withdrawal queue or similar mechanism and directly go to a DEX
+    function deallocateDex(bytes calldata quote, bool prevSettler) external returns (uint256 ret) {
+        IERC20 asset = IERC20(address(MYT.asset()));
+        // TODO additional access control needed?
+        require(whitelistedAllocators[msg.sender], "PD");
+        address currentSettler = prevSettler ? ZERO_EX_DEPLOYER.prev(2) : ZERO_EX_DEPLOYER.ownerOf(2);
+        uint256 balanceBefore = asset.balanceOf(address(this));
+        uint256 limit = balanceBefore * 10 / 100; // 10% of balance
+        require(ZeroXSwapVerifier.verifySwapCalldata(quote, address(this), address(MYT.asset()), limit));
+
+        (bool success,) = currentSettler.call(quote);
+        require(success, "SF"); // settler failed
+        uint256 balanceAfter = asset.balanceOf(address(this));
+        ret = balanceBefore - balanceAfter;
+        emit DeallocateDex(ret);
     }
 
     /// @notice call this function to handle strategies with withdrawal queue NFT
@@ -175,4 +211,6 @@ contract MYTStrategy is IMYTStrategy, Ownable {
     function getGlobalCap() external view returns (uint256) {
         return params.globalCap;
     }
+
+
 }

@@ -20,6 +20,7 @@ interface IMYTStrategy {
     // Events
     event Allocate(uint256 indexed amount);
     event Deallocate(uint256 indexed amount);
+    event DeallocateDex(uint256 indexed amount);
     event YieldUpdated(uint256 indexed yield);
     event RiskClassUpdated(RiskClass indexed class);
     event IncentivesUpdated(bool indexed enabled);
@@ -34,6 +35,11 @@ interface IMYTStrategy {
     /// @dev override this function to handle unwrapping/deallocation/moving funds from
     /// the respective protocol of this strategy
     function deallocate(uint256 amount) external returns (uint256);
+
+    /// @notice call this function to handle unwrapping/deallocation/moving funds from
+    /// the respective protocol of this strategy in case we want to bypass
+    /// a withdrawal queue or similar mechanism and directly go to a DEX
+    function deallocateDex(bytes calldata quote, bool prevSettler) external returns (uint256 ret);
 
     /// @dev override this function to handle strategies with withdrawal queue NFT
     function claimWithdrawalQueue(uint256 positionId) external returns(uint256);
