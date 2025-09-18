@@ -5,6 +5,7 @@ pragma solidity 0.8.28;
 
 import {MYTAdapter} from "../MYTAdapter.sol";
 import {IWETH} from "../../interfaces/IWETH.sol";
+import {TokenUtils} from "../../libraries/TokenUtils.sol";
 
 interface FraxMinter {
     function submitAndDeposit(address recipient) external payable returns (uint256);
@@ -42,16 +43,14 @@ contract SfrxETHStrategy is MYTAdapter {
     }
 
     function _allocate(uint256 amount) internal override returns (uint256 depositReturn) {
-        // need to unwrap ether since strats only recieve weth (morpho v2 vault cannot hold native eth by default)
+        // need to unwrap ether since this strategy only recieves weth (morpho v2 vault cannot hold native eth by default)
         IWETH(WETH).withdraw(amount);
         // check that eth balance is equal to amount
-        emit SfrxETHStrategyDebugLog("Cheking if ETH balance is greater than amount.", address(this).balance);
         require(address(this).balance >= amount, "ETH balance is less than amount");
-        emit SfrxETHStrategyDebugLog("Success. ETH balance is greater than amount.", address(this).balance);
         depositReturn = minter.submitAndDeposit{value: amount}(address(this));
     }
 
-    function _deallocate(uint256 amount) internal override returns (uint256 requestedAmount) {
+    /*     function _deallocate(uint256 amount) internal override returns (uint256 requestedAmount) {
         // protection for uint120 requirement
         require(amount <= type(uint120).max);
         require(sfrxEth.transferFrom(msg.sender, address(this), amount), "pull shares fail");
@@ -61,13 +60,33 @@ contract SfrxETHStrategy is MYTAdapter {
         uint256 positionId = redemptionQueue.enterRedemptionQueueViaSfrxEth(address(this), uint120(amount));
         require(positionId != 0);
         requestedAmount = amount;
+    } */
+
+    function _deallocate(uint256 amount) internal override returns (uint256 requestedAmount) {
+        // protection for uint120 requirement
+        require(amount <= type(uint120).max);
+        requestedAmount = _doDexSwap(amount);
+        TokenUtils.safeTransfer(WETH, msg.sender, requestedAmount);
+    }
+
+    function _doDexSwap(uint256 amount) internal returns (uint256 amountReturned) {
+        // TODO: implement dex swap
+        address fakeDexAddress = address(0);
+        uint256 sfrxEthBalance = sfrxEth.balanceOf(address(this));
+        emit SfrxETHStrategyDebugLog("SfrxETH balance", sfrxEthBalance);
+        uint256 adjusted = amount < sfrxEthBalance ? amount : sfrxEthBalance;
+        emit SfrxETHStrategyDebugLog("Adjusted", adjusted);
+        TokenUtils.safeApprove(address(sfrxEth), fakeDexAddress, adjusted);
+        // sfrxEth balance should for this address should now be reduced by amount
+        TokenUtils.safeTransfer(address(sfrxEth), fakeDexAddress, adjusted);
+        amountReturned = adjusted;
     }
 
     function _claimWithdrawalQueue(uint256 positionId) internal returns (uint256 ethOut) {
         redemptionQueue.burnRedemptionTicketNft(positionId, payable(address(this)));
     }
 
-    function _computeBaseRatePerSecond() internal returns (uint256 ratePerSec, uint256 newIndex) {
+    function _computeBaseRatePerSecond() internal override returns (uint256 ratePerSec, uint256 newIndex) {
         uint256 dt = lastSnapshotTime == 0 ? 0 : block.timestamp - lastSnapshotTime;
 
         uint256 currentPPS = sfrxEth.convertToAssets(1e18);
