@@ -85,6 +85,8 @@ contract MYTAdapter is IMYTAdapter, Ownable {
 
     function _deallocate(uint256 assets) internal virtual returns (uint256) {}
 
+    function _computeBaseRatePerSecond() internal virtual returns (uint256 ratePerSec, uint256 newIndex) {}
+
     function snapshotYield() external virtual returns (uint256) {}
 
     function realAssets() external view virtual override returns (uint256) {}

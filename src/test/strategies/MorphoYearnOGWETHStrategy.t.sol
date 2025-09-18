@@ -11,14 +11,14 @@ import {MockMYTVault} from "../mocks/MockMYTVault.sol";
 import {SfrxETHStrategy} from "../../myt/strategies/SfrxETHStrategy.sol";
 import {MYTTestHelper} from "../libraries/MYTTestHelper.sol";
 
-contract MockSfrxETHStrategy is SfrxETHStrategy {
+contract MockMorphoYearnOGWETHStrategy is MorphoYearnOGWETHStrategy {
     constructor(address _myt, StrategyParams memory _params, address _sfrxEth, address _fraxMinter, address _redemptionQueue)
-        SfrxETHStrategy(_myt, _params, _sfrxEth, _fraxMinter, _redemptionQueue)
+        MorphoYearnOGWETHStrategy(_myt, _params, _sfrxEth, _fraxMinter, _redemptionQueue)
     {}
 }
 
-contract SfrxETHStrategyTest is Test {
-    MockSfrxETHStrategy public mytStrategy;
+contract MorphoYearnOGWETHStrategyTest is Test {
+    MockMorphoYearnOGWETHStrategy public mytStrategy;
     MockMYTVault public mytVault;
     IVaultV2 public vault;
     address public sfrxEth = address(0xac3E018457B222d93114458476f3E3416Abbe38F);
