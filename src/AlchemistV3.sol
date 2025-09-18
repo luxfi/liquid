@@ -15,7 +15,6 @@ import {Initializable} from "../lib/openzeppelin-contracts-upgradeable/contracts
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {Unauthorized, IllegalArgument, IllegalState, MissingInputData} from "./base/Errors.sol";
 import {IERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import {IPriceFeedAdapter} from "./adapters/ETHUSDPriceFeedAdapter.sol";
 import {IAlchemistTokenVault} from "./interfaces/IAlchemistTokenVault.sol";
 
 import {console} from "forge-std/console.sol";
@@ -400,7 +399,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         _sync(tokenId);
 
-        uint256 lockedCollateral = convertDebtTokensToYield( _accounts[tokenId].debt) * minimumCollateralization / FIXED_POINT_SCALAR;
+        uint256 lockedCollateral = convertDebtTokensToYield(_accounts[tokenId].debt) * minimumCollateralization / FIXED_POINT_SCALAR;
         _checkArgument(_accounts[tokenId].collateralBalance - lockedCollateral >= amount);
 
         _accounts[tokenId].collateralBalance -= amount;
@@ -486,7 +485,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         _accounts[recipientId].collateralBalance -= convertDebtTokensToYield(credit) * protocolFee / BPS;
         TokenUtils.safeTransfer(yieldToken, protocolFeeReceiver, convertDebtTokensToYield(credit) * protocolFee / BPS);
         _yieldTokensDeposited -= convertDebtTokensToYield(credit) * protocolFee / BPS;
-        
+
         // Update the recipient's debt.
         _subDebt(recipientId, credit);
 
@@ -1022,8 +1021,9 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         // Recreate account state at last redemption block if the redemption was in the past
         uint256 earmarkToRedeem;
         uint256 earmarkPreviousState;
-        if (block.number > lastRedemptionBlock && lastRedemptionBlock > account.lastRedemptionSync &&_redemptionWeight != 0) {
-            debtToEarmark = PositionDecay.ScaleByWeightDelta(account.debt - account.earmarked, previousRedemption.earmarkWeight - account.lastAccruedEarmarkWeight);
+        if (block.number > lastRedemptionBlock && lastRedemptionBlock > account.lastRedemptionSync && _redemptionWeight != 0) {
+            debtToEarmark =
+                PositionDecay.ScaleByWeightDelta(account.debt - account.earmarked, previousRedemption.earmarkWeight - account.lastAccruedEarmarkWeight);
 
             earmarkPreviousState = account.earmarked + debtToEarmark;
             earmarkToRedeem = PositionDecay.ScaleByWeightDelta(earmarkPreviousState, _redemptionWeight - account.lastAccruedRedemptionWeight);
@@ -1052,9 +1052,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         // Yield the transmuter accumulated since last earmark (cover)
         uint256 transmuterCurrentBalance = TokenUtils.safeBalanceOf(yieldToken, address(transmuter));
-        uint256 transmuterDifference = transmuterCurrentBalance > lastTransmuterTokenBalance
-            ? transmuterCurrentBalance - lastTransmuterTokenBalance
-            : 0;
+        uint256 transmuterDifference = transmuterCurrentBalance > lastTransmuterTokenBalance ? transmuterCurrentBalance - lastTransmuterTokenBalance : 0;
 
         uint256 amount = ITransmuter(transmuter).queryGraph(lastEarmarkBlock + 1, block.number);
 
@@ -1104,7 +1102,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         uint256 earmarkedPreviousState;
         uint256 earmarkToRedeem;
         if (block.number > lastRedemptionBlock && _redemptionWeight != 0) {
-            debtToEarmark = PositionDecay.ScaleByWeightDelta(account.debt - account.earmarked, previousRedemption.earmarkWeight - account.lastAccruedEarmarkWeight);
+            debtToEarmark =
+                PositionDecay.ScaleByWeightDelta(account.debt - account.earmarked, previousRedemption.earmarkWeight - account.lastAccruedEarmarkWeight);
 
             earmarkedPreviousState = account.earmarked + debtToEarmark;
             earmarkToRedeem = PositionDecay.ScaleByWeightDelta(earmarkedPreviousState, _redemptionWeight - account.lastAccruedRedemptionWeight);
