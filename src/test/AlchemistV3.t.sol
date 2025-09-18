@@ -230,7 +230,7 @@ contract AlchemistV3Test is Test {
         deal(address(fakeUnderlyingToken), alice, accountFunds);
         deal(address(fakeUnderlyingToken), carol, accountFunds);
         deal(address(fakeUnderlyingToken), bob, accountFunds);
-        deal(address(fakeUnderlyingToken), alchemist.alchemistFeeVault(), 10_000 ether);
+        deal(address(fakeUnderlyingToken), alchemist.alchemistFeeVault(), 100_000 ether);
 
         vm.startPrank(bob);
 
@@ -2889,9 +2889,10 @@ contract AlchemistV3Test is Test {
 
         uint256 transmuterPreviousBalance = IVaultV2(yieldToken).balanceOf(address(transmuterLogic));
 
-        _setAccountPosition(carol, depositAmount, false, minimumCollateralization);
+        // Create a healthy position to maintain global collateralization
+        _setAccountPosition(carol, depositAmount * 10, false, minimumCollateralization);
 
-        _manipulateYieldTokenPrice(590);
+        _manipulateYieldTokenPrice(8000); // Drop price by 80% to create significantly undercollateralized positions
 
         // let another user liquidate the previous user position
         vm.startPrank(address(0xdad));
@@ -2906,7 +2907,22 @@ contract AlchemistV3Test is Test {
         // get expected liquidation results for each account
         CalculateLiquidationResult memory expectedResult1 = _calculateLiquidationForAccount(position1);
         CalculateLiquidationResult memory expectedResult2 = _calculateLiquidationForAccount(position2);
-
+        // Debug: Print liquidation calculation details
+        console.log("Position1 - collateral: %d, debt: %d", position1.collateral, position1.debt);
+        console.log("Position2 - collateral: %d, debt: %d", position2.collateral, position2.debt);
+        console.log("Expected fee1: %d, fee2: %d", expectedResult1.baseFeeInYield, expectedResult2.baseFeeInYield);
+        
+        // Debug: Print collateralization details
+        uint256 alchemistCurrentCollateralization =
+            alchemist.normalizeUnderlyingTokensToDebt(alchemist.getTotalUnderlyingValue()) * FIXED_POINT_SCALAR / alchemist.totalDebt();
+        console.log("Current global collateralization: %d", alchemistCurrentCollateralization);
+        console.log("Minimum collateralization: %d", alchemist.minimumCollateralization());
+        console.log("Global minimum collateralization: %d", alchemist.globalMinimumCollateralization());
+        
+        // Debug: Print position values after price drop
+        console.log("Position1 value after price drop: %d", alchemist.totalValue(position1.tokenId));
+        console.log("Position2 value after price drop: %d", alchemist.totalValue(position2.tokenId));
+        
         (uint256 assets, uint256 feeInYield, uint256 feeInUnderlying) = alchemist.batchLiquidate(accountsToLiquidate);
 
         vm.stopPrank();
@@ -2966,7 +2982,7 @@ contract AlchemistV3Test is Test {
 
         uint256 transmuterPreviousBalance = IERC20(address(yieldToken)).balanceOf(address(transmuterLogic));
 
-        _manipulateYieldTokenPrice(590);
+        _manipulateYieldTokenPrice(410);
 
         // let another user liquidate the previous user position
         vm.startPrank(address(0xdad));
@@ -3034,7 +3050,7 @@ contract AlchemistV3Test is Test {
 
         uint256 transmuterPreviousBalance = IERC20(address(yieldToken)).balanceOf(address(transmuterLogic));
 
-        _manipulateYieldTokenPrice(590);
+        _manipulateYieldTokenPrice(410);
 
         // let another user liquidate the previous user position
         vm.startPrank(alice);
@@ -3169,17 +3185,38 @@ contract AlchemistV3Test is Test {
     function _calculateLiquidationForAccount(AccountPosition memory position) internal view returns (CalculateLiquidationResult memory result) {
         uint256 alchemistCurrentCollateralization =
             alchemist.normalizeUnderlyingTokensToDebt(alchemist.getTotalUnderlyingValue()) * FIXED_POINT_SCALAR / alchemist.totalDebt();
+        
+        uint256 currentValue = alchemist.totalValue(position.tokenId);
+        
+        console.log("Calculating liquidation for position %d:", position.tokenId);
+        console.log("Current value: %d, Debt: %d", currentValue, position.debt);
+        console.log("Current collateralization: %d", currentValue * FIXED_POINT_SCALAR / position.debt);
+        console.log("Minimum collateralization: %d", alchemist.minimumCollateralization());
+        console.log("Global minimum collateralization: %d", alchemist.globalMinimumCollateralization());
+        console.log("Current global collateralization: %d", alchemistCurrentCollateralization);
+        
         (uint256 liquidationAmount, uint256 debtToBurn, uint256 baseFee, uint256 outSourcedFee) = alchemist.calculateLiquidation(
-            alchemist.totalValue(position.tokenId),
+            currentValue,
             position.debt,
             alchemist.minimumCollateralization(),
             alchemistCurrentCollateralization,
             alchemist.globalMinimumCollateralization(),
             liquidatorFeeBPS
         );
+        
+        console.log("Liquidation calculation results:");
+        console.log("liquidationAmount: %d", liquidationAmount);
+        console.log("debtToBurn: %d", debtToBurn);
+        console.log("baseFee: %d", baseFee);
+        console.log("outSourcedFee: %d", outSourcedFee);
+        console.log("liquidatorFee BPS: %d", liquidatorFeeBPS);
+        console.log("Expected fee calculation: %d", debtToBurn * liquidatorFeeBPS / 10_000);
 
         uint256 liquidationAmountInYield = alchemist.convertDebtTokensToYield(liquidationAmount);
         uint256 baseFeeInYield = alchemist.convertDebtTokensToYield(baseFee);
+        
+        console.log("liquidationAmountInYield: %d", liquidationAmountInYield);
+        console.log("baseFeeInYield: %d", baseFeeInYield);
 
         result = CalculateLiquidationResult({
             liquidationAmountInYield: liquidationAmountInYield,
@@ -3192,14 +3229,47 @@ contract AlchemistV3Test is Test {
     }
 
     /// helper functions to simplify batch liquidation tests
+        function _manipulateYieldTokenPrice(uint256 priceDropPercentage) internal {
+        // Directly manipulate the underlying token balance to create a price drop
+        uint256 initialUnderlyingBalance = IERC20(fakeUnderlyingToken).balanceOf(address(yieldToken));
+        uint256 vaultSupply = IERC20(address(yieldToken)).totalSupply();
 
-    function _manipulateYieldTokenPrice(uint256 tokenySupplyBPSIncrease) internal {
-        uint256 initialVaultSupply = IERC20(address(yieldToken)).totalSupply();
-        // increasing yeild token suppy by 59 bps or 5.9%  while keeping the unederlying supply unchanged
-        uint256 modifiedVaultSupply = (initialVaultSupply * tokenySupplyBPSIncrease / 10_000) + initialVaultSupply;
-        deal(address(yieldToken), address(0xdead), (initialVaultSupply * tokenySupplyBPSIncrease / 10_000), true);
+        // Ensure we don't drop the price to zero by limiting the percentage
+        priceDropPercentage = priceDropPercentage > 8000 ? 8000 : priceDropPercentage;
+
+        // Calculate how much underlying to remove to achieve desired price drop
+        uint256 amountToRemove = initialUnderlyingBalance * priceDropPercentage / 10_000;
+
+        // Make sure we leave at least 10% of the balance to avoid zero price
+        if (amountToRemove > initialUnderlyingBalance * 9 / 10) {
+            amountToRemove = initialUnderlyingBalance * 9 / 10;
+        }
+
+        // Transfer underlying tokens out of the vault to decrease the price
+        vm.startPrank(address(yieldToken));
+        IERC20(fakeUnderlyingToken).transfer(address(0xdead), amountToRemove);
+        vm.stopPrank();
+
+        // Update the vault's total supply to reflect the removed tokens
+        vaultSupply = IERC20(address(yieldToken)).totalSupply();
+
+        // Verify the price dropped as expected
+        uint256 newPrice = IERC20(fakeUnderlyingToken).balanceOf(address(yieldToken)) * 1e18 /
+vaultSupply;
+        uint256 expectedPrice = (initialUnderlyingBalance - amountToRemove) * 1e18 / vaultSupply;
+
+        // Log the price change for debugging
+        console.log("Initial price:", initialUnderlyingBalance * 1e18 / vaultSupply);
+        console.log("New price:", newPrice);
+        console.log("Expected price:", expectedPrice);
+
+        // Also log the total value of positions to verify they're undercollateralized
+        console.log("Total underlying value:", alchemist.getTotalUnderlyingValue());
+        console.log("Total debt:", alchemist.totalDebt());
+
+        assertApproxEqRel(newPrice, expectedPrice, 1e16); // Allow 1% deviation
     }
-
+                   
     function _setAccountPosition(address user, uint256 deposit, bool doMint, uint256 ltv) internal returns (AccountPosition memory) {
         vm.startPrank(user);
         SafeERC20.safeApprove(address(yieldToken), address(alchemist), deposit + 100e18);
