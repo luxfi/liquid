@@ -18,7 +18,10 @@ interface IERC4626 {
     function asset() external view returns (address);
     function deposit(uint256 assets, address receiver) external returns (uint256 shares);
     function redeem(uint256 shares, address receiver, address owner) external returns (uint256 assetsOut);
-    function convertToAssets(uint256 shares) external view returns (uint256 assets);
+    function convertToAssets(uint256 shares) external view returns (uint256);
+    function balanceOf(address owner) external view returns (uint256);
+    function previewWithdraw(uint256 assets) external view returns (uint256);
+    function convertToShares(uint256 assets) external view returns (uint256);
 }
 
 contract MorphoYearnOGWETHStrategy is MYTAdapter {
@@ -28,15 +31,21 @@ contract MorphoYearnOGWETHStrategy is MYTAdapter {
     uint256 lastIndex;
     uint256 FIXED_POINT_SCALAR = 1e18;
 
+    event StrategyDebugLog(string message, address value);
+    event StrategyDebugLogUint(string message, uint256 value);
+
     constructor(address _myt, StrategyParams memory _params, address _vault, address _weth) MYTAdapter(_myt, _weth, _params) {
         weth = WETH(_weth);
         vault = IERC4626(_vault);
+        emit StrategyDebugLog("vault ", _vault);
         require(vault.asset() == _weth, "Vault asset != WETH");
     }
 
     function _allocate(uint256 amount) internal override returns (uint256 depositReturn) {
         require(TokenUtils.safeBalanceOf(address(weth), address(this)) >= amount, "Strategy balance is less than amount");
+        TokenUtils.safeApprove(address(weth), address(vault), amount);
         depositReturn = vault.deposit(amount, address(this));
+        emit StrategyDebugLogUint("MorphoYearnOGWETHStrategy _allocate depositReturn ", depositReturn);
     }
 
     function _deallocate(uint256 amount) internal override returns (uint256 withdrawReturn) {
@@ -63,6 +72,10 @@ contract MorphoYearnOGWETHStrategy is MYTAdapter {
         uint256 growth = (currentPPS - lastIndex) * FIXED_POINT_SCALAR / lastIndex;
         ratePerSec = growth / dt;
         return (ratePerSec, newIndex);
+    }
+
+    function realAssets() external view override returns (uint256) {
+        return vault.convertToAssets(vault.convertToShares(vault.balanceOf(address(this))));
     }
 
     receive() external payable {
