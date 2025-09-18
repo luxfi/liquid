@@ -781,6 +781,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         uint256 price = IVaultV2(yieldToken).convertToAssets(10**IVaultV2(yieldToken).decimals());
         if (price == 0) {
+            console.log("NO PRICE?");
             return (0, 0, 0);
         }
 
@@ -792,7 +793,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         if (collateralizationRatio > collateralizationLowerBound) {
             return (0, 0, 0);
         }
-
         // Try to repay earmarked debt if it exists
         uint256 repaidAmountInYield = 0;
         if (account.earmarked > 0) {
@@ -800,6 +800,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         }
         // If debt is fully cleared, return with only the repaid amount, no liquidation needed, caller receives repayment fee
         if (account.debt == 0) {
+            console.log("setter 1 - %d", feeInYield);
             feeInYield = _resolveRepaymentFee(accountId, repaidAmountInYield);
             TokenUtils.safeTransfer(yieldToken, msg.sender, feeInYield);
             return (repaidAmountInYield, feeInYield, 0);
@@ -821,6 +822,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
         } else {
             // Since only a repayment happened, send repayment fee to caller
             feeInYield = _resolveRepaymentFee(accountId, repaidAmountInYield);
+            console.log("setter 2 - %d", feeInYield);
             TokenUtils.safeTransfer(yieldToken, msg.sender, feeInYield);
             return (repaidAmountInYield, feeInYield, 0);
         }
@@ -850,7 +852,7 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         amountLiquidated = convertDebtTokensToYield(liquidationAmount);
         feeInYield = convertDebtTokensToYield(baseFee);
-
+        console.log("convertDebtTokensToYield(%d) -> %d", baseFee, feeInYield);
         // update user balance and debt
         account.collateralBalance = account.collateralBalance > amountLiquidated ? account.collateralBalance - amountLiquidated : 0;
         _subDebt(accountId, debtToBurn);
@@ -1184,6 +1186,8 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
 
         // gross collateral seize = net + fee
         grossCollateralToSeize = debtToBurn + fee;
+
+        // FIXME fee is 0 at this point when we run the testBatch_Liquidate_Undercollateralized_Position test
     }
 
 }
