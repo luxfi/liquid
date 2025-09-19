@@ -1,29 +1,32 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity 0.8.28;
+
 import {IVaultV2} from "../lib/vault-v2/src/interfaces/IVaultV2.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import {IMYTStrategy} from "./interfaces/IMYTStrategy.sol";
 import "forge-std/console.sol";
-import {ISettlerActions} from './external/interfaces/ISettlerActions.sol';
-import {IVelodromePair} from './external/interfaces/IVelodromePair.sol';
-import {ISignatureTransfer} from '../lib/permit2/src/interfaces/ISignatureTransfer.sol';
+import {ISettlerActions} from "./external/interfaces/ISettlerActions.sol";
+import {IVelodromePair} from "./external/interfaces/IVelodromePair.sol";
+import {ISignatureTransfer} from "../lib/permit2/src/interfaces/ISignatureTransfer.sol";
 import {IERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import {ZeroXSwapVerifier} from './utils/ZeroXSwapVerifier.sol';
+import {ZeroXSwapVerifier} from "./utils/ZeroXSwapVerifier.sol";
 
 interface IERC721Tiny {
     function ownerOf(uint256 tokenId) external view returns (address);
 }
+
 interface IDeployerTiny is IERC721Tiny {
     function prev(uint128 featureId) external view returns (address);
 }
+
 contract MYTStrategy is IMYTStrategy, Ownable {
     IVaultV2 public immutable MYT;
     uint256 public constant SECONDS_PER_YEAR = 365 days;
     uint256 public constant FIXED_POINT_SCALAR = 1e18;
 
     StrategyParams public params;
-
+    bytes32 public immutable adapterId;
     uint256 public lastSnapshotTime;
     uint256 public lastIndex;
     uint256 public estApr;
@@ -34,41 +37,56 @@ contract MYTStrategy is IMYTStrategy, Ownable {
     /// bypassed without reverts (to keep external allocators from reverting).
     bool public killSwitch;
 
-    mapping (address => bool) public whitelistedAllocators;
+    mapping(address => bool) public whitelistedAllocators;
 
-    IDeployerTiny constant ZERO_EX_DEPLOYER =
-    IDeployerTiny(0x00000000000004533Fe15556B1E086BB1A72cEae);
+    IDeployerTiny constant ZERO_EX_DEPLOYER = IDeployerTiny(0x00000000000004533Fe15556B1E086BB1A72cEae);
 
     error CounterfeitSettler(address);
 
+    event MYTLog(string message, uint256 value);
+
+    /// @notice Modifier to restrict access to the vault **managed** by the MYT contract
+    modifier onlyVault() {
+        require(msg.sender == address(MYT), "Only vault can call this function");
+        _;
+    }
 
     constructor(address _myt, StrategyParams memory _params) Ownable(_params.owner) {
         require(_params.owner != address(0));
         require(_myt != address(0));
         MYT = IVaultV2(_myt);
         params = _params;
+        adapterId = keccak256(abi.encode(_params.protocol, address(this)));
         // TODO add the strategy to the perpetual gauge in an authenticated manner
         // TODO perhap take initial snapshot now to set up start block
     }
 
-    /// @notice call this function to handle wrapping/allocation/moving funds to
-    /// the respective protocol of this strategy
-    function allocate(uint256 amount) public payable returns (uint256 ret) {
-        // TODO additional access control needed?
-        require(whitelistedAllocators[msg.sender], "PD");
-        require(!killSwitch, "emergency");
-        ret = _allocate(amount);
-        emit Allocate(amount);
+    function allocate(bytes memory data, uint256 assets, bytes4 selector, address sender)
+        external
+        onlyVault
+        returns (bytes32[] memory strategyIds, int256 change)
+    {
+        uint256 oldAllocation = abi.decode(data, (uint256));
+        uint256 amountAllocated = _allocate(assets);
+        uint256 newAllocation = oldAllocation + amountAllocated;
+        emit Allocate(amountAllocated, address(this));
+        return (ids(), int256(newAllocation) - int256(oldAllocation));
     }
 
-    /// @notice call this function to handle unwrapping/deallocation/moving funds from
-    /// the respective protocol of this strategy
-    function deallocate(uint256 amount) public virtual returns (uint256 ret) {
-        // TODO additional access control needed?
-        require(whitelistedAllocators[msg.sender], "PD");
-        require(!killSwitch, "emergency");
-        ret = _deallocate(amount);
-        emit Deallocate(amount);
+    function deallocate(bytes memory data, uint256 assets, bytes4 selector, address sender)
+        external
+        onlyVault
+        returns (bytes32[] memory strategyIds, int256 change)
+    {
+        uint256 oldAllocation = abi.decode(data, (uint256));
+        emit MYTLog("oldAllocation", oldAllocation);
+        uint256 amountDeallocated = _deallocate(assets);
+        emit MYTLog("amountDeallocated", amountDeallocated);
+
+        uint256 newAllocation = oldAllocation - amountDeallocated;
+        emit MYTLog("newAllocation", newAllocation);
+        emit Deallocate(amountDeallocated, address(this));
+        return (ids(), int256(newAllocation) - int256(oldAllocation));
     }
 
     /// @notice call this function to handle unwrapping/deallocation/moving funds from
@@ -114,7 +132,7 @@ contract MYTStrategy is IMYTStrategy, Ownable {
 
     /// @dev override this function to claim all available rewards from the respective
     /// protocol of this strategy
-    function _claimRewards() internal virtual returns (uint256){}
+    function _claimRewards() internal virtual returns (uint256) {}
 
     /// @notice can be called by anyone to recalculate the
     /// estimated yields of this strategy based on external price
@@ -130,8 +148,8 @@ contract MYTStrategy is IMYTStrategy, Ownable {
         // Base rate of strategy
         (uint256 baseRatePerSec, uint256 newIndex) = _computeBaseRatePerSecond();
 
-        // Add incentives to calculation if applicable 
-        uint256 rewardsRatePerSec; 
+        // Add incentives to calculation if applicable
+        uint256 rewardsRatePerSec;
         if (params.additionalIncentives == true) rewardsRatePerSec = _computeRewardsRatePerSecond();
 
         // Combine rates
@@ -160,7 +178,7 @@ contract MYTStrategy is IMYTStrategy, Ownable {
     // may be good to move this logic here and host only the price in the adapter
     function _computeBaseRatePerSecond() internal virtual returns (uint256 ratePerSec, uint256 newIndex) {}
 
-    /// @dev override this function to handle strategy specific reward rate calculation   
+    /// @dev override this function to handle strategy specific reward rate calculation
     function _computeRewardsRatePerSecond() internal virtual returns (uint256) {}
 
     // Helper for yield snapshot calculation
@@ -214,5 +232,15 @@ contract MYTStrategy is IMYTStrategy, Ownable {
         return params.globalCap;
     }
 
+    function ids() public view returns (bytes32[] memory) {
+        bytes32[] memory ids_ = new bytes32[](1);
+        ids_[0] = adapterId;
+        return ids_;
+    }
 
+    function getIdData() external view returns (bytes memory) {
+        return abi.encode(params.protocol, address(this));
+    }
+
+    function realAssets() external view virtual returns (uint256) {}
 }

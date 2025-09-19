@@ -9,23 +9,17 @@ import {IVaultV2} from "../../lib/vault-v2/src/interfaces/IVaultV2.sol";
 import {TestYieldToken} from "./mocks/TestYieldToken.sol";
 import {TestERC20} from "./mocks/TestERC20.sol";
 import {TokenUtils} from "../libraries/TokenUtils.sol";
-import {MYTAdapter} from "../myt/MYTAdapter.sol";
-import {IMYTVault} from "../myt/interfaces/IMYTVault.sol";
-import {IMYTAdapter} from "../myt/MYTAdapter.sol";
-import {MYTVault} from "../myt/MYTVault.sol";
-import {MYTCuratorProxy} from "../myt/MYTCuratorProxy.sol";
-import {MockMYTVault} from "./mocks/MockMYTVault.sol";
-import {MockMYTCuratorProxy} from "./mocks/MockMYTCuratorProxy.sol";
 import {MockYieldToken} from "./mocks/MockYieldToken.sol";
 import {IMockYieldToken} from "./mocks/MockYieldToken.sol";
 import {MockMYTStrategy} from "./mocks/MockMYTStrategy.sol";
+import {MockAlchemistCurator} from "./mocks/MockAlchemistCurator.sol";
 import {MYTTestHelper} from "./libraries/MYTTestHelper.sol";
+import {IMYTStrategy} from "../interfaces/IMYTStrategy.sol";
 
-contract MYTCuratorProxyTest is Test {
+contract AlchemistCuratorTest is Test {
     using MYTTestHelper for *;
 
-    MockMYTCuratorProxy public mytCuratorProxy;
-    MockMYTVault public mytVault;
+    MockAlchemistCurator public mytCuratorProxy;
     VaultV2 public vault;
     address public operator = address(0x2222222222222222222222222222222222222222); // default operator
     address public admin = address(0x4444444444444444444444444444444444444444); // DAO OSX
@@ -39,11 +33,9 @@ contract MYTCuratorProxyTest is Test {
 
     function setUp() public {
         vm.startPrank(admin);
-        mytCuratorProxy = new MockMYTCuratorProxy(admin, operator);
+        mytCuratorProxy = new MockAlchemistCurator(admin, operator);
         vault = MYTTestHelper._setupVault(mockVaultCollateral, admin, address(mytCuratorProxy));
-        mytVault = MYTTestHelper._setupMYTVault(address(vault));
-        mytStrategy =
-            MYTTestHelper._setupStrategy(address(mytVault), address(mockStrategyYieldToken), admin, "MockToken", "MockTokenProtocol", IMYTAdapter.RiskClass.LOW);
+        mytStrategy = MYTTestHelper._setupStrategy(address(vault), mockStrategyYieldToken, admin, "MockToken", "MockTokenProtocol", IMYTStrategy.RiskClass.LOW);
         vm.stopPrank();
     }
 
@@ -51,34 +43,34 @@ contract MYTCuratorProxyTest is Test {
 
     function testSubmitSetStrategy() public {
         vm.startPrank(operator);
-        mytCuratorProxy.submitSetStrategy(address(mytStrategy), address(mytVault));
+        mytCuratorProxy.submitSetStrategy(address(mytStrategy), address(vault));
         vm.stopPrank();
     }
 
     function testSetStrategy() public {
         vm.startPrank(operator);
-        mytCuratorProxy.submitSetStrategy(address(mytStrategy), address(mytVault));
+        mytCuratorProxy.submitSetStrategy(address(mytStrategy), address(vault));
         _vaultFastForward(abi.encodeCall(IVaultV2.setIsAdapter, (address(mytStrategy), true)));
-        mytCuratorProxy.setStrategy(address(mytStrategy), address(mytVault));
+        mytCuratorProxy.setStrategy(address(mytStrategy), address(vault));
         vm.stopPrank();
     }
 
     function testSubmitDecreaseAbsoluteCap() public {
-        _submitAndSetStrategy(address(mytStrategy), address(mytVault));
+        _submitAndSetStrategy(address(mytStrategy), address(vault));
         vm.startPrank(admin);
         mytCuratorProxy.submitDecreaseAbsoluteCap(address(mytStrategy), defaultStrategyAbsoluteCap);
         vm.stopPrank();
     }
 
     function testSubmitDecreaseRelativeCap() public {
-        _submitAndSetStrategy(address(mytStrategy), address(mytVault));
+        _submitAndSetStrategy(address(mytStrategy), address(vault));
         vm.startPrank(admin);
         mytCuratorProxy.submitDecreaseRelativeCap(address(mytStrategy), defaultStrategyRelativeCap);
         vm.stopPrank();
     }
 
     function testDecreaseAbsoluteCap() public {
-        _submitAndSetStrategy(address(mytStrategy), address(mytVault));
+        _submitAndSetStrategy(address(mytStrategy), address(vault));
         vm.startPrank(admin);
         mytCuratorProxy.submitIncreaseAbsoluteCap(address(mytStrategy), defaultStrategyAbsoluteCap);
         _vaultFastForward(abi.encodeCall(IVaultV2.increaseAbsoluteCap, (mytStrategy.getIdData(), defaultStrategyAbsoluteCap)));
@@ -88,12 +80,12 @@ contract MYTCuratorProxyTest is Test {
         mytCuratorProxy.decreaseAbsoluteCap(address(mytStrategy), defaultStrategyAbsoluteCap / 2);
 
         // verify absolute cap has decreased
-        assertEq(vault.absoluteCap(IMYTAdapter(address(mytStrategy)).adapterId()), defaultStrategyAbsoluteCap / 2);
+        assertEq(vault.absoluteCap(IMYTStrategy(address(mytStrategy)).adapterId()), defaultStrategyAbsoluteCap / 2);
         vm.stopPrank();
     }
 
     function testDecreaseRelativeCap() public {
-        _submitAndSetStrategy(address(mytStrategy), address(mytVault));
+        _submitAndSetStrategy(address(mytStrategy), address(vault));
         vm.startPrank(admin);
         mytCuratorProxy.submitIncreaseRelativeCap(address(mytStrategy), defaultStrategyRelativeCap);
         _vaultFastForward(abi.encodeCall(IVaultV2.increaseRelativeCap, (mytStrategy.getIdData(), defaultStrategyRelativeCap)));
@@ -104,45 +96,45 @@ contract MYTCuratorProxyTest is Test {
         mytCuratorProxy.decreaseRelativeCap(address(mytStrategy), defaultStrategyRelativeCap / 2);
 
         // verify relative cap has decreased
-        assertEq(vault.relativeCap(IMYTAdapter(address(mytStrategy)).adapterId()), defaultStrategyRelativeCap / 2);
+        assertEq(vault.relativeCap(IMYTStrategy(address(mytStrategy)).adapterId()), defaultStrategyRelativeCap / 2);
         vm.stopPrank();
     }
 
     function testSubmitIncreaseAbsoluteCap() public {
-        _submitAndSetStrategy(address(mytStrategy), address(mytVault));
+        _submitAndSetStrategy(address(mytStrategy), address(vault));
         vm.startPrank(admin);
         mytCuratorProxy.submitIncreaseAbsoluteCap(address(mytStrategy), defaultStrategyAbsoluteCap);
         vm.stopPrank();
     }
 
     function testSubmitIncreaseRelativeCap() public {
-        _submitAndSetStrategy(address(mytStrategy), address(mytVault));
+        _submitAndSetStrategy(address(mytStrategy), address(vault));
         vm.startPrank(admin);
         mytCuratorProxy.submitIncreaseRelativeCap(address(mytStrategy), defaultStrategyRelativeCap);
         vm.stopPrank();
     }
 
     function testIncreaseAbsoluteCap() public {
-        _submitAndSetStrategy(address(mytStrategy), address(mytVault));
+        _submitAndSetStrategy(address(mytStrategy), address(vault));
         vm.startPrank(admin);
         mytCuratorProxy.submitIncreaseAbsoluteCap(address(mytStrategy), defaultStrategyAbsoluteCap);
         _vaultFastForward(abi.encodeCall(IVaultV2.increaseAbsoluteCap, (mytStrategy.getIdData(), defaultStrategyAbsoluteCap)));
         mytCuratorProxy.increaseAbsoluteCap(address(mytStrategy), defaultStrategyAbsoluteCap);
 
         // verify absolute cap has increased
-        assertEq(vault.absoluteCap(IMYTAdapter(address(mytStrategy)).adapterId()), defaultStrategyAbsoluteCap);
+        assertEq(vault.absoluteCap(IMYTStrategy(address(mytStrategy)).adapterId()), defaultStrategyAbsoluteCap);
         vm.stopPrank();
     }
 
     function testIncreaseRelativeCap() public {
-        _submitAndSetStrategy(address(mytStrategy), address(mytVault));
+        _submitAndSetStrategy(address(mytStrategy), address(vault));
         vm.startPrank(admin);
         mytCuratorProxy.submitIncreaseRelativeCap(address(mytStrategy), defaultStrategyRelativeCap);
         _vaultFastForward(abi.encodeCall(IVaultV2.increaseRelativeCap, (mytStrategy.getIdData(), defaultStrategyRelativeCap)));
         mytCuratorProxy.increaseRelativeCap(address(mytStrategy), defaultStrategyRelativeCap);
 
         // verify relative cap has increased
-        assertEq(vault.relativeCap(IMYTAdapter(address(mytStrategy)).adapterId()), defaultStrategyRelativeCap);
+        assertEq(vault.relativeCap(IMYTStrategy(address(mytStrategy)).adapterId()), defaultStrategyRelativeCap);
         vm.stopPrank();
     }
 
@@ -204,13 +196,13 @@ contract MYTCuratorProxyTest is Test {
 
     function testSetStrategyUnauthorizedAccessRevert() public {
         vm.expectRevert(abi.encode("PD"));
-        mytCuratorProxy.setStrategy(address(mytStrategy), address(mytVault));
+        mytCuratorProxy.setStrategy(address(mytStrategy), address(vault));
     }
 
     function testSetStrategyInvalidAdapterRevert() public {
         vm.prank(operator);
         vm.expectRevert(abi.encode("INVALID_ADDRESS"));
-        mytCuratorProxy.setStrategy(address(0), address(mytVault));
+        mytCuratorProxy.setStrategy(address(0), address(vault));
     }
 
     function testSetStrategyInvalidMYTRevert() public {

@@ -1,18 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {MYTAdapter} from "../../myt/MYTAdapter.sol";
-import {IMYTAdapter} from "../../myt/interfaces/IMYTAdapter.sol";
 import {TokenUtils} from "../../libraries/TokenUtils.sol";
 import {IMockYieldToken} from "./MockYieldToken.sol";
+import {MYTStrategy} from "../../MYTStrategy.sol";
+import {IMYTStrategy} from "../../interfaces/IMYTStrategy.sol";
 
-contract MockMYTStrategy is MYTAdapter {
-    event TestLogger(string message, uint256 value);
-    event TestLoggerAddress(string message, address value);
-
+contract MockMYTStrategy is MYTStrategy {
     IMockYieldToken public immutable token;
 
-    constructor(address _myt, address _token, IMYTAdapter.StrategyParams memory _params) MYTAdapter(_myt, _token, _params) {
+    constructor(address _myt, address _token, IMYTStrategy.StrategyParams memory _params) MYTStrategy(_myt, _params) {
         token = IMockYieldToken(_token);
     }
 
@@ -30,12 +27,12 @@ contract MockMYTStrategy is MYTAdapter {
         require(amountRequested != 0);
     }
 
-    function snapshotYield() external override returns (uint256) {
-        // TODO calculate & snapshot yield
-    }
-
     function realAssets() external view override returns (uint256) {
         return (token.balanceOf(address(this)) * token.price()) / 10 ** token.decimals();
+    }
+
+    function _computeBaseRatePerSecond() internal override returns (uint256 ratePerSec, uint256 newIndex) {
+        return (0, 0);
     }
 
     function mockUpdateWhitelistedAllocators(address allocator, bool value) public {}
