@@ -21,6 +21,8 @@ struct AlchemistInitializationParams {
     uint256 globalMinimumCollateralization;
     // The minimum collateralization for liquidation eligibility. between 1 and minimumCollateralization inclusive.
     uint256 collateralizationLowerBound;
+    // Token adapter used to get price for yiel tokens.
+    address tokenAdapter;
     // The initial transmuter or transmuter buffer.
     address transmuter;
     // The fee on user debt paid to the protocol.
@@ -330,6 +332,15 @@ interface IAlchemistV3AdminActions {
     /// @param value The value of the new deposit cap.
     function setDepositCap(uint256 value) external;
 
+    /// @notice Sets the token adapter for the yield token.
+    ///
+    /// @notice `msg.sender` must be the admin or this call will will revert with an {Unauthorized} error.
+    ///
+    /// @notice Emits a {TokenAdapterSet} event.
+    ///
+    /// @param value The address of token adapter.
+    function setTokenAdapter(address value) external;
+
     /// @notice Set the minimum collateralization ratio.
     ///
     /// @notice `msg.sender` must be the admin or this call will revert with an {Unauthorized} error.
@@ -628,7 +639,6 @@ interface IAlchemistV3State {
 
     function underlyingToken() external view returns (address token);
 
-    /// @notice This is a MYT token (Morpho v2 ERC4626) as of v3
     function yieldToken() external view returns (address token);
 
     function depositsPaused() external view returns (bool isPaused);
@@ -641,6 +651,11 @@ interface IAlchemistV3State {
     ///
     /// @return pendingAdmin The pending administrator address.
     function pendingAdmin() external view returns (address pendingAdmin);
+
+    /// @notice Gets the address of the current yield token adapter.
+    ///
+    /// @return adapter The token adapter address.
+    function tokenAdapter() external returns (address adapter);
 
     /// @notice Gets the address of the alchemist fee vault.
     ///

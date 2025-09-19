@@ -155,6 +155,7 @@ contract IntegrationTest is Test {
             minimumCollateralization: minimumCollateralization,
             collateralizationLowerBound: 1_052_631_578_950_000_000, // 1.05 collateralization
             globalMinimumCollateralization: 1_111_111_111_111_111_111, // 1.1
+            tokenAdapter: address(vaultAdapter),
             transmuter: address(transmuterLogic),
             protocolFee: 100,
             protocolFeeReceiver: receiver,
@@ -245,7 +246,7 @@ contract IntegrationTest is Test {
         (uint256 collateral, uint256 debt,) = alchemist.getCDP(tokenId);
 
         assertApproxEqAbs(debt, 0, 9201);
-        assertEq(collateral, 100_000e6 - alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10000);
+        assertEq(collateral, 100_000e6 - alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10_000);
         assertEq(IERC20(EULER_USDC).balanceOf(receiver), alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10_000);
     }
 
@@ -434,7 +435,7 @@ contract IntegrationTest is Test {
         (uint256 collateral, uint256 debt,) = alchemist.getCDP(tokenId);
 
         assertEq(debt, 0);
-        assertEq(collateral, 100_000e6 - alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10000);
+        assertEq(collateral, 100_000e6 - alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10_000);
         assertEq(IERC20(EULER_USDC).balanceOf(receiver), alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10_000);
     }
 
@@ -615,7 +616,7 @@ contract IntegrationTest is Test {
         transmuterLogic.claimRedemption(2);
         vm.stopPrank();
         (uint256 collateral, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
-        assertApproxEqAbs(debt, 10_000e18 - 2_500e18, 1e15); // The debt includes amount that is not claimed yet
+        assertApproxEqAbs(debt, 10_000e18 - 2500e18, 1e15); // The debt includes amount that is not claimed yet
         assertEq(earmarked, 0);
     }
 }

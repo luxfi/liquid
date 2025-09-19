@@ -1,15 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {MockMYTVault} from "../mocks/MockMYTVault.sol";
 import {MockMYTStrategy} from "../mocks/MockMYTStrategy.sol";
 import {TokenUtils} from "../../libraries/TokenUtils.sol";
 import {IVaultV2} from "../../../lib/vault-v2/src/interfaces/IVaultV2.sol";
 import {VaultV2} from "../../../lib/vault-v2/src/VaultV2.sol";
-import {MockMYTVault} from "../mocks/MockMYTVault.sol";
 import {Test} from "forge-std/Test.sol";
-import {IMYTAdapter} from "../../myt/interfaces/IMYTAdapter.sol";
 import {Vm} from "forge-std/Vm.sol";
+import {IMYTStrategy} from "../../interfaces/IMYTStrategy.sol";
 
 library MYTTestHelper {
     Vm private constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
@@ -23,11 +21,11 @@ library MYTTestHelper {
         return vault;
     }
 
-    function _setupStrategy(address myt, address yieldToken, address owner, string memory name, string memory protocol, IMYTAdapter.RiskClass riskClass)
+    function _setupStrategy(address myt, address yieldToken, address owner, string memory name, string memory protocol, IMYTStrategy.RiskClass riskClass)
         external
         returns (MockMYTStrategy)
     {
-        IMYTAdapter.StrategyParams memory params = IMYTAdapter.StrategyParams({
+        IMYTStrategy.StrategyParams memory params = IMYTStrategy.StrategyParams({
             owner: owner,
             name: name,
             protocol: protocol,
@@ -38,9 +36,5 @@ library MYTTestHelper {
             additionalIncentives: false
         });
         return new MockMYTStrategy(myt, yieldToken, params);
-    }
-
-    function _setupMYTVault(address morphoV2Vault) internal returns (MockMYTVault) {
-        return new MockMYTVault(morphoV2Vault);
     }
 }

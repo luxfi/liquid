@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {MYTAllocator} from "../myt/MYTAllocator.sol";
 import {Test} from "forge-std/Test.sol";
 import {VaultV2} from "../../lib/vault-v2/src/VaultV2.sol";
 import {ERC20Mock} from "../../lib/vault-v2/test/mocks/ERC20Mock.sol";
@@ -9,25 +8,22 @@ import {IVaultV2} from "../../lib/vault-v2/src/interfaces/IVaultV2.sol";
 import {TestYieldToken} from "./mocks/TestYieldToken.sol";
 import {TestERC20} from "./mocks/TestERC20.sol";
 import {TokenUtils} from "../libraries/TokenUtils.sol";
-import {MYTAdapter} from "../myt/MYTAdapter.sol";
-import {IMYTVault} from "../myt/interfaces/IMYTVault.sol";
-import {IMYTAdapter} from "../myt/MYTAdapter.sol";
-import {MYTVault} from "../myt/MYTVault.sol";
-import {MockMYTVault} from "./mocks/MockMYTVault.sol";
 import {MockYieldToken} from "./mocks/MockYieldToken.sol";
 import {IMockYieldToken} from "./mocks/MockYieldToken.sol";
 import {MYTTestHelper} from "./libraries/MYTTestHelper.sol";
 import {MockMYTStrategy} from "./mocks/MockMYTStrategy.sol";
+import {AlchemistAllocator} from "../AlchemistAllocator.sol";
+import {IAllocator} from "../interfaces/IAllocator.sol";
+import {IMYTStrategy} from "../interfaces/IMYTStrategy.sol";
 
-contract MockAlchemistAllocator is MYTAllocator {
-    constructor(address _myt, address _admin, address _operator) MYTAllocator(_myt, _admin, _operator) {}
+contract MockAlchemistAllocator is AlchemistAllocator {
+    constructor(address _myt, address _admin, address _operator) AlchemistAllocator(_myt, _admin, _operator) {}
 }
 
 contract AlchemistAllocatorTest is Test {
     using MYTTestHelper for *;
 
     MockAlchemistAllocator public allocator;
-    MockMYTVault public mytVault;
     VaultV2 public vault;
     address public admin = address(0x2222222222222222222222222222222222222222);
     address public operator = address(0x3333333333333333333333333333333333333333);
@@ -46,11 +42,8 @@ contract AlchemistAllocatorTest is Test {
     function setUp() public {
         vm.startPrank(admin);
         vault = MYTTestHelper._setupVault(mockVaultCollateral, admin, curator);
-        mytVault = MYTTestHelper._setupMYTVault(address(vault));
-        mytStrategy =
-            MYTTestHelper._setupStrategy(address(mytVault), address(mockStrategyYieldToken), admin, "MockToken", "MockTokenProtocol", IMYTAdapter.RiskClass.LOW);
-        allocator = new MockAlchemistAllocator(address(mytVault.MYT()), admin, operator);
-        mytVault.setWhitelistedAllocator(address(allocator), true);
+        mytStrategy = MYTTestHelper._setupStrategy(address(vault), mockStrategyYieldToken, admin, "MockToken", "MockTokenProtocol", IMYTStrategy.RiskClass.LOW);
+        allocator = new MockAlchemistAllocator(address(vault), admin, operator);
         vm.stopPrank();
         vm.startPrank(curator);
         _vaultSubmitAndFastForward(abi.encodeCall(IVaultV2.setIsAllocator, (address(allocator), true)));
@@ -88,7 +81,9 @@ contract AlchemistAllocatorTest is Test {
         _magicDepositToVault(address(vault), user1, 150 ether);
         vm.startPrank(admin);
         bytes32 allocationId = mytStrategy.adapterId();
+        emit AlchemistAllocatorTestLog("allocating", 100 ether);
         allocator.allocate(address(mytStrategy), 100 ether);
+        emit AlchemistAllocatorTestLog("allocated", 100 ether);
         uint256 mytStrategyYieldTokenBalance = IMockYieldToken(mockStrategyYieldToken).balanceOf(address(mytStrategy));
         (uint256 newTotalAssets, uint256 performanceFeeShares, uint256 managementFeeShares) = vault.accrueInterestView();
         uint256 mytStrategyYieldTokenRealAssets = mytStrategy.realAssets();
