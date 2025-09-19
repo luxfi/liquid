@@ -7,6 +7,8 @@ import {StdCheats} from "forge-std/StdCheats.sol";
 import {AlchemistV3} from "../AlchemistV3.sol";
 import {AlEth} from "../external/AlEth.sol";
 import {Transmuter} from "../Transmuter.sol";
+import {StakingGraph} from "../libraries/StakingGraph.sol";
+import {console} from "../../lib/forge-std/src/console.sol";
 
 import "../interfaces/ITransmuter.sol";
 
@@ -64,7 +66,11 @@ contract MockAlchemist {
         }
     }
 
-    function adjustTotalSyntheticsIssued(uint256 amount) external {
+    function reduceSyntheticsIssued(uint256 amount) external {
+        
+    }
+
+    function setTransmuterTokenBalance(uint256 amount) external {
 
     }
 
@@ -82,12 +88,16 @@ contract MockAlchemist {
 }
 
 contract TransmuterTest is Test {
+    using StakingGraph for StakingGraph.Graph;
+
     AlEth public alETH;
     AlEth public collateralToken;
     AlEth public underlyingToken;
     Transmuter public transmuter;
 
     MockAlchemist public alchemist;
+
+    StakingGraph.Graph private graph;
 
     function setUp() public {
         alETH = new AlEth();
@@ -231,8 +241,8 @@ contract TransmuterTest is Test {
     }
 
     function testClaimRedemptionBadDebt() public {
-        deal(address(collateralToken), address(transmuter), uint256(type(int256).max) / 1e20);
-
+        deal(address(collateralToken), address(transmuter), 200e18);
+        alchemist.setSyntheticsIssued(1200e18);
         vm.prank(address(0xbeef));
         transmuter.createRedemption(100e18);
 
@@ -241,7 +251,7 @@ contract TransmuterTest is Test {
         assertEq(collateralToken.balanceOf(address(0xbeef)), 0);
         assertEq(alETH.balanceOf(address(transmuter)), 100e18);
 
-        alchemist.setUnderlyingValue((type(uint256).max / 1e20) / 2);
+        alchemist.setUnderlyingValue(200e18);
 
         vm.prank(address(0xbeef));
         transmuter.claimRedemption(1);
@@ -452,5 +462,38 @@ contract TransmuterTest is Test {
         uint256 treeQuery = transmuter.queryGraph(block.number - (5_256_000 / 2) + 1, block.number);
 
         assertApproxEqAbs(treeQuery, 50e18, 1);
+    }
+
+    function testClaimRedemption_division() public {
+        deal(address(collateralToken), address(transmuter), uint256(type(int256).max) / 1e20);
+        vm.prank(address(0xbeef));
+        transmuter.createRedemption(100e18);
+        vm.roll(block.number + 5_256_000); // Mature the staking position
+        alchemist.setUnderlyingValue(0); // Simulate all users exiting with 0 underlying left
+        emit log_named_uint("total token there",alchemist.getTotalUnderlyingValue());
+        vm.prank(address(0xbeef));
+        transmuter.claimRedemption(1);
+    }
+
+    function test_delta_overflow() public {
+        int256 amount = (2**111) - 1;
+        uint32 start = 1000;
+        uint32 duration = 10;
+
+        graph.addStake(amount / 10, start, duration);
+        
+        int256 result = graph.queryStake(start, start + duration);
+
+        assertApproxEqAbs(result, amount, 10);
+    }
+
+    function test_negative_stake() public {
+        // Add stake of 100 wei from block 25 to block 28
+        graph.addStake(100, 25, 3);
+        assertEq(graph.size, 32, "Graph size should be 32 after stake");
+        // The current block is now greater than the last initialized block in the fenwick tree
+        // Check that the graph queries only to its max size and does not return negative number
+        int256 result = graph.queryStake(63, 63);
+        assertEq(result, 0);
     }
 }

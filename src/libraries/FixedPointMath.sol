@@ -137,7 +137,7 @@ library FixedPointMath {
     function div(Number memory self, uint256 value) internal pure returns (Number memory) {
         return Number(self.n / value);
     }
-
+    
     /**
      * @notice Compares two fixed point decimals.
      *
