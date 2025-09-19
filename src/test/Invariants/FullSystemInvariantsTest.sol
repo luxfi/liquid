@@ -88,4 +88,6 @@ contract FullSystemInvariantsTest is InvariantBaseTest {
             : 0;
         assertLe(totalLocked, alchemist.totalDebt());
     }
+
+    // Earmarked can never be more than total debt
 }

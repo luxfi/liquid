@@ -21,8 +21,6 @@ struct AlchemistInitializationParams {
     uint256 globalMinimumCollateralization;
     // The minimum collateralization for liquidation eligibility. between 1 and minimumCollateralization inclusive.
     uint256 collateralizationLowerBound;
-    // Token adapter used to get price for yiel tokens.
-    address tokenAdapter;
     // The initial transmuter or transmuter buffer.
     address transmuter;
     // The fee on user debt paid to the protocol.
@@ -31,6 +29,8 @@ struct AlchemistInitializationParams {
     address protocolFeeReceiver;
     // Fee paid to liquidators.
     uint256 liquidatorFee;
+    // Fee paid to liquidators forcing an account earmarked debt repayment.
+    uint256 repaymentFee;
 }
 
 /// @notice A user account.
@@ -50,8 +50,10 @@ struct Account {
     uint256 lastAccruedRedemptionWeight;
     /// @notice Last weight of collateral from most recent account sync.
     uint256 lastCollateralWeight;
-    /// @notice Block of the most recent mint 
+    /// @notice Block of the most recent mint
     uint256 lastMintBlock;
+    /// @notice The block that the last redemption was synced to the account.
+    uint256 lastRedemptionSync;
     /// @notice The un-scaled locked collateral.
     uint256 rawLocked;
     /// @notice allowances for minting alAssets, per version.
@@ -262,6 +264,20 @@ interface IAlchemistV3Actions {
     /// @param amount The amount of tokens to redeem.
     function redeem(uint256 amount) external;
 
+    /// @notice Reduces syntheticTokensIssued by `amount`.
+    ///
+    /// @notice This function is only callable by the transmuter.
+    ///
+    /// @param amount The amount of tokens burned during redemption.
+    function reduceSyntheticsIssued(uint256 amount) external;
+
+    /// @notice Sets lastTransmuterTokenBalance to `amount`.
+    ///
+    /// @notice This function is only callable by the transmuter.
+    ///
+    /// @param amount The balance of the transmuter.
+    function setTransmuterTokenBalance(uint256 amount) external;
+
     /// @notice Resets all mint allowances by account managed by `tokenId`.
     ///
     /// @notice This function is only callable by the owner of the token id or the AlchemistV3Position contract.
@@ -314,15 +330,6 @@ interface IAlchemistV3AdminActions {
     /// @param value The value of the new deposit cap.
     function setDepositCap(uint256 value) external;
 
-    /// @notice Sets the token adapter for the yield token.
-    ///
-    /// @notice `msg.sender` must be the admin or this call will will revert with an {Unauthorized} error.
-    ///
-    /// @notice Emits a {TokenAdapterSet} event.
-    ///
-    /// @param value The address of token adapter.
-    function setTokenAdapter(address value) external;
-
     /// @notice Set the minimum collateralization ratio.
     ///
     /// @notice `msg.sender` must be the admin or this call will revert with an {Unauthorized} error.
@@ -359,14 +366,14 @@ interface IAlchemistV3AdminActions {
     /// @param fee The new liquidator fee.
     function setLiquidatorFee(uint256 fee) external;
 
-    /// @notice Set a new transmuter to `value`.
+    /// @notice Set a new repayment fee.
     ///
     /// @notice `msg.sender` must be the admin or this call will revert with an {Unauthorized} error.
     ///
-    /// @notice Emits a {ProtocolFeeReceiverUpdated} event.
+    /// @notice Emits a {RepaymentFeeUpdated} event.
     ///
-    /// @param value The address of the new fee transmuter.
-    function setTransmuter(address value) external;
+    /// @param fee The new repayment fee.
+    function setRepaymentFee(uint256 fee) external;
 
     /// @notice Set the global minimum collateralization ratio.
     ///
@@ -539,6 +546,11 @@ interface IAlchemistV3Events {
     /// @param fee  The new liquidator fee.
     event LiquidatorFeeUpdated(uint256 fee);
 
+    /// @notice Emitted when the repayment fee is updated.
+    ///
+    /// @param fee  The new repayment fee.
+    event RepaymentFeeUpdated(uint256 fee);
+
     /// @notice Emitted when the fee receiver is updated.
     ///
     /// @param receiver   The address of the new receiver.
@@ -598,6 +610,8 @@ interface IAlchemistV3State {
 
     function lastRedemptionBlock() external view returns (uint256 block);
 
+    function lastTransmuterTokenBalance() external view returns (uint256 balance);
+
     function totalDebt() external view returns (uint256 debt);
 
     function totalSyntheticsIssued() external view returns (uint256 syntheticAmount);
@@ -606,12 +620,15 @@ interface IAlchemistV3State {
 
     function liquidatorFee() external view returns (uint256 fee);
 
+    function repaymentFee() external view returns (uint256 fee);
+
     function underlyingConversionFactor() external view returns (uint256 factor);
 
     function protocolFeeReceiver() external view returns (address receiver);
 
     function underlyingToken() external view returns (address token);
 
+    /// @notice This is a MYT token (Morpho v2 ERC4626) as of v3
     function yieldToken() external view returns (address token);
 
     function depositsPaused() external view returns (bool isPaused);
@@ -624,11 +641,6 @@ interface IAlchemistV3State {
     ///
     /// @return pendingAdmin The pending administrator address.
     function pendingAdmin() external view returns (address pendingAdmin);
-
-    /// @notice Gets the address of the current yield token adapter.
-    ///
-    /// @return adapter The token adapter address.
-    function tokenAdapter() external returns (address adapter);
 
     /// @notice Gets the address of the alchemist fee vault.
     ///
@@ -692,6 +704,7 @@ interface IAlchemistV3State {
     /// @return grossCollateralToSeize  Total collateral to take (fee + net)
     /// @return debtToBurn              Amount of debt to erase (sent to protocol)
     /// @return fee                     Amount of collateral paid to liquidator
+    /// @return outsourcedFee           Amount of fee paid to liquidator in underlying tokens in the event that account funds are insufficient to cover the fee
     function calculateLiquidation(
         uint256 collateral,
         uint256 debt,
@@ -699,7 +712,7 @@ interface IAlchemistV3State {
         uint256 alchemistCurrentCollateralization,
         uint256 alchemistMinimumCollateralization,
         uint256 feeBps
-    ) external view returns (uint256 grossCollateralToSeize, uint256 debtToBurn, uint256 fee);
+    ) external view returns (uint256 grossCollateralToSeize, uint256 debtToBurn, uint256 fee, uint256 outsourcedFee);
 
     /// @dev Normalizes underlying tokens to debt tokens.
     /// @notice This is to handle decimal conversion in the case where underlying tokens have < 18 decimals.
