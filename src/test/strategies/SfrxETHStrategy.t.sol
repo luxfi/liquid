@@ -25,8 +25,6 @@ contract SfrxETHStrategyTest is Test {
     address public admin = address(0x1111111111111111111111111111111111111111);
     address public curator = address(0x2222222222222222222222222222222222222222);
 
-    event TestSfrxETHStrategyTestDebugLog(string message, uint256 amount);
-
     function setUp() public {
         vm.startPrank(admin);
         vault = MYTTestHelper._setupVault(WETH, admin, curator);
@@ -49,7 +47,10 @@ contract SfrxETHStrategyTest is Test {
         uint256 amount = 100 ether;
         deal(WETH, address(mytStrategy), amount);
         bytes memory data = abi.encode(amount);
-        mytStrategy.allocate(data, amount, "", address(vault));
+        (bytes32[] memory strategyIds, int256 change) = mytStrategy.allocate(data, amount, "", address(vault));
+        assertGt(change, int256(0), "positive change");
+        assertGt(strategyIds.length, 0, "strategyIds is empty");
+        assertEq(strategyIds[0], mytStrategy.adapterId(), "adapter id not in strategyIds");
         assertApproxEqAbs(mytStrategy.realAssets(), amount, 1e18);
         vm.stopPrank();
     }
@@ -59,13 +60,14 @@ contract SfrxETHStrategyTest is Test {
         uint256 amount = 100 ether;
         deal(WETH, address(mytStrategy), amount);
         bytes memory data = abi.encode(amount);
-        mytStrategy.allocate(data, amount, "", address(vault));
+        (bytes32[] memory strategyIds, int256 change) = mytStrategy.allocate(data, amount, "", address(vault));
+        assertGt(change, int256(0), "positive change");
+        assertGt(strategyIds.length, 0, "strategyIds is empty");
+        assertEq(strategyIds[0], mytStrategy.adapterId(), "adapter id not in strategyIds");
         uint256 initialRealAssets = mytStrategy.realAssets();
-        emit TestSfrxETHStrategyTestDebugLog("Initial real assets", initialRealAssets);
         assertApproxEqAbs(initialRealAssets, amount, 1e18);
         vm.warp(block.timestamp + 180 days);
         uint256 realAssets = mytStrategy.realAssets();
-        emit TestSfrxETHStrategyTestDebugLog("Real assets", realAssets);
         assertGt(realAssets, initialRealAssets);
         vm.stopPrank();
     }
@@ -79,7 +81,10 @@ contract SfrxETHStrategyTest is Test {
         uint256 initialRealAssets = mytStrategy.realAssets();
         require(initialRealAssets > 0, "Initial real assets is 0");
         deal(WETH, address(mytStrategy), amount);
-        mytStrategy.deallocate(data, amount, "", address(vault));
+        (bytes32[] memory strategyIds, int256 change) = mytStrategy.deallocate(data, amount, "", address(vault));
+        assertLt(change, int256(0), "negative change");
+        assertGt(strategyIds.length, 0, "strategyIds is empty");
+        assertEq(strategyIds[0], mytStrategy.adapterId(), "adapter id not in strategyIds");
         uint256 finalRealAssets = mytStrategy.realAssets();
         require(finalRealAssets < initialRealAssets, "Final real assets is not less than initial real assets");
         vm.stopPrank();

@@ -81,9 +81,7 @@ contract AlchemistAllocatorTest is Test {
         _magicDepositToVault(address(vault), user1, 150 ether);
         vm.startPrank(admin);
         bytes32 allocationId = mytStrategy.adapterId();
-        emit AlchemistAllocatorTestLog("allocating", 100 ether);
         allocator.allocate(address(mytStrategy), 100 ether);
-        emit AlchemistAllocatorTestLog("allocated", 100 ether);
         uint256 mytStrategyYieldTokenBalance = IMockYieldToken(mockStrategyYieldToken).balanceOf(address(mytStrategy));
         (uint256 newTotalAssets, uint256 performanceFeeShares, uint256 managementFeeShares) = vault.accrueInterestView();
         uint256 mytStrategyYieldTokenRealAssets = mytStrategy.realAssets();

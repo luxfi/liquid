@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity 0.8.28;
+
 import {MYTStrategy} from "../MYTStrategy.sol";
 
 import {IERC4626} from "../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import {IMainRewarder, IAutopilotRouter} from "./interfaces/ITokemac.sol";
+import {TokenUtils} from "../libraries/TokenUtils.sol";
 
 interface WETH {
     function deposit() external payable;
@@ -23,15 +25,9 @@ contract TokeAutoEthStrategy is MYTStrategy {
     RootOracle public immutable oracle;
     address public immutable rewardToken;
 
-    constructor(
-        address _myt,
-        StrategyParams memory _params,
-        address _autoEth,
-        address _router,
-        address _rewarder,
-        address _weth,
-        address _oracle
-    ) MYTStrategy(_myt, _params) {
+    constructor(address _myt, StrategyParams memory _params, address _autoEth, address _router, address _rewarder, address _weth, address _oracle)
+        MYTStrategy(_myt, _params)
+    {
         autoEth = IERC4626(_autoEth);
         router = IAutopilotRouter(_router);
         rewarder = IMainRewarder(_rewarder);
@@ -40,20 +36,22 @@ contract TokeAutoEthStrategy is MYTStrategy {
     }
 
     function _allocate(uint256 amount) internal override returns (uint256 depositReturn) {
-        require(msg.value == amount);
-        weth.deposit{value: msg.value}();      
+        require(TokenUtils.safeBalanceOf(address(weth), address(this)) >= amount, "Strategy balance is less than amount");
         depositReturn = router.depositMax(autoEth, address(this), 0);
-
         // Stake on behalf of MYT
         autoEth.approve(address(rewarder), depositReturn);
         rewarder.stake(address(this), depositReturn);
     }
-    
+
     // todo slippage checks
     function _deallocate(uint256 amount) internal override returns (uint256 withdrawReturn) {
-        rewarder.withdraw(address(this), amount, false);
-        withdrawReturn = autoEth.redeem(amount, address(this), address(this));
-        _unwrapWETH(withdrawReturn, address(MYT));
+        uint256 stakedShares = rewarder.balanceOf(address(this));
+        uint256 sharesToWithdraw = amount > stakedShares ? stakedShares : amount;
+        rewarder.withdraw(address(this), sharesToWithdraw, false);
+        withdrawReturn = autoEth.redeem(sharesToWithdraw, address(this), address(this));
+        require(TokenUtils.safeBalanceOf(address(weth), address(this)) >= withdrawReturn, "Strategy balance is less than amount");
+        TokenUtils.safeApprove(address(weth), msg.sender, withdrawReturn);
+        TokenUtils.safeTransfer(address(weth), msg.sender, withdrawReturn);
     }
 
     function _claimRewards() internal override returns (uint256 rewardsClaimed) {
@@ -63,7 +61,7 @@ contract TokeAutoEthStrategy is MYTStrategy {
 
     function _unwrapWETH(uint256 amount, address to) internal {
         weth.withdraw(amount);
-        (bool ok, ) = to.call{value: amount}("");
+        (bool ok,) = to.call{value: amount}("");
         require(ok, "ETH send failed");
     }
 
@@ -104,6 +102,11 @@ contract TokeAutoEthStrategy is MYTStrategy {
         if (rate == 0) return (0, false);
 
         return (rate * rewardPrice, true);
+    }
+
+    function realAssets() external view override returns (uint256) {
+        uint256 stakedShares = rewarder.balanceOf(address(this));
+        return autoEth.convertToAssets(stakedShares);
     }
 
     receive() external payable {

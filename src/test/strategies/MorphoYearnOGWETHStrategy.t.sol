@@ -21,10 +21,6 @@ contract MorphoYearnOGWETHStrategyTest is Test {
     address public admin = address(0x1111111111111111111111111111111111111111);
     address public curator = address(0x2222222222222222222222222222222222222222);
 
-    event TestLog(string message, uint256 amount);
-    event TestLogAddress(string message, address value);
-    event TestLogString(string message, string value);
-
     function setUp() public {
         vm.startPrank(admin);
         vault = MYTTestHelper._setupVault(WETH, admin, curator);

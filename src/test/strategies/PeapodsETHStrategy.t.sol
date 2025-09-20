@@ -64,7 +64,7 @@ contract PeapodsETHStrategyTest is Test {
         // uint256 sharesOut = strat.allocate{value: ethAmt}(ethAmt);
         bytes memory prevAllocationAmount = abi.encode(0);
 
-        (bytes32[] memory strategyIds, int256 change) = strat.allocate(prevAllocationAmount, ethAmt, "", address(vault));
+        (bytes32[] memory strategyIds, int256 change) = strat.allocate(prevAllocationAmount, ethAmt, "", address(MYT));
 
         // assert positive change
         assertGt(change, int256(0), "positive change");
@@ -79,11 +79,11 @@ contract PeapodsETHStrategyTest is Test {
         deal(WETH_ADDRESS, address(strat), ethAmt);
         vm.startPrank(address(0xbeef));
         bytes memory prevAllocationAmount = abi.encode(0);
-        strat.allocate(prevAllocationAmount, ethAmt, "", address(vault));
+        strat.allocate(prevAllocationAmount, ethAmt, "", address(MYT));
         IERC20(address(vault)).approve(address(strat), ethAmt);
         uint256 beforeBal = address(0xbeef).balance;
         bytes memory prevAllocationAmount2 = abi.encode(ethAmt);
-        (bytes32[] memory strategyIds, int256 change) = strat.deallocate(prevAllocationAmount2, ethAmt, "", address(vault));
+        (bytes32[] memory strategyIds, int256 change) = strat.deallocate(prevAllocationAmount2, ethAmt, "", address(MYT));
         vm.stopPrank();
         assertLt(change, int256(0), "redeem returned 0");
     }
@@ -96,7 +96,7 @@ contract PeapodsETHStrategyTest is Test {
         vm.startPrank(address(0xbeef));
         // strat.allocate{value: ethAmt}(ethAmt);
         bytes memory prevAllocationAmount = abi.encode(0);
-        strat.allocate(prevAllocationAmount, ethAmt, "", address(vault));
+        strat.allocate(prevAllocationAmount, ethAmt, "", address(MYT));
 
         // First snapshot seeds lastIndex; first return commonly 0
         uint256 first = strat.snapshotYield();
