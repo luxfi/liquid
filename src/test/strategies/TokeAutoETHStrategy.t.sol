@@ -62,36 +62,41 @@ contract TokeAutoEthStrategyTest is Test {
         vm.makePersistent(address(strat));
     }
 
-    /* function testAllocate() public {
-        uint256 ethAmt = 0.20 ether;
-        vm.deal(address(0xbeef), ethAmt);
+    function testAllocate() public {
+        uint256 ethAmt = 0.2 ether;
+        deal(WETH, address(strat), ethAmt);
 
         vm.startPrank(address(0xbeef));
-        uint256 sharesOut = strat.allocate{value: ethAmt}(ethAmt);
+        bytes memory prevAllocationAmount = abi.encode(0);
+        (bytes32[] memory strategyIds, int256 change) = strat.allocate(prevAllocationAmount, ethAmt, "", address(MYT));
         vm.stopPrank();
 
-        assertGt(sharesOut, 0, "no shares minted");
+        assertGt(change, int256(0), "positive change expected");
+        assertGt(strategyIds.length, 0, "strategyIds is empty");
+        assertEq(strategyIds[0], strat.adapterId(), "adapter id not in strategyIds");
+        uint256 shares = IMainRewarder(REWARDER).balanceOf(address(strat));
+        assertGe(strat.realAssets(), shares, "ETH not deposited into strategy");
+        // assertEq(strat.realAssets(), ethAmt, "ETH not deposited into strategy");
     }
 
     function testDeallocate() public {
         uint256 ethAmt = 0.15 ether;
-        vm.deal(address(0xbeef), ethAmt);
-
+        deal(WETH, address(strat), ethAmt);
         vm.startPrank(address(0xbeef));
-        uint256 shares = strat.allocate{value: ethAmt}(ethAmt);
+        bytes memory prevAllocationAmount = abi.encode(0);
+        strat.allocate(prevAllocationAmount, ethAmt, "", address(MYT));
+        bytes memory prevAllocationAmount2 = abi.encode(ethAmt);
+        (bytes32[] memory strategyIds, int256 change) = strat.deallocate(prevAllocationAmount2, ethAmt, "", address(MYT));
         vm.stopPrank();
-        assertGt(shares, 0, "allocate failed");
-
-        vm.startPrank(address(0xbeef));
-        uint256 assetsOut = strat.deallocate(shares);
-        vm.stopPrank();
-
-        assertGt(assetsOut, 0, "redeem returned 0");
+        assertLt(change, int256(0), "negative change expected");
+        assertGt(strategyIds.length, 0, "strategyIds is empty");
+        assertEq(strategyIds[0], strat.adapterId(), "adapter id not in strategyIds");
+        assertEq(strat.realAssets(), 0, "ETH not deallocated from strategy");
     }
 
     // TODO find blocks to test where we actually will acrue rewards
     // Currently earned 0
-    function testClaim() public {
+    /*function testClaim() public {
         uint256 ethAmt = 0.15 ether;
         vm.deal(address(0xbeef), ethAmt);
 
@@ -103,22 +108,23 @@ contract TokeAutoEthStrategyTest is Test {
         vm.rollFork(23281065);
 
         strat.claimRewards();
-    }
+    }*/
 
     function testSnapshotYield() public {
-        uint256 ethAmt = 0.20 ether;
-        vm.deal(address(0xbeef), ethAmt);
+        uint256 ethAmt = 0.2 ether;
+        deal(WETH, address(strat), ethAmt);
 
         vm.startPrank(address(0xbeef));
-        strat.allocate{value: ethAmt}(ethAmt);
+        bytes memory prevAllocationAmount = abi.encode(0);
+        (bytes32[] memory strategyIds, int256 change) = strat.allocate(prevAllocationAmount, ethAmt, "", address(MYT));
         vm.stopPrank();
 
         uint256 first = strat.snapshotYield();
         assertEq(first, 0, "first snapshot should be 0");
 
-        vm.rollFork(23281065);
+        vm.rollFork(23_281_065);
 
         uint256 second = strat.snapshotYield();
         assertGt(second, 0, "APY should be > 0 after moving to later block");
-    } */
+    }
 }
