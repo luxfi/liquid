@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.26;
+pragma solidity 0.8.28;
 
 import "./interfaces/IAlchemistV3.sol";
 import {ITokenAdapter} from "./interfaces/ITokenAdapter.sol";
