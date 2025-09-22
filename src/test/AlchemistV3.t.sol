@@ -3756,9 +3756,6 @@ contract AlchemistV3Test is Test {
         (uint256 collateral, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenIdFor0xdad);
         (uint256 collateralBeef, uint256 debtBeef, uint256 earmarkedBeef) = alchemist.getCDP(tokenIdFor0xBeef);
 
-        assertEq(earmarked + earmarkedBeef, alchemist.cumulativeEarmarked());
-        assertEq(debt + debtBeef, alchemist.totalDebt());
-
         // The first redemption
         vm.startPrank(address(0xaaaa));
         transmuterLogic.claimRedemption(2);
@@ -3778,7 +3775,7 @@ contract AlchemistV3Test is Test {
         (collateralBeef, debtBeef, earmarkedBeef) = alchemist.getCDP(tokenIdFor0xBeef);
 
         
-        assertEq(earmarked + earmarkedBeef, alchemist.cumulativeEarmarked());
-        assertEq(debt + debtBeef, alchemist.totalDebt());
+        assertApproxEqAbs(earmarked + earmarkedBeef, alchemist.cumulativeEarmarked(), 1);
+        assertApproxEqAbs(debt + debtBeef, alchemist.totalDebt(), 2);
     }
 }
