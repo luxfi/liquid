@@ -1123,7 +1123,6 @@ contract AlchemistV3 is IAlchemistV3, Initializable {
     /// @return The amount of collateral that has yet to be redeemed.
     function _calculateUnrealizedDebt(uint256 tokenId) internal view returns (uint256, uint256, uint256) {
         Account storage account = _accounts[tokenId];
-        RedemptionInfo memory previousRedemption = _redemptions[lastRedemptionBlock];
 
         uint256 earmarkWeightCopy = _earmarkWeight;
         uint256 normalizedEarmarkWeightCopy = _normalizedEarmarkWeight;
