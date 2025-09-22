@@ -46,20 +46,31 @@ contract AlchemistCurator is IAlchemistCurator, PermissionedProxy {
         require(adapter != address(0), "INVALID_ADDRESS");
         require(myt != address(0), "INVALID_ADDRESS");
         // require(address(IVaultV2(myt)) != address(0), "INVALID_ADDRESS");
-        _setStrategy(adapter, myt);
+        _setStrategy(adapter, myt, false);
+    }
+
+    function removeStrategy(address adapter, address myt) external onlyOperator {
+        require(adapter != address(0), "INVALID_ADDRESS");
+        require(myt != address(0), "INVALID_ADDRESS");
+        // require(address(IVaultV2(myt)) != address(0), "INVALID_ADDRESS");
+        _setStrategy(adapter, myt, true); // remove
     }
 
     function _submitSetStrategy(address adapter, address myt) internal {
         IVaultV2 vault = IVaultV2(myt);
-        bytes memory data = abi.encodeCall(IVaultV2.setIsAdapter, (adapter, true));
+        bytes memory data = abi.encodeCall(IVaultV2.addAdapter, adapter);
         vault.submit(data);
         emit SubmitSetStrategy(adapter, myt);
     }
 
-    function _setStrategy(address adapter, address myt) internal {
+    function _setStrategy(address adapter, address myt, bool remove) internal {
         adapterToMYT[adapter] = myt;
         IVaultV2 vault = _vault(adapter);
-        vault.setIsAdapter(adapter, true);
+        if (remove) {
+            vault.removeAdapter(adapter);
+        } else {
+            vault.addAdapter(adapter);
+        }
         emit StrategySet(adapter, myt);
     }
 
