@@ -604,19 +604,19 @@ contract IntegrationTest is Test {
         IERC20(alUSD).approve(address(transmuterLogic), 3000e18);
         // Create redemption for 1_000 alUSD and claim
         transmuterLogic.createRedemption(1000e18);
-        vm.roll(vm.getBlockNumber() + 5_256_000 + 1);
-        transmuterLogic.claimRedemption(1); // _redemptionWeight = 0x800... + 1 = infinite
+        vm.roll(vm.getBlockNumber() + 5_256_000);
+        transmuterLogic.claimRedemption(1);
         // Create redemption for 1_000 alUSD
         transmuterLogic.createRedemption(1000e18);
         vm.roll(vm.getBlockNumber() + 5_256_000 / 2);
         // Create another redemption for 1_000 alUSD after passing half period
         transmuterLogic.createRedemption(1000e18);
-        vm.roll(vm.getBlockNumber() + 5_256_000 / 2 + 1);
+        vm.roll(vm.getBlockNumber() + 5_256_000 / 2);
         // Claim the second redemption
         transmuterLogic.claimRedemption(2);
         vm.stopPrank();
         (uint256 collateral, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
-        assertApproxEqAbs(debt, 10_000e18 - 2500e18, 1e15); // The debt includes amount that is not claimed yet
+        assertApproxEqAbs(debt, 10_000e18 - 2000e18, 1);
         assertEq(earmarked, 0);
     }
 }
