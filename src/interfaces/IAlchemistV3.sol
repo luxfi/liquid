@@ -38,6 +38,7 @@ struct AlchemistInitializationParams {
 /// @notice A user account.
 /// @notice This account struct is included in the main contract, AlchemistV3.sol, to aid readability.
 struct Account {
+    uint256 accumulator;
     /// @notice User's collateral.
     uint256 collateralBalance;
     /// @notice User's debt.
@@ -46,16 +47,16 @@ struct Account {
     uint256 earmarked;
     /// @notice The amount of unlocked collateral.
     uint256 freeCollateral;
-    /// @notice Last weight of debt from most recent account sync.
+    /// @notice Last weight of earmark from most recent account sync.
     uint256 lastAccruedEarmarkWeight;
-    /// @notice Last weight of debt from most recent account sync.
+    /// @notice Last weight of normalized earmark from most recent account sync.
+    uint256 lastAccruedNormalizedEarmarkWeight;
+    /// @notice Last weight of redemption from most recent account sync.
     uint256 lastAccruedRedemptionWeight;
     /// @notice Last weight of collateral from most recent account sync.
     uint256 lastCollateralWeight;
     /// @notice Block of the most recent mint
     uint256 lastMintBlock;
-    /// @notice The block that the last redemption was synced to the account.
-    uint256 lastRedemptionSync;
     /// @notice The un-scaled locked collateral.
     uint256 rawLocked;
     /// @notice allowances for minting alAssets, per version.
