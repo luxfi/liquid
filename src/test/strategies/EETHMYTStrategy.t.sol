@@ -9,7 +9,7 @@ import {IMYTStrategy} from "../../interfaces/IMYTStrategy.sol";
 import {EETHMYTStrategy} from "../../strategies/EETH.sol";
 
 contract MockEETHMYTStrategy is EETHMYTStrategy {
-    constructor(address _myt, address _eeth, IMYTStrategy.StrategyParams memory _params) EETHMYTStrategy(_myt, _params, _eeth) {}
+    constructor(address _myt, IMYTStrategy.StrategyParams memory _params, address _eeth, address _weth) EETHMYTStrategy(_myt, _params, _eeth, _weth) {}
 }
 
 contract EETHMYTStrategyTest is Test {

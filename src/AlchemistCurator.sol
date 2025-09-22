@@ -17,8 +17,6 @@ contract AlchemistCurator is IAlchemistCurator, PermissionedProxy {
     address public pendingAdmin;
     address public pendingStrategy;
 
-    event MYTCuratorProxyTestLog(string message, address value);
-
     constructor(address _admin, address _operator) PermissionedProxy(_admin, _operator) {}
 
     // ===== Admin Management =====
@@ -34,25 +32,19 @@ contract AlchemistCurator is IAlchemistCurator, PermissionedProxy {
 
     function submitSetStrategy(address adapter, address myt) external onlyOperator {
         require(adapter != address(0), "INVALID_ADDRESS");
-        emit MYTCuratorProxyTestLog("submitSetStrategy", adapter);
-        emit MYTCuratorProxyTestLog("submitSetStrategy", myt);
-
         require(myt != address(0), "INVALID_ADDRESS");
-        // require(address(IMYTVault(myt).MYT()) != address(0), "INVALID_ADDRESS");
         _submitSetStrategy(adapter, myt);
     }
 
     function setStrategy(address adapter, address myt) external onlyOperator {
         require(adapter != address(0), "INVALID_ADDRESS");
         require(myt != address(0), "INVALID_ADDRESS");
-        // require(address(IVaultV2(myt)) != address(0), "INVALID_ADDRESS");
         _setStrategy(adapter, myt, false);
     }
 
     function removeStrategy(address adapter, address myt) external onlyOperator {
         require(adapter != address(0), "INVALID_ADDRESS");
         require(myt != address(0), "INVALID_ADDRESS");
-        // require(address(IVaultV2(myt)) != address(0), "INVALID_ADDRESS");
         _setStrategy(adapter, myt, true); // remove
     }
 

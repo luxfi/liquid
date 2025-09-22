@@ -119,8 +119,6 @@ contract AlchemistV3Test is Test {
         uint256 tokenId;
     }
 
-    event TestLog(string message, uint256 value);
-
     function setUp() external {
         deployCoreContracts(18);
     }

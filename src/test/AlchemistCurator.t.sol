@@ -29,8 +29,6 @@ contract AlchemistCuratorTest is Test {
     uint256 public defaultStrategyRelativeCap = 1e18; // 100%
     MockMYTStrategy public mytStrategy;
 
-    event MYTCuratorProxyTestDebugLog(string message, uint256 value);
-
     function setUp() public {
         vm.startPrank(admin);
         mytCuratorProxy = new MockAlchemistCurator(admin, operator);
