@@ -35,10 +35,6 @@ contract AlchemistAllocatorTest is Test {
     uint256 public defaultStrategyRelativeCap = 1e18; // 100%
     MockMYTStrategy public mytStrategy;
 
-    event MockETHMYTStrategyLogBool(string message, bool value);
-    event AlchemistAllocatorTestLog(string message, uint256 value);
-    event AlchemistAllocatorTestLogBytes32(string message, bytes32 value);
-
     function setUp() public {
         vm.startPrank(admin);
         vault = MYTTestHelper._setupVault(mockVaultCollateral, admin, curator);

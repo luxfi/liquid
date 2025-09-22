@@ -30,8 +30,6 @@ contract SfrxETHStrategy is MYTStrategy {
     StakedFraxEth public immutable sfrxEth;
     address public immutable WETH = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
 
-    event SfrxETHStrategyDebugLog(string message, uint256 amount);
-
     constructor(address _myt, StrategyParams memory _params, address _sfrxEth, address _fraxMinter, address _redemptionQueue) MYTStrategy(_myt, _params) {
         minter = FraxMinter(_fraxMinter);
         redemptionQueue = FraxRedemptionQueue(_redemptionQueue);
@@ -58,9 +56,7 @@ contract SfrxETHStrategy is MYTStrategy {
         // TODO: implement dex swap
         address fakeDexAddress = address(0);
         uint256 sfrxEthBalance = sfrxEth.balanceOf(address(this));
-        emit SfrxETHStrategyDebugLog("SfrxETH balance", sfrxEthBalance);
         uint256 adjusted = amount < sfrxEthBalance ? amount : sfrxEthBalance;
-        emit SfrxETHStrategyDebugLog("Adjusted", adjusted);
         TokenUtils.safeApprove(address(sfrxEth), fakeDexAddress, adjusted);
         // sfrxEth balance should for this address should now be reduced by amount
         TokenUtils.safeTransfer(address(sfrxEth), fakeDexAddress, adjusted);
