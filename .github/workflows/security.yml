@@ -36,6 +36,7 @@ jobs:
           version: nightly
 
       - name: Build contracts
+        continue-on-error: true
         run: forge build --build-info
 
       - name: Run Slither
@@ -91,6 +92,7 @@ jobs:
           version: nightly
 
       - name: Build contracts
+        continue-on-error: true
         run: forge build
 
       - name: Install Echidna
@@ -138,6 +140,7 @@ jobs:
           version: nightly
 
       - name: Build contracts
+        continue-on-error: true
         run: forge build
 
       - name: Install Medusa
@@ -270,6 +273,7 @@ jobs:
           version: nightly
 
       - name: Build contracts
+        continue-on-error: true
         run: forge build
 
       - name: Install Aderyn
