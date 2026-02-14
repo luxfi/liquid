@@ -15,9 +15,6 @@ on:
     # Run weekly on Sunday at midnight
     - cron: '0 0 * * 0'
 
-env:
-  FOUNDRY_PROFILE: ci
-
 jobs:
   # ═══════════════════════════════════════════════════════════════════════════
   # SLITHER - Static Analysis
