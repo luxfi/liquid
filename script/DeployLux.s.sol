@@ -8,7 +8,8 @@ import {Transmuter} from "../src/Transmuter.sol";
 import {AlchemistETHVault} from "../src/AlchemistETHVault.sol";
 import {AlchemistTokenVault} from "../src/AlchemistTokenVault.sol";
 import {AlchemistCurator} from "../src/AlchemistCurator.sol";
-import {AlchemistAllocator} from "../src/AlchemistAllocator.sol";
+// AlchemistAllocator requires a vault-v2 (IVaultV2) address; deploy separately
+// import {AlchemistAllocator} from "../src/AlchemistAllocator.sol";
 import {AlchemistStrategyClassifier} from "../src/AlchemistStrategyClassifier.sol";
 import {MYTStrategy} from "../src/MYTStrategy.sol";
 import {IAlchemistV3, AlchemistInitializationParams} from "../src/interfaces/IAlchemistV3.sol";
@@ -152,58 +153,56 @@ contract DeployLux is Script {
     }
 
     function _deployFullStack(DeploymentConfig memory config) internal returns (DeployedContracts memory deployed) {
-        // 1. Deploy Strategy Classifier
+        // 1. Deploy Strategy Classifier (constructor: address _admin)
         console.log("Deploying AlchemistStrategyClassifier...");
         AlchemistStrategyClassifier classifier = new AlchemistStrategyClassifier(config.admin);
         deployed.classifier = address(classifier);
         console.log("  AlchemistStrategyClassifier:", deployed.classifier);
 
-        // 2. Deploy Curator
+        // 2. Deploy AlchemistV3 (empty constructor, uses initialize pattern)
+        console.log("Deploying AlchemistV3...");
+        AlchemistV3 alchemist = new AlchemistV3();
+        deployed.alchemist = address(alchemist);
+        console.log("  AlchemistV3:", deployed.alchemist);
+
+        // 3. Deploy Curator (constructor: address _admin, address _operator)
         console.log("Deploying AlchemistCurator...");
-        AlchemistCurator curator = new AlchemistCurator(config.admin);
+        AlchemistCurator curator = new AlchemistCurator(config.admin, config.admin);
         deployed.curator = address(curator);
         console.log("  AlchemistCurator:", deployed.curator);
 
-        // 3. Deploy Allocator
-        console.log("Deploying AlchemistAllocator...");
-        AlchemistAllocator allocator = new AlchemistAllocator(config.admin);
-        deployed.allocator = address(allocator);
-        console.log("  AlchemistAllocator:", deployed.allocator);
-
-        // 4. Deploy Vault (ETH or Token based on underlying)
+        // 4. Deploy Vault (constructor: address _weth, address _alchemist, address _owner)
         console.log("Deploying AlchemistETHVault...");
         AlchemistETHVault vault = new AlchemistETHVault(
             config.underlyingToken,
-            config.admin,
-            deployed.curator,
-            deployed.allocator
+            deployed.alchemist,
+            config.admin
         );
         deployed.vault = address(vault);
         console.log("  AlchemistETHVault:", deployed.vault);
 
-        // 5. Deploy Position NFT
+        // 5. Deploy Position NFT (constructor: address alchemist_)
         console.log("Deploying AlchemistV3Position...");
-        AlchemistV3Position position = new AlchemistV3Position("Liquid V3 Position", "LIQ-V3-POS");
+        AlchemistV3Position position = new AlchemistV3Position(deployed.alchemist);
         deployed.position = address(position);
         console.log("  AlchemistV3Position:", deployed.position);
 
         // 6. Deploy Transmuter
         console.log("Deploying Transmuter...");
         ITransmuter.TransmuterInitializationParams memory transmuterParams = ITransmuter.TransmuterInitializationParams({
-            syntheticToken: config.debtToken, // Will need to be set after alchemist deployment
+            syntheticToken: config.debtToken,
             feeReceiver: config.protocolFeeReceiver,
             timeToTransmute: DEFAULT_TIME_TO_TRANSMUTE,
             transmutationFee: DEFAULT_TRANSMUTATION_FEE,
             exitFee: DEFAULT_EXIT_FEE,
             graphSize: DEFAULT_GRAPH_SIZE
         });
+        Transmuter transmuter = new Transmuter(transmuterParams);
+        deployed.transmuter = address(transmuter);
+        console.log("  Transmuter:", deployed.transmuter);
 
-        // Note: Transmuter deployment requires the synthetic token address
-        // This would be updated after the debt token is deployed
-        console.log("  Transmuter params configured (deploy after debt token)");
-
-        // 7. Deploy Alchemist V3
-        console.log("Deploying AlchemistV3...");
+        // 7. Initialize AlchemistV3
+        console.log("Initializing AlchemistV3...");
         AlchemistInitializationParams memory alchemistParams = AlchemistInitializationParams({
             admin: config.admin,
             debtToken: config.debtToken,
@@ -215,24 +214,30 @@ contract DeployLux is Script {
             globalMinimumCollateralization: DEFAULT_GLOBAL_MIN_COLLATERALIZATION,
             collateralizationLowerBound: DEFAULT_COLLATERALIZATION_LOWER_BOUND,
             tokenAdapter: config.tokenAdapter,
-            transmuter: address(0), // Will be set after transmuter deployment
+            transmuter: deployed.transmuter,
             protocolFee: DEFAULT_PROTOCOL_FEE,
             protocolFeeReceiver: config.protocolFeeReceiver,
             liquidatorFee: DEFAULT_LIQUIDATOR_FEE,
             repaymentFee: DEFAULT_REPAYMENT_FEE
         });
+        alchemist.initialize(alchemistParams);
+        console.log("  AlchemistV3 initialized");
 
-        AlchemistV3 alchemist = new AlchemistV3(alchemistParams);
-        deployed.alchemist = address(alchemist);
-        console.log("  AlchemistV3:", deployed.alchemist);
+        // 8. Set position NFT on alchemist
+        alchemist.setAlchemistPositionNFT(deployed.position);
+        console.log("  AlchemistV3Position NFT set on AlchemistV3");
+
+        // 9. Set alchemist on transmuter
+        transmuter.setAlchemist(deployed.alchemist);
+        console.log("  Alchemist set on Transmuter");
 
         // Log deployment summary
         console.log("\n=== Deployment Summary ===");
         console.log("AlchemistV3:", deployed.alchemist);
         console.log("AlchemistV3Position:", deployed.position);
+        console.log("Transmuter:", deployed.transmuter);
         console.log("AlchemistETHVault:", deployed.vault);
         console.log("AlchemistCurator:", deployed.curator);
-        console.log("AlchemistAllocator:", deployed.allocator);
         console.log("AlchemistStrategyClassifier:", deployed.classifier);
 
         return deployed;
