@@ -1,7 +1,7 @@
 pragma solidity >=0.5.0;
 
 /// @title  IERC20Minimal
-/// @author Alchemix Finance
+/// @author Lux Liquid
 interface IERC20Minimal {
     /// @notice An event which is emitted when tokens are transferred between two parties.
     ///
