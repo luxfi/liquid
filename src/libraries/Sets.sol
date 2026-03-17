@@ -1,7 +1,7 @@
 pragma solidity ^0.8.23;
 
 /// @title  Sets
-/// @author Alchemix Finance
+/// @author Lux Liquid
 library Sets {
     using Sets for AddressSet;
 

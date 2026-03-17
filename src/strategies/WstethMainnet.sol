@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity 0.8.28;
-import {MYTStrategy} from "../MYTStrategy.sol";
+import {LiquidStrategy} from "../LiquidStrategy.sol";
 
 interface stETH {
     function sharesOf(address account) external view returns (uint256);
@@ -22,12 +22,12 @@ interface unstETH {
 }
 
 // THIS IS A WIP THAT WAS STARTED BEFORE REALIZING WE ARENT PRIORITIZING THIS VAULT
-contract WstethMainnetStrategy is MYTStrategy {
+contract WstethMainnetStrategy is LiquidStrategy {
     stETH public immutable steth;
     wstETH public immutable wsteth;
     unstETH public immutable unsteth;
 
-    constructor(address _myt, StrategyParams memory _params, address _stETH, address _wstETH, address _unstETH, address _referral) MYTStrategy(_myt, _params) {
+    constructor(address _vault, StrategyParams memory _params, address _stETH, address _wstETH, address _unstETH, address _referral) LiquidStrategy(_vault, _params) {
         steth = stETH(_stETH);
         wsteth = wstETH(_wstETH);
         unsteth = unstETH(_unstETH);

@@ -8,41 +8,41 @@ import "../libraries/SafeCast.sol";
 import "../../lib/forge-std/src/Test.sol";
 import {SafeERC20} from "../libraries/SafeERC20.sol";
 import {console} from "../../lib/forge-std/src/console.sol";
-import {AlchemistV3} from "../AlchemistV3.sol";
-import {AlchemicTokenV3} from "../test/mocks/AlchemicTokenV3.sol";
-import {Transmuter} from "../Transmuter.sol";
+import {Liquid} from "../Liquid.sol";
+import {LiquidMintableToken} from "../test/mocks/LiquidMintableToken.sol";
+import {LiquidTransmuter} from "../LiquidTransmuter.sol";
 import {Whitelist} from "../utils/Whitelist.sol";
 import {TestERC20} from "./mocks/TestERC20.sol";
 import {TestYieldToken} from "./mocks/TestYieldToken.sol";
 import {TokenAdapterMock} from "./mocks/TokenAdapterMock.sol";
-import {IAlchemistV3, IAlchemistV3Errors, AlchemistInitializationParams} from "../interfaces/IAlchemistV3.sol";
-import {ITransmuter} from "../interfaces/ITransmuter.sol";
+import {ILiquid, ILiquidErrors, LiquidInitializationParams} from "../interfaces/ILiquid.sol";
+import {ILiquidTransmuter} from "../interfaces/ILiquidTransmuter.sol";
 import {ITestYieldToken} from "../interfaces/test/ITestYieldToken.sol";
 import {InsufficientAllowance} from "../base/Errors.sol";
 import {Unauthorized, IllegalArgument, IllegalState, MissingInputData} from "../base/Errors.sol";
-import {AlchemistNFTHelper} from "./libraries/AlchemistNFTHelper.sol";
-import {AlchemistV3Position} from "../AlchemistV3Position.sol";
-import {AlchemistETHVault} from "../AlchemistETHVault.sol";
+import {LiquidNFTHelper} from "./libraries/LiquidNFTHelper.sol";
+import {LiquidPosition} from "../LiquidPosition.sol";
+import {LiquidETHVault} from "../LiquidETHVault.sol";
 import {TokenUtils} from "../libraries/TokenUtils.sol";
 
 contract InvariantsTest is Test {
     bytes4[] internal selectors;
 
     // Callable contract variables
-    AlchemistV3 alchemist;
-    Transmuter transmuter;
-    AlchemistV3Position alchemistNFT;
-    AlchemistETHVault ethVault;
+    Liquid liquid;
+    LiquidTransmuter transmuter;
+    LiquidPosition liquidNFT;
+    LiquidETHVault ethVault;
 
     // // Proxy variables
-    TransparentUpgradeableProxy proxyAlchemist;
+    TransparentUpgradeableProxy proxyLiquid;
     TransparentUpgradeableProxy proxyTransmuter;
 
     // // Contract variables
     // CheatCodes cheats = CheatCodes(HEVM_ADDRESS);
-    AlchemistV3 alchemistLogic;
-    Transmuter transmuterLogic;
-    AlchemicTokenV3 alToken;
+    Liquid liquidLogic;
+    LiquidTransmuter transmuterLogic;
+    LiquidMintableToken alToken;
     Whitelist whitelist;
 
     // Token addresses
@@ -58,7 +58,7 @@ contract InvariantsTest is Test {
     // Total tokens sent to transmuter
     uint256 public sentToTransmuter;
 
-    // Parameters for AlchemicTokenV2
+    // Parameters for Liquid MintableTokenV2
     string public _name;
     string public _symbol;
     uint256 public _flashFee;
@@ -114,9 +114,9 @@ contract InvariantsTest is Test {
 
         fakeUnderlyingToken = new TestERC20(100e18, uint8(18));
         fakeYieldToken = new TestYieldToken(address(fakeUnderlyingToken));
-        alToken = new AlchemicTokenV3(_name, _symbol, _flashFee);
+        alToken = new LiquidMintableToken(_name, _symbol, _flashFee);
 
-        ITransmuter.TransmuterInitializationParams memory transParams = ITransmuter.TransmuterInitializationParams({
+        ILiquidTransmuter.TransmuterInitializationParams memory transParams = ILiquidTransmuter.TransmuterInitializationParams({
             syntheticToken: address(alToken),
             feeReceiver: address(this),
             timeToTransmute: 5_256_000,
@@ -127,8 +127,8 @@ contract InvariantsTest is Test {
 
         // Contracts and logic contracts
         alOwner = caller;
-        transmuterLogic = new Transmuter(transParams);
-        alchemistLogic = new AlchemistV3();
+        transmuterLogic = new LiquidTransmuter(transParams);
+        liquidLogic = new Liquid();
         whitelist = new Whitelist();
 
         // // Proxy contracts
@@ -145,8 +145,8 @@ contract InvariantsTest is Test {
         // proxyTransmuter = new TransparentUpgradeableProxy(address(transmuterLogic), proxyOwner, transParams);
         // transmuter = TransmuterV3(address(proxyTransmuter));
 
-        // AlchemistV3 proxy
-        AlchemistInitializationParams memory params = AlchemistInitializationParams({
+        // Liquid proxy
+        LiquidInitializationParams memory params = LiquidInitializationParams({
             admin: alOwner,
             debtToken: address(alToken),
             underlyingToken: address(fakeUnderlyingToken),
@@ -164,21 +164,21 @@ contract InvariantsTest is Test {
             repaymentFee: 100
         });
 
-        bytes memory alchemParams = abi.encodeWithSelector(AlchemistV3.initialize.selector, params);
-        proxyAlchemist = new TransparentUpgradeableProxy(address(alchemistLogic), proxyOwner, alchemParams);
-        alchemist = AlchemistV3(address(proxyAlchemist));
+        bytes memory alchemParams = abi.encodeWithSelector(Liquid.initialize.selector, params);
+        proxyLiquid = new TransparentUpgradeableProxy(address(liquidLogic), proxyOwner, alchemParams);
+        liquid = Liquid(address(proxyLiquid));
 
-        // Whitelist alchemist proxy for minting tokens
-        alToken.setWhitelist(address(proxyAlchemist), true);
+        // Whitelist liquid proxy for minting tokens
+        alToken.setWhitelist(address(proxyLiquid), true);
 
         whitelist.add(address(0xbeef));
         whitelist.add(externalUser);
         whitelist.add(anotherExternalUser);
 
-        transmuterLogic.setAlchemist(address(alchemist));
+        transmuterLogic.setLiquid(address(liquid));
         transmuterLogic.setDepositCap(uint256(type(int256).max));
-        alchemistNFT = new AlchemistV3Position(address(alchemist));
-        alchemist.setAlchemistPositionNFT(address(alchemistNFT));
+        liquidNFT = new LiquidPosition(address(liquid));
+        liquid.setLiquidPositionNFT(address(liquidNFT));
 
         vm.stopPrank();
 
@@ -212,8 +212,8 @@ contract InvariantsTest is Test {
         alToken.setWhitelist(sender, true);
 
         vm.startPrank(sender);
-        TokenUtils.safeApprove(address(alToken), address(alchemist), type(uint256).max);
-        TokenUtils.safeApprove(address(fakeYieldToken), address(alchemist), type(uint256).max);
+        TokenUtils.safeApprove(address(alToken), address(liquid), type(uint256).max);
+        TokenUtils.safeApprove(address(fakeYieldToken), address(liquid), type(uint256).max);
         vm.stopPrank();
     }
 
@@ -240,11 +240,11 @@ contract InvariantsTest is Test {
             address user = users[i];
 
             // a single position nft would have been minted to address(0xbeef)
-            uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(user, address(alchemistNFT));
+            uint256 tokenId = LiquidNFTHelper.getFirstTokenId(user, address(liquidNFT));
 
             uint256 borrowable;
 
-            if (tokenId != 0) borrowable = alchemist.getMaxBorrowable(tokenId);
+            if (tokenId != 0) borrowable = liquid.getMaxBorrowable(tokenId);
 
             if (borrowable > 0) {
                 candidates[i] = user;
@@ -260,11 +260,11 @@ contract InvariantsTest is Test {
         for (uint256 i; i < users.length; ++i) {
             address user = users[i];
             // a single position nft would have been minted to address(0xbeef)
-            uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(user, address(alchemistNFT));
+            uint256 tokenId = LiquidNFTHelper.getFirstTokenId(user, address(liquidNFT));
 
             uint256 borrowable;
 
-            if (tokenId != 0) alchemist.getMaxBorrowable(tokenId);
+            if (tokenId != 0) liquid.getMaxBorrowable(tokenId);
 
             if (borrowable > 0) {
                 candidates[i] = user;
@@ -280,11 +280,11 @@ contract InvariantsTest is Test {
         for (uint256 i; i < users.length; ++i) {
             address user = users[i];
             // a single position nft would have been minted to address(0xbeef)
-            uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(user, address(alchemistNFT));
+            uint256 tokenId = LiquidNFTHelper.getFirstTokenId(user, address(liquidNFT));
             uint256 collateral;
             uint256 debt;
 
-            if (tokenId != 0) (collateral, debt,) = alchemist.getCDP(tokenId);
+            if (tokenId != 0) (collateral, debt,) = liquid.getCDP(tokenId);
 
             if (debt > 0) {
                 candidates[i] = user;
@@ -300,13 +300,13 @@ contract InvariantsTest is Test {
         for (uint256 i; i < users.length; ++i) {
             address user = users[i];
             // a single position nft would have been minted to address(0xbeef)
-            uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(user, address(alchemistNFT));
+            uint256 tokenId = LiquidNFTHelper.getFirstTokenId(user, address(liquidNFT));
 
             uint256 collateral;
             uint256 debt;
             uint256 earmarked;
 
-            if (tokenId != 0) (collateral, debt, earmarked) = alchemist.getCDP(tokenId);
+            if (tokenId != 0) (collateral, debt, earmarked) = liquid.getCDP(tokenId);
 
             if (debt > 0 && debt > earmarked) {
                 candidates[i] = user;

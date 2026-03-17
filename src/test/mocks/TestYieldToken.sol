@@ -7,7 +7,7 @@ import "../../interfaces/test/ITestYieldToken.sol";
 import "./TestERC20.sol";
 
 /// @title  TestYieldToken
-/// @author Alchemix Finance
+/// @author Lux Liquid
 contract TestYieldToken is ITestYieldToken, ERC20 {
     address private constant BLACKHOLE = address(0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB);
     uint256 private constant BPS = 10_000;

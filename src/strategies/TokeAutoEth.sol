@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {MYTStrategy} from "../MYTStrategy.sol";
+import {LiquidStrategy} from "../LiquidStrategy.sol";
 
 import {IERC4626} from "../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import {IMainRewarder, IAutopilotRouter} from "./interfaces/ITokemac.sol";
@@ -17,7 +17,7 @@ interface RootOracle {
     function getPriceInEth(address token) external returns (uint256 price);
 }
 
-contract TokeAutoEthStrategy is MYTStrategy {
+contract TokeAutoEthStrategy is LiquidStrategy {
     IERC4626 public immutable autoEth;
     IAutopilotRouter public immutable router;
     IMainRewarder public immutable rewarder;
@@ -25,8 +25,8 @@ contract TokeAutoEthStrategy is MYTStrategy {
     RootOracle public immutable oracle;
     address public immutable rewardToken;
 
-    constructor(address _myt, StrategyParams memory _params, address _autoEth, address _router, address _rewarder, address _weth, address _oracle)
-        MYTStrategy(_myt, _params)
+    constructor(address _vault, StrategyParams memory _params, address _autoEth, address _router, address _rewarder, address _weth, address _oracle)
+        LiquidStrategy(_vault, _params)
     {
         autoEth = IERC4626(_autoEth);
         router = IAutopilotRouter(_router);
@@ -38,7 +38,7 @@ contract TokeAutoEthStrategy is MYTStrategy {
     function _allocate(uint256 amount) internal override returns (uint256 depositReturn) {
         require(TokenUtils.safeBalanceOf(address(weth), address(this)) >= amount, "Strategy balance is less than amount");
         depositReturn = router.depositMax(autoEth, address(this), 0);
-        // Stake on behalf of MYT
+        // Stake on behalf of VAULT
         autoEth.approve(address(rewarder), depositReturn);
         rewarder.stake(address(this), depositReturn);
     }
@@ -56,7 +56,7 @@ contract TokeAutoEthStrategy is MYTStrategy {
 
     function _claimRewards() internal override returns (uint256 rewardsClaimed) {
         rewardsClaimed = rewarder.earned(address(this));
-        rewarder.getReward(address(this), address(MYT), false);
+        rewarder.getReward(address(this), address(VAULT), false);
     }
 
     function _unwrapWETH(uint256 amount, address to) internal {
@@ -81,7 +81,7 @@ contract TokeAutoEthStrategy is MYTStrategy {
         if (rewarder.rewardToken() == address(0)) return 0;
 
         uint256 assetPrice = oracle.getPriceInEth(address(autoEth));
-        uint256 tvlAssets = autoEth.balanceOf(address(MYT));
+        uint256 tvlAssets = autoEth.balanceOf(address(VAULT));
         if (tvlAssets == 0 || assetPrice == 0) return 0;
 
         (uint256 rewardPrice, bool haveRew) = _rewardPricePerSecond();

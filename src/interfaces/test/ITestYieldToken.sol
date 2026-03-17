@@ -3,7 +3,7 @@ pragma solidity >=0.5.0;
 import "../../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 /// @title  ITestYieldToken
-/// @author Alchemix Finance
+/// @author Lux Liquid
 interface ITestYieldToken is IERC20 {
     /// @notice Gets the address of underlying token that the yield token wraps.
     ///

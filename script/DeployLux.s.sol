@@ -2,18 +2,18 @@
 pragma solidity ^0.8.28;
 
 import {Script, console} from "forge-std/Script.sol";
-import {AlchemistV3} from "../src/AlchemistV3.sol";
-import {AlchemistV3Position} from "../src/AlchemistV3Position.sol";
-import {Transmuter} from "../src/Transmuter.sol";
-import {AlchemistETHVault} from "../src/AlchemistETHVault.sol";
-import {AlchemistTokenVault} from "../src/AlchemistTokenVault.sol";
-import {AlchemistCurator} from "../src/AlchemistCurator.sol";
-// AlchemistAllocator requires a vault-v2 (IVaultV2) address; deploy separately
-// import {AlchemistAllocator} from "../src/AlchemistAllocator.sol";
-import {AlchemistStrategyClassifier} from "../src/AlchemistStrategyClassifier.sol";
-import {MYTStrategy} from "../src/MYTStrategy.sol";
-import {IAlchemistV3, AlchemistInitializationParams} from "../src/interfaces/IAlchemistV3.sol";
-import {ITransmuter} from "../src/interfaces/ITransmuter.sol";
+import {Liquid} from "../src/Liquid.sol";
+import {LiquidPosition} from "../src/LiquidPosition.sol";
+import {LiquidTransmuter} from "../src/LiquidTransmuter.sol";
+import {LiquidETHVault} from "../src/LiquidETHVault.sol";
+import {LiquidTokenVault} from "../src/LiquidTokenVault.sol";
+import {LiquidCurator} from "../src/LiquidCurator.sol";
+// LiquidAllocator requires a vault-v2 (IVaultV2) address; deploy separately
+// import {LiquidAllocator} from "../src/LiquidAllocator.sol";
+import {LiquidStrategyClassifier} from "../src/LiquidStrategyClassifier.sol";
+import {LiquidStrategy} from "../src/LiquidStrategy.sol";
+import {ILiquid, LiquidInitializationParams} from "../src/interfaces/ILiquid.sol";
+import {ILiquidTransmuter} from "../src/interfaces/ILiquidTransmuter.sol";
 
 /// @title DeployLux
 /// @notice Deployment script for Liquid V3 on Lux Network chains
@@ -57,7 +57,7 @@ contract DeployLux is Script {
     }
 
     struct DeployedContracts {
-        address alchemist;
+        address liquid;
         address position;
         address transmuter;
         address vault;
@@ -96,7 +96,7 @@ contract DeployLux is Script {
         // Note: These addresses need to be set for the actual deployment
         // For now, using placeholder addresses that would be replaced
         address wlux = address(0); // WLUX address
-        address yieldToken = address(0); // MYT yield token address
+        address yieldToken = address(0); // VAULT yield token address
 
         DeploymentConfig memory config = DeploymentConfig({
             admin: deployer,
@@ -105,7 +105,7 @@ contract DeployLux is Script {
             yieldToken: yieldToken,
             tokenAdapter: address(0), // Will be deployed
             protocolFeeReceiver: deployer,
-            debtTokenName: "Alchemix LUX",
+            debtTokenName: "Lux Liquid LUX",
             debtTokenSymbol: "alLUX"
         });
 
@@ -116,7 +116,7 @@ contract DeployLux is Script {
         console.log("\n=== Deploying to Zoo Network ===");
 
         address wzoo = address(0); // WZOO address
-        address yieldToken = address(0); // MYT yield token address
+        address yieldToken = address(0); // VAULT yield token address
 
         DeploymentConfig memory config = DeploymentConfig({
             admin: deployer,
@@ -125,7 +125,7 @@ contract DeployLux is Script {
             yieldToken: yieldToken,
             tokenAdapter: address(0),
             protocolFeeReceiver: deployer,
-            debtTokenName: "Alchemix ZOO",
+            debtTokenName: "Lux Liquid ZOO",
             debtTokenSymbol: "alZOO"
         });
 
@@ -136,7 +136,7 @@ contract DeployLux is Script {
         console.log("\n=== Deploying to Hanzo Network ===");
 
         address whanzo = address(0); // WHANZO address
-        address yieldToken = address(0); // MYT yield token address
+        address yieldToken = address(0); // VAULT yield token address
 
         DeploymentConfig memory config = DeploymentConfig({
             admin: deployer,
@@ -145,7 +145,7 @@ contract DeployLux is Script {
             yieldToken: yieldToken,
             tokenAdapter: address(0),
             protocolFeeReceiver: deployer,
-            debtTokenName: "Alchemix HANZO",
+            debtTokenName: "Lux Liquid HANZO",
             debtTokenSymbol: "alHANZO"
         });
 
@@ -154,42 +154,42 @@ contract DeployLux is Script {
 
     function _deployFullStack(DeploymentConfig memory config) internal returns (DeployedContracts memory deployed) {
         // 1. Deploy Strategy Classifier (constructor: address _admin)
-        console.log("Deploying AlchemistStrategyClassifier...");
-        AlchemistStrategyClassifier classifier = new AlchemistStrategyClassifier(config.admin);
+        console.log("Deploying LiquidStrategyClassifier...");
+        LiquidStrategyClassifier classifier = new LiquidStrategyClassifier(config.admin);
         deployed.classifier = address(classifier);
-        console.log("  AlchemistStrategyClassifier:", deployed.classifier);
+        console.log("  LiquidStrategyClassifier:", deployed.classifier);
 
-        // 2. Deploy AlchemistV3 (empty constructor, uses initialize pattern)
-        console.log("Deploying AlchemistV3...");
-        AlchemistV3 alchemist = new AlchemistV3();
-        deployed.alchemist = address(alchemist);
-        console.log("  AlchemistV3:", deployed.alchemist);
+        // 2. Deploy Liquid (empty constructor, uses initialize pattern)
+        console.log("Deploying Liquid...");
+        Liquid liquid = new Liquid();
+        deployed.liquid = address(liquid);
+        console.log("  Liquid:", deployed.liquid);
 
         // 3. Deploy Curator (constructor: address _admin, address _operator)
-        console.log("Deploying AlchemistCurator...");
-        AlchemistCurator curator = new AlchemistCurator(config.admin, config.admin);
+        console.log("Deploying LiquidCurator...");
+        LiquidCurator curator = new LiquidCurator(config.admin, config.admin);
         deployed.curator = address(curator);
-        console.log("  AlchemistCurator:", deployed.curator);
+        console.log("  LiquidCurator:", deployed.curator);
 
-        // 4. Deploy Vault (constructor: address _weth, address _alchemist, address _owner)
-        console.log("Deploying AlchemistETHVault...");
-        AlchemistETHVault vault = new AlchemistETHVault(
+        // 4. Deploy Vault (constructor: address _weth, address _liquid, address _owner)
+        console.log("Deploying LiquidETHVault...");
+        LiquidETHVault vault = new LiquidETHVault(
             config.underlyingToken,
-            deployed.alchemist,
+            deployed.liquid,
             config.admin
         );
         deployed.vault = address(vault);
-        console.log("  AlchemistETHVault:", deployed.vault);
+        console.log("  LiquidETHVault:", deployed.vault);
 
-        // 5. Deploy Position NFT (constructor: address alchemist_)
-        console.log("Deploying AlchemistV3Position...");
-        AlchemistV3Position position = new AlchemistV3Position(deployed.alchemist);
+        // 5. Deploy Position NFT (constructor: address liquid_)
+        console.log("Deploying LiquidPosition...");
+        LiquidPosition position = new LiquidPosition(deployed.liquid);
         deployed.position = address(position);
-        console.log("  AlchemistV3Position:", deployed.position);
+        console.log("  LiquidPosition:", deployed.position);
 
         // 6. Deploy Transmuter
-        console.log("Deploying Transmuter...");
-        ITransmuter.TransmuterInitializationParams memory transmuterParams = ITransmuter.TransmuterInitializationParams({
+        console.log("Deploying LiquidTransmuter...");
+        ILiquidTransmuter.TransmuterInitializationParams memory transmuterParams = ILiquidTransmuter.TransmuterInitializationParams({
             syntheticToken: config.debtToken,
             feeReceiver: config.protocolFeeReceiver,
             timeToTransmute: DEFAULT_TIME_TO_TRANSMUTE,
@@ -197,13 +197,13 @@ contract DeployLux is Script {
             exitFee: DEFAULT_EXIT_FEE,
             graphSize: DEFAULT_GRAPH_SIZE
         });
-        Transmuter transmuter = new Transmuter(transmuterParams);
+        LiquidTransmuter transmuter = new LiquidTransmuter(transmuterParams);
         deployed.transmuter = address(transmuter);
-        console.log("  Transmuter:", deployed.transmuter);
+        console.log("  LiquidTransmuter:", deployed.transmuter);
 
-        // 7. Initialize AlchemistV3
-        console.log("Initializing AlchemistV3...");
-        AlchemistInitializationParams memory alchemistParams = AlchemistInitializationParams({
+        // 7. Initialize Liquid
+        console.log("Initializing Liquid...");
+        LiquidInitializationParams memory liquidParams = LiquidInitializationParams({
             admin: config.admin,
             debtToken: config.debtToken,
             underlyingToken: config.underlyingToken,
@@ -220,37 +220,37 @@ contract DeployLux is Script {
             liquidatorFee: DEFAULT_LIQUIDATOR_FEE,
             repaymentFee: DEFAULT_REPAYMENT_FEE
         });
-        alchemist.initialize(alchemistParams);
-        console.log("  AlchemistV3 initialized");
+        liquid.initialize(liquidParams);
+        console.log("  Liquid initialized");
 
-        // 8. Set position NFT on alchemist
-        alchemist.setAlchemistPositionNFT(deployed.position);
-        console.log("  AlchemistV3Position NFT set on AlchemistV3");
+        // 8. Set position NFT on liquid
+        liquid.setLiquidPositionNFT(deployed.position);
+        console.log("  LiquidPosition NFT set on Liquid");
 
-        // 9. Set alchemist on transmuter
-        transmuter.setAlchemist(deployed.alchemist);
-        console.log("  Alchemist set on Transmuter");
+        // 9. Set liquid on transmuter
+        transmuter.setLiquid(deployed.liquid);
+        console.log("  Liquid set on LiquidTransmuter");
 
         // Log deployment summary
         console.log("\n=== Deployment Summary ===");
-        console.log("AlchemistV3:", deployed.alchemist);
-        console.log("AlchemistV3Position:", deployed.position);
-        console.log("Transmuter:", deployed.transmuter);
-        console.log("AlchemistETHVault:", deployed.vault);
-        console.log("AlchemistCurator:", deployed.curator);
-        console.log("AlchemistStrategyClassifier:", deployed.classifier);
+        console.log("Liquid:", deployed.liquid);
+        console.log("LiquidPosition:", deployed.position);
+        console.log("LiquidTransmuter:", deployed.transmuter);
+        console.log("LiquidETHVault:", deployed.vault);
+        console.log("LiquidCurator:", deployed.curator);
+        console.log("LiquidStrategyClassifier:", deployed.classifier);
 
         return deployed;
     }
 
-    /// @notice Deploy only the MYT strategy contracts
+    /// @notice Deploy only the Liquid strategy contracts
     function deployStrategies() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
 
         vm.startBroadcast(deployerPrivateKey);
 
-        console.log("\n=== Deploying MYT Strategies ===");
+        console.log("\n=== Deploying Liquid Strategies ===");
 
         // Strategy deployment would go here
         // Each strategy (EETH, SfrxETH, etc.) would be deployed

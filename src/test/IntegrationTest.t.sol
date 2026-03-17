@@ -7,41 +7,41 @@ import "../libraries/SafeCast.sol";
 import "../../lib/forge-std/src/Test.sol";
 import {SafeERC20} from "../libraries/SafeERC20.sol";
 import {console} from "../../lib/forge-std/src/console.sol";
-import {AlchemistV3} from "../AlchemistV3.sol";
-import {AlchemicTokenV3} from "../test/mocks/AlchemicTokenV3.sol";
+import {Liquid} from "../Liquid.sol";
+import {LiquidMintableToken} from "../test/mocks/LiquidMintableToken.sol";
 import {EulerUSDCAdapter} from "../adapters/EulerUSDCAdapter.sol";
-import {Transmuter} from "../Transmuter.sol";
+import {LiquidTransmuter} from "../LiquidTransmuter.sol";
 import {Whitelist} from "../utils/Whitelist.sol";
 import {TestERC20} from "./mocks/TestERC20.sol";
 import {TestYieldToken} from "./mocks/TestYieldToken.sol";
 import {TokenAdapterMock} from "./mocks/TokenAdapterMock.sol";
-import {IAlchemistV3, IAlchemistV3Errors, AlchemistInitializationParams} from "../interfaces/IAlchemistV3.sol";
-import {IAlchemicToken} from "../interfaces/IAlchemicToken.sol";
-import {ITransmuter} from "../interfaces/ITransmuter.sol";
+import {ILiquid, ILiquidErrors, LiquidInitializationParams} from "../interfaces/ILiquid.sol";
+import {ILiquidMintable} from "../interfaces/ILiquidMintable.sol";
+import {ILiquidTransmuter} from "../interfaces/ILiquidTransmuter.sol";
 import {ITestYieldToken} from "../interfaces/test/ITestYieldToken.sol";
 import {InsufficientAllowance} from "../base/Errors.sol";
 import {Unauthorized, IllegalArgument, IllegalState, MissingInputData} from "../base/Errors.sol";
-import {AlchemistNFTHelper} from "./libraries/AlchemistNFTHelper.sol";
-import {AlchemistV3Position} from "../AlchemistV3Position.sol";
-import {AlchemistETHVault} from "../AlchemistETHVault.sol";
+import {LiquidNFTHelper} from "./libraries/LiquidNFTHelper.sol";
+import {LiquidPosition} from "../LiquidPosition.sol";
+import {LiquidETHVault} from "../LiquidETHVault.sol";
 import {TokenUtils} from "../libraries/TokenUtils.sol";
 
 // Tests for integration with Euler V2 Earn Vault
 contract IntegrationTest is Test {
     // Callable contract variables
-    AlchemistV3 alchemist;
-    Transmuter transmuter;
-    AlchemistV3Position alchemistNFT;
+    Liquid liquid;
+    LiquidTransmuter transmuter;
+    LiquidPosition liquidNFT;
 
     // // Proxy variables
-    TransparentUpgradeableProxy proxyAlchemist;
+    TransparentUpgradeableProxy proxyLiquid;
     TransparentUpgradeableProxy proxyTransmuter;
 
     // // Contract variables
     // CheatCodes cheats = CheatCodes(HEVM_ADDRESS);
-    AlchemistV3 alchemistLogic;
-    Transmuter transmuterLogic;
-    AlchemicTokenV3 alToken;
+    Liquid liquidLogic;
+    LiquidTransmuter transmuterLogic;
+    LiquidMintableToken alToken;
     Whitelist whitelist;
 
     // Total minted debt
@@ -57,7 +57,7 @@ contract IntegrationTest is Test {
     address weth = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     address ETH_USD_PRICE_FEED_MAINNET = 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419;
     uint256 ETH_USD_UPDATE_TIME_MAINNET = 3600 seconds;
-    // Parameters for AlchemicTokenV2
+    // Parameters for Liquid MintableTokenV2
     string public _name;
     string public _symbol;
     uint256 public _flashFee;
@@ -113,7 +113,7 @@ contract IntegrationTest is Test {
         vm.assume(caller != proxyOwner);
         vm.startPrank(caller);
 
-        ITransmuter.TransmuterInitializationParams memory transParams = ITransmuter.TransmuterInitializationParams({
+        ILiquidTransmuter.TransmuterInitializationParams memory transParams = ILiquidTransmuter.TransmuterInitializationParams({
             syntheticToken: alUSD,
             feeReceiver: receiver,
             timeToTransmute: 5_256_000,
@@ -124,8 +124,8 @@ contract IntegrationTest is Test {
 
         // Contracts and logic contracts
         alOwner = caller;
-        transmuterLogic = new Transmuter(transParams);
-        alchemistLogic = new AlchemistV3();
+        transmuterLogic = new LiquidTransmuter(transParams);
+        liquidLogic = new Liquid();
         whitelist = new Whitelist();
 
         // // Proxy contracts
@@ -144,8 +144,8 @@ contract IntegrationTest is Test {
 
         vaultAdapter = new EulerUSDCAdapter(EULER_USDC, USDC);
 
-        // AlchemistV3 proxy
-        AlchemistInitializationParams memory params = AlchemistInitializationParams({
+        // Liquid proxy
+        LiquidInitializationParams memory params = LiquidInitializationParams({
             admin: alOwner,
             debtToken: alUSD,
             underlyingToken: USDC,
@@ -163,25 +163,25 @@ contract IntegrationTest is Test {
             repaymentFee: 100
         });
 
-        bytes memory alchemParams = abi.encodeWithSelector(AlchemistV3.initialize.selector, params);
-        proxyAlchemist = new TransparentUpgradeableProxy(address(alchemistLogic), proxyOwner, alchemParams);
-        alchemist = AlchemistV3(address(proxyAlchemist));
+        bytes memory alchemParams = abi.encodeWithSelector(Liquid.initialize.selector, params);
+        proxyLiquid = new TransparentUpgradeableProxy(address(liquidLogic), proxyOwner, alchemParams);
+        liquid = Liquid(address(proxyLiquid));
 
-        // Whitelist alchemist proxy for minting tokens
-        // alToken.setWhitelist(address(proxyAlchemist), true);
+        // Whitelist liquid proxy for minting tokens
+        // alToken.setWhitelist(address(proxyLiquid), true);
 
         // whitelist.add(address(0xbeef));
         // whitelist.add(externalUser);
         // whitelist.add(anotherExternalUser);
 
-        // transmuterLogic.addAlchemist(address(alchemist));
+        // transmuterLogic.addLiquid(address(liquid));
 
         transmuterLogic.setDepositCap(uint256(type(int256).max));
 
-        transmuterLogic.setAlchemist(address(alchemist));
+        transmuterLogic.setLiquid(address(liquid));
 
-        alchemistNFT = new AlchemistV3Position(address(alchemist));
-        alchemist.setAlchemistPositionNFT(address(alchemistNFT));
+        liquidNFT = new LiquidPosition(address(liquid));
+        liquid.setLiquidPositionNFT(address(liquidNFT));
 
         vm.stopPrank();
 
@@ -191,75 +191,75 @@ contract IntegrationTest is Test {
         deal(alUSD, address(0xdead), 100_000e18);
 
         vm.startPrank(0x8392F6669292fA56123F71949B52d883aE57e225);
-        IAlchemicToken(alUSD).setWhitelist(address(alchemist), true);
-        IAlchemicToken(alUSD).setCeiling(address(alchemist), type(uint256).max);
+        ILiquidMintable(alUSD).setWhitelist(address(liquid), true);
+        ILiquidMintable(alUSD).setCeiling(address(liquid), type(uint256).max);
         vm.stopPrank();
     }
 
     function testRoundTrip() external {
         vm.startPrank(address(0xbeef));
-        IERC20(EULER_USDC).approve(address(alchemist), 100_000e18);
-        alchemist.deposit(100_000e18, address(0xbeef), 0);
+        IERC20(EULER_USDC).approve(address(liquid), 100_000e18);
+        liquid.deposit(100_000e18, address(0xbeef), 0);
         // a single position nft would have been minted to address(0xbeef)
-        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
-        (uint256 collateral,,) = alchemist.getCDP(tokenId);
+        uint256 tokenId = LiquidNFTHelper.getFirstTokenId(address(0xbeef), address(liquidNFT));
+        (uint256 collateral,,) = liquid.getCDP(tokenId);
         assertEq(collateral, 100_000e18);
-        assertEq(IERC20(EULER_USDC).balanceOf(address(alchemist)), 100_000e18);
+        assertEq(IERC20(EULER_USDC).balanceOf(address(liquid)), 100_000e18);
 
-        alchemist.withdraw(100_000e18, address(0xbeef), tokenId);
+        liquid.withdraw(100_000e18, address(0xbeef), tokenId);
         vm.stopPrank();
 
-        (collateral,,) = alchemist.getCDP(tokenId);
+        (collateral,,) = liquid.getCDP(tokenId);
         assertEq(collateral, 0);
         assertEq(IERC20(EULER_USDC).balanceOf(address(0xbeef)), 100_000e18);
     }
 
     function testMint() external {
         vm.startPrank(address(0xbeef));
-        IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
-        alchemist.deposit(100_000e6, address(0xbeef), 0);
+        IERC20(EULER_USDC).approve(address(liquid), 100_000e6);
+        liquid.deposit(100_000e6, address(0xbeef), 0);
         // a single position nft would have been minted to address(0xbeef)
-        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
-        alchemist.mint(tokenId, alchemist.getMaxBorrowable(tokenId), address(0xbeef));
-        (uint256 collateral, uint256 debt,) = alchemist.getCDP(tokenId);
+        uint256 tokenId = LiquidNFTHelper.getFirstTokenId(address(0xbeef), address(liquidNFT));
+        liquid.mint(tokenId, liquid.getMaxBorrowable(tokenId), address(0xbeef));
+        (uint256 collateral, uint256 debt,) = liquid.getCDP(tokenId);
         assertEq(collateral, 100_000e6);
-        assertEq(debt, alchemist.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111);
+        assertEq(debt, liquid.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111);
 
         vm.stopPrank();
     }
 
     function testRepay() external {
         vm.startPrank(address(0xbeef));
-        IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
-        alchemist.deposit(100_000e6, address(0xbeef), 0);
+        IERC20(EULER_USDC).approve(address(liquid), 100_000e6);
+        liquid.deposit(100_000e6, address(0xbeef), 0);
         // a single position nft would have been minted to address(0xbeef)
-        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
-        uint256 maxBorrow = alchemist.getMaxBorrowable(tokenId);
-        alchemist.mint(tokenId, maxBorrow, address(0xbeef));
-        IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
+        uint256 tokenId = LiquidNFTHelper.getFirstTokenId(address(0xbeef), address(liquidNFT));
+        uint256 maxBorrow = liquid.getMaxBorrowable(tokenId);
+        liquid.mint(tokenId, maxBorrow, address(0xbeef));
+        IERC20(EULER_USDC).approve(address(liquid), 100_000e6);
 
         vm.roll(block.number + 1);
 
-        alchemist.repay(alchemist.convertDebtTokensToYield(maxBorrow), tokenId);
+        liquid.repay(liquid.convertDebtTokensToYield(maxBorrow), tokenId);
         vm.stopPrank();
 
-        (uint256 collateral, uint256 debt,) = alchemist.getCDP(tokenId);
+        (uint256 collateral, uint256 debt,) = liquid.getCDP(tokenId);
 
         assertApproxEqAbs(debt, 0, 9201);
-        assertEq(collateral, 100_000e6 - alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10_000);
-        assertEq(IERC20(EULER_USDC).balanceOf(receiver), alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10_000);
+        assertEq(collateral, 100_000e6 - liquid.convertDebtTokensToYield(maxBorrow) * 100 / 10_000);
+        assertEq(IERC20(EULER_USDC).balanceOf(receiver), liquid.convertDebtTokensToYield(maxBorrow) * 100 / 10_000);
     }
 
     function testRepayEarmarkedFull() external {
-        uint256 debtAmount = alchemist.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
+        uint256 debtAmount = liquid.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
 
         vm.startPrank(address(0xbeef));
-        IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
-        alchemist.deposit(100_000e6, address(0xbeef), 0);
+        IERC20(EULER_USDC).approve(address(liquid), 100_000e6);
+        liquid.deposit(100_000e6, address(0xbeef), 0);
         // a single position nft would have been minted to address(0xbeef)
-        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
-        uint256 maxBorrow = alchemist.getMaxBorrowable(tokenId);
-        alchemist.mint(tokenId, maxBorrow, address(0xbeef));
+        uint256 tokenId = LiquidNFTHelper.getFirstTokenId(address(0xbeef), address(liquidNFT));
+        uint256 maxBorrow = liquid.getMaxBorrowable(tokenId);
+        liquid.mint(tokenId, maxBorrow, address(0xbeef));
         vm.stopPrank();
 
         vm.startPrank(address(0xdad));
@@ -269,37 +269,37 @@ contract IntegrationTest is Test {
 
         vm.roll(block.number + 5_256_000);
 
-        (uint256 collateral, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
+        (uint256 collateral, uint256 debt, uint256 earmarked) = liquid.getCDP(tokenId);
 
         assertApproxEqAbs(debt, maxBorrow, 1);
         assertEq(collateral, 100_000e6);
         assertApproxEqAbs(earmarked, maxBorrow, 1);
 
         vm.startPrank(address(0xbeef));
-        IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
-        alchemist.repay(alchemist.convertDebtTokensToYield(maxBorrow), tokenId);
+        IERC20(EULER_USDC).approve(address(liquid), 100_000e6);
+        liquid.repay(liquid.convertDebtTokensToYield(maxBorrow), tokenId);
         vm.stopPrank();
 
-        (collateral, debt, earmarked) = alchemist.getCDP(tokenId);
+        (collateral, debt, earmarked) = liquid.getCDP(tokenId);
 
         assertApproxEqAbs(debt, 0, 9201);
-        assertEq(collateral, 100_000e6 - alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10_000);
+        assertEq(collateral, 100_000e6 - liquid.convertDebtTokensToYield(maxBorrow) * 100 / 10_000);
         assertApproxEqAbs(earmarked, 0, 9201);
 
-        assertApproxEqAbs(IERC20(alchemist.yieldToken()).balanceOf(address(transmuterLogic)), alchemist.convertDebtTokensToYield(maxBorrow), 1);
-        assertEq(IERC20(EULER_USDC).balanceOf(receiver), alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10_000);
+        assertApproxEqAbs(IERC20(liquid.yieldToken()).balanceOf(address(transmuterLogic)), liquid.convertDebtTokensToYield(maxBorrow), 1);
+        assertEq(IERC20(EULER_USDC).balanceOf(receiver), liquid.convertDebtTokensToYield(maxBorrow) * 100 / 10_000);
     }
 
     function testRepayEarmarkedPartialEarmarked() external {
-        uint256 debtAmount = alchemist.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
+        uint256 debtAmount = liquid.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
 
         vm.startPrank(address(0xbeef));
-        IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
-        alchemist.deposit(100_000e6, address(0xbeef), 0);
+        IERC20(EULER_USDC).approve(address(liquid), 100_000e6);
+        liquid.deposit(100_000e6, address(0xbeef), 0);
         // a single position nft would have been minted to address(0xbeef)
-        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
-        uint256 maxBorrow = alchemist.getMaxBorrowable(tokenId);
-        alchemist.mint(tokenId, maxBorrow, address(0xbeef));
+        uint256 tokenId = LiquidNFTHelper.getFirstTokenId(address(0xbeef), address(liquidNFT));
+        uint256 maxBorrow = liquid.getMaxBorrowable(tokenId);
+        liquid.mint(tokenId, maxBorrow, address(0xbeef));
         vm.stopPrank();
 
         vm.startPrank(address(0xdad));
@@ -309,37 +309,37 @@ contract IntegrationTest is Test {
 
         vm.roll(block.number + 5_256_000 / 2);
 
-        (uint256 collateral, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
+        (uint256 collateral, uint256 debt, uint256 earmarked) = liquid.getCDP(tokenId);
 
         assertApproxEqAbs(debt, maxBorrow, 1);
         assertApproxEqAbs(collateral, 100_000e6, 1);
         assertApproxEqAbs(earmarked, maxBorrow / 2, 1);
 
         vm.startPrank(address(0xbeef));
-        IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
-        alchemist.repay(alchemist.convertDebtTokensToYield(maxBorrow), tokenId);
+        IERC20(EULER_USDC).approve(address(liquid), 100_000e6);
+        liquid.repay(liquid.convertDebtTokensToYield(maxBorrow), tokenId);
         vm.stopPrank();
 
-        (collateral, debt, earmarked) = alchemist.getCDP(tokenId);
+        (collateral, debt, earmarked) = liquid.getCDP(tokenId);
 
         assertApproxEqAbs(debt, 0, 9201);
-        assertApproxEqAbs(collateral, 100_000e6 - alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10_000, 1);
+        assertApproxEqAbs(collateral, 100_000e6 - liquid.convertDebtTokensToYield(maxBorrow) * 100 / 10_000, 1);
         assertApproxEqAbs(earmarked, 0, 9201);
 
-        assertApproxEqAbs(IERC20(alchemist.yieldToken()).balanceOf(address(transmuterLogic)), alchemist.convertDebtTokensToYield(maxBorrow), 1);
-        assertEq(IERC20(EULER_USDC).balanceOf(receiver), alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10_000);
+        assertApproxEqAbs(IERC20(liquid.yieldToken()).balanceOf(address(transmuterLogic)), liquid.convertDebtTokensToYield(maxBorrow), 1);
+        assertEq(IERC20(EULER_USDC).balanceOf(receiver), liquid.convertDebtTokensToYield(maxBorrow) * 100 / 10_000);
     }
 
     function testRepayEarmarkedPartialRepayment() external {
-        uint256 debtAmount = alchemist.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
+        uint256 debtAmount = liquid.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
 
         vm.startPrank(address(0xbeef));
-        IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
-        alchemist.deposit(100_000e6, address(0xbeef), 0);
+        IERC20(EULER_USDC).approve(address(liquid), 100_000e6);
+        liquid.deposit(100_000e6, address(0xbeef), 0);
         // a single position nft would have been minted to address(0xbeef)
-        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
-        uint256 maxBorrow = alchemist.getMaxBorrowable(tokenId);
-        alchemist.mint(tokenId, maxBorrow, address(0xbeef));
+        uint256 tokenId = LiquidNFTHelper.getFirstTokenId(address(0xbeef), address(liquidNFT));
+        uint256 maxBorrow = liquid.getMaxBorrowable(tokenId);
+        liquid.mint(tokenId, maxBorrow, address(0xbeef));
         vm.stopPrank();
 
         vm.startPrank(address(0xdad));
@@ -349,37 +349,37 @@ contract IntegrationTest is Test {
 
         vm.roll(block.number + 5_256_000 / 2);
 
-        (uint256 collateral, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
+        (uint256 collateral, uint256 debt, uint256 earmarked) = liquid.getCDP(tokenId);
 
         assertApproxEqAbs(debt, maxBorrow, 1);
         assertApproxEqAbs(collateral, 100_000e6, 1);
         assertApproxEqAbs(earmarked, maxBorrow / 2, 1);
 
         vm.startPrank(address(0xbeef));
-        IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
-        alchemist.repay(alchemist.convertDebtTokensToYield(maxBorrow) / 2, tokenId);
+        IERC20(EULER_USDC).approve(address(liquid), 100_000e6);
+        liquid.repay(liquid.convertDebtTokensToYield(maxBorrow) / 2, tokenId);
         vm.stopPrank();
 
-        (collateral, debt, earmarked) = alchemist.getCDP(tokenId);
+        (collateral, debt, earmarked) = liquid.getCDP(tokenId);
 
         assertApproxEqAbs(debt, (maxBorrow / 2), 9201);
-        assertApproxEqAbs(collateral, 100_000e6 - (alchemist.convertDebtTokensToYield(maxBorrow) / 2) * 100 / 10_000, 1);
+        assertApproxEqAbs(collateral, 100_000e6 - (liquid.convertDebtTokensToYield(maxBorrow) / 2) * 100 / 10_000, 1);
         assertApproxEqAbs(earmarked, 0, 9201);
 
-        assertApproxEqAbs(IERC20(alchemist.yieldToken()).balanceOf(address(transmuterLogic)), alchemist.convertDebtTokensToYield(maxBorrow) / 2, 1);
-        assertEq(IERC20(EULER_USDC).balanceOf(receiver), (alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10_000) / 2);
+        assertApproxEqAbs(IERC20(liquid.yieldToken()).balanceOf(address(transmuterLogic)), liquid.convertDebtTokensToYield(maxBorrow) / 2, 1);
+        assertEq(IERC20(EULER_USDC).balanceOf(receiver), (liquid.convertDebtTokensToYield(maxBorrow) * 100 / 10_000) / 2);
     }
 
     function testRepayEarmarkedOverRepayment() external {
-        uint256 debtAmount = alchemist.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
+        uint256 debtAmount = liquid.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
 
         vm.startPrank(address(0xbeef));
-        IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
-        alchemist.deposit(100_000e6, address(0xbeef), 0);
+        IERC20(EULER_USDC).approve(address(liquid), 100_000e6);
+        liquid.deposit(100_000e6, address(0xbeef), 0);
         // a single position nft would have been minted to address(0xbeef)
-        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
-        uint256 maxBorrow = alchemist.getMaxBorrowable(tokenId);
-        alchemist.mint(tokenId, maxBorrow, address(0xbeef));
+        uint256 tokenId = LiquidNFTHelper.getFirstTokenId(address(0xbeef), address(liquidNFT));
+        uint256 maxBorrow = liquid.getMaxBorrowable(tokenId);
+        liquid.mint(tokenId, maxBorrow, address(0xbeef));
         vm.stopPrank();
 
         vm.startPrank(address(0xdad));
@@ -389,75 +389,75 @@ contract IntegrationTest is Test {
 
         vm.roll(block.number + 5_256_000 / 2);
 
-        (uint256 collateral, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
+        (uint256 collateral, uint256 debt, uint256 earmarked) = liquid.getCDP(tokenId);
 
         assertApproxEqAbs(debt, maxBorrow, 1);
         assertApproxEqAbs(collateral, 100_000e6, 1);
         assertApproxEqAbs(earmarked, maxBorrow / 2, 1);
 
-        uint256 beefStartingBalance = IERC20(alchemist.yieldToken()).balanceOf(address(0xbeef));
+        uint256 beefStartingBalance = IERC20(liquid.yieldToken()).balanceOf(address(0xbeef));
 
         vm.startPrank(address(0xbeef));
-        IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
-        alchemist.repay(alchemist.convertDebtTokensToYield(maxBorrow) * 2, tokenId);
+        IERC20(EULER_USDC).approve(address(liquid), 100_000e6);
+        liquid.repay(liquid.convertDebtTokensToYield(maxBorrow) * 2, tokenId);
         vm.stopPrank();
 
-        (collateral, debt, earmarked) = alchemist.getCDP(tokenId);
+        (collateral, debt, earmarked) = liquid.getCDP(tokenId);
 
-        uint256 beefEndBalance = IERC20(alchemist.yieldToken()).balanceOf(address(0xbeef));
+        uint256 beefEndBalance = IERC20(liquid.yieldToken()).balanceOf(address(0xbeef));
 
         // Loss of precision. Small, but consider using LTV rather than minimum collateralization
         assertApproxEqAbs(debt, 0, 1);
-        assertEq(collateral, 100_000e6 - alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10_000);
+        assertEq(collateral, 100_000e6 - liquid.convertDebtTokensToYield(maxBorrow) * 100 / 10_000);
         assertApproxEqAbs(earmarked, 0, 9201);
 
         // Overpayment sent back to user and transmuter received what was credited
         // uint256 amountSpent = maxBorrow / 2;
-        // assertApproxEqAbs(beefStartingBalance - beefEndBalance, alchemist.convertDebtTokensToYield(amountSpent), 1);
-        // assertApproxEqAbs(IERC20(alchemist.yieldToken()).balanceOf(address(transmuterLogic)), alchemist.convertDebtTokensToYield(amountSpent), 1);
+        // assertApproxEqAbs(beefStartingBalance - beefEndBalance, liquid.convertDebtTokensToYield(amountSpent), 1);
+        // assertApproxEqAbs(IERC20(liquid.yieldToken()).balanceOf(address(transmuterLogic)), liquid.convertDebtTokensToYield(amountSpent), 1);
     }
 
     function testBurn() external {
         vm.startPrank(address(0xbeef));
-        IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
-        alchemist.deposit(100_000e6, address(0xbeef), 0);
+        IERC20(EULER_USDC).approve(address(liquid), 100_000e6);
+        liquid.deposit(100_000e6, address(0xbeef), 0);
         // a single position nft would have been minted to address(0xbeef)
-        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
-        uint256 maxBorrow = alchemist.getMaxBorrowable(tokenId);
-        alchemist.mint(tokenId, maxBorrow, address(0xbeef));
-        IERC20(alUSD).approve(address(alchemist), maxBorrow);
+        uint256 tokenId = LiquidNFTHelper.getFirstTokenId(address(0xbeef), address(liquidNFT));
+        uint256 maxBorrow = liquid.getMaxBorrowable(tokenId);
+        liquid.mint(tokenId, maxBorrow, address(0xbeef));
+        IERC20(alUSD).approve(address(liquid), maxBorrow);
 
         vm.roll(block.number + 1);
 
-        alchemist.burn(maxBorrow, tokenId);
+        liquid.burn(maxBorrow, tokenId);
         vm.stopPrank();
 
-        (uint256 collateral, uint256 debt,) = alchemist.getCDP(tokenId);
+        (uint256 collateral, uint256 debt,) = liquid.getCDP(tokenId);
 
         assertEq(debt, 0);
-        assertEq(collateral, 100_000e6 - alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10_000);
-        assertEq(IERC20(EULER_USDC).balanceOf(receiver), alchemist.convertDebtTokensToYield(maxBorrow) * 100 / 10_000);
+        assertEq(collateral, 100_000e6 - liquid.convertDebtTokensToYield(maxBorrow) * 100 / 10_000);
+        assertEq(IERC20(EULER_USDC).balanceOf(receiver), liquid.convertDebtTokensToYield(maxBorrow) * 100 / 10_000);
     }
 
     function testBurnWithEarmarkPartial() external {
-        uint256 debtAmount = alchemist.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
+        uint256 debtAmount = liquid.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
 
         vm.startPrank(address(0xbeef));
-        IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
-        alchemist.deposit(100_000e6, address(0xbeef), 0);
+        IERC20(EULER_USDC).approve(address(liquid), 100_000e6);
+        liquid.deposit(100_000e6, address(0xbeef), 0);
         // a single position nft would have been minted to address(0xbeef)
-        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
-        uint256 maxBorrow = alchemist.getMaxBorrowable(tokenId);
-        alchemist.mint(tokenId, maxBorrow, address(0xbeef));
+        uint256 tokenId = LiquidNFTHelper.getFirstTokenId(address(0xbeef), address(liquidNFT));
+        uint256 maxBorrow = liquid.getMaxBorrowable(tokenId);
+        liquid.mint(tokenId, maxBorrow, address(0xbeef));
         vm.stopPrank();
 
         vm.startPrank(address(0xdad));
-        IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
-        alchemist.deposit(100_000e6, address(0xdad), 0);
+        IERC20(EULER_USDC).approve(address(liquid), 100_000e6);
+        liquid.deposit(100_000e6, address(0xdad), 0);
         // a single position nft would have been minted to address(0xdad)
-        uint256 tokenId2 = AlchemistNFTHelper.getFirstTokenId(address(0xdad), address(alchemistNFT));
-        uint256 maxBorrow2 = alchemist.getMaxBorrowable(tokenId2);
-        alchemist.mint(tokenId2, maxBorrow2, address(0xdad));
+        uint256 tokenId2 = LiquidNFTHelper.getFirstTokenId(address(0xdad), address(liquidNFT));
+        uint256 maxBorrow2 = liquid.getMaxBorrowable(tokenId2);
+        liquid.mint(tokenId2, maxBorrow2, address(0xdad));
         vm.stopPrank();
 
         vm.startPrank(address(0xdad));
@@ -468,11 +468,11 @@ contract IntegrationTest is Test {
         vm.roll(block.number + 5_256_000 / 2);
 
         vm.startPrank(address(0xbeef));
-        IERC20(alUSD).approve(address(alchemist), maxBorrow);
-        alchemist.burn(maxBorrow, tokenId);
+        IERC20(alUSD).approve(address(liquid), maxBorrow);
+        liquid.burn(maxBorrow, tokenId);
         vm.stopPrank();
 
-        (uint256 collateral, uint256 debt,) = alchemist.getCDP(tokenId);
+        (uint256 collateral, uint256 debt,) = liquid.getCDP(tokenId);
 
         // Make sure only unEarmarked debt is repaid
         assertApproxEqAbs(debt, maxBorrow / 4, 2);
@@ -484,15 +484,15 @@ contract IntegrationTest is Test {
     }
 
     function testBurnFullyEarmarked() external {
-        uint256 debtAmount = alchemist.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
+        uint256 debtAmount = liquid.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
 
         vm.startPrank(address(0xbeef));
-        IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
-        alchemist.deposit(100_000e6, address(0xbeef), 0);
+        IERC20(EULER_USDC).approve(address(liquid), 100_000e6);
+        liquid.deposit(100_000e6, address(0xbeef), 0);
         // a single position nft would have been minted to address(0xbeef)
-        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
-        uint256 maxBorrow = alchemist.getMaxBorrowable(tokenId);
-        alchemist.mint(tokenId, maxBorrow, address(0xbeef));
+        uint256 tokenId = LiquidNFTHelper.getFirstTokenId(address(0xbeef), address(liquidNFT));
+        uint256 maxBorrow = liquid.getMaxBorrowable(tokenId);
+        liquid.mint(tokenId, maxBorrow, address(0xbeef));
         vm.stopPrank();
 
         vm.startPrank(address(0xdad));
@@ -503,21 +503,21 @@ contract IntegrationTest is Test {
         vm.roll(block.number + 5_256_000);
 
         vm.startPrank(address(0xbeef));
-        IERC20(alUSD).approve(address(alchemist), maxBorrow);
+        IERC20(alUSD).approve(address(liquid), maxBorrow);
         vm.expectRevert();
-        alchemist.burn(maxBorrow, tokenId);
+        liquid.burn(maxBorrow, tokenId);
         vm.stopPrank();
     }
 
     function testPositionToFullMaturity() external {
-        uint256 debtAmount = alchemist.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
+        uint256 debtAmount = liquid.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
 
         vm.startPrank(address(0xbeef));
-        IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
-        alchemist.deposit(100_000e6, address(0xbeef), 0);
+        IERC20(EULER_USDC).approve(address(liquid), 100_000e6);
+        liquid.deposit(100_000e6, address(0xbeef), 0);
         // a single position nft would have been minted to address(0xbeef)
-        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
-        alchemist.mint(tokenId, alchemist.getMaxBorrowable(tokenId), address(0xbeef));
+        uint256 tokenId = LiquidNFTHelper.getFirstTokenId(address(0xbeef), address(liquidNFT));
+        liquid.mint(tokenId, liquid.getMaxBorrowable(tokenId), address(0xbeef));
         vm.stopPrank();
 
         vm.startPrank(address(0xdad));
@@ -525,7 +525,7 @@ contract IntegrationTest is Test {
         transmuterLogic.createRedemption(debtAmount);
         vm.stopPrank();
 
-        (uint256 collateral, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
+        (uint256 collateral, uint256 debt, uint256 earmarked) = liquid.getCDP(tokenId);
         assertEq(collateral, 100_000e6);
         assertEq(debt, debtAmount);
 
@@ -536,10 +536,10 @@ contract IntegrationTest is Test {
         transmuterLogic.claimRedemption(1);
         vm.stopPrank();
 
-        (collateral, debt, earmarked) = alchemist.getCDP(tokenId);
+        (collateral, debt, earmarked) = liquid.getCDP(tokenId);
 
         // 10% remaining since 90% was borrowed against initially
-        assertApproxEqAbs(collateral, 100_000e5 - alchemist.convertDebtTokensToYield(debtAmount * 100 / 10_000), 1);
+        assertApproxEqAbs(collateral, 100_000e5 - liquid.convertDebtTokensToYield(debtAmount * 100 / 10_000), 1);
 
         // Only remaining debt should be from the fees paid on debt
         assertApproxEqAbs(debt, 0, 1);
@@ -551,10 +551,10 @@ contract IntegrationTest is Test {
         uint256 bn = block.number;
         // 1. Add collateral and mints 10,000 alUSD as debt
         vm.startPrank(address(0xbeef));
-        IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
-        alchemist.deposit(1e5 * 1e6, address(0xbeef), 0);
-        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
-        alchemist.mint(tokenId, 1e4 * 1e6, address(0xbeef));
+        IERC20(EULER_USDC).approve(address(liquid), 100_000e6);
+        liquid.deposit(1e5 * 1e6, address(0xbeef), 0);
+        uint256 tokenId = LiquidNFTHelper.getFirstTokenId(address(0xbeef), address(liquidNFT));
+        liquid.mint(tokenId, 1e4 * 1e6, address(0xbeef));
         vm.stopPrank();
         // 2. Create a redemption for 1,000 alUSD
         vm.startPrank(address(0xdad));
@@ -568,8 +568,8 @@ contract IntegrationTest is Test {
         vm.roll(bn += 1);
         // 4. Update debt and earmark
         vm.prank(address(0xbeef));
-        alchemist.poke(tokenId);
-        (, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
+        liquid.poke(tokenId);
+        (, uint256 debt, uint256 earmarked) = liquid.getCDP(tokenId);
         assertEq(debt, 9e3 * 1e6); // 10,000 - 1,000
         assertEq(earmarked, 0);
         // 5. Create another redemption for 1,000 alUSD
@@ -580,7 +580,7 @@ contract IntegrationTest is Test {
         vm.roll(bn += 5_256_000);
         // 6. Update debt and earmark
         vm.prank(address(0xbeef));
-        alchemist.poke(tokenId);
+        liquid.poke(tokenId);
         // 7. Create another redemption for 1,000 alUSD
         vm.startPrank(address(0xdad));
         IERC20(alUSD).approve(address(transmuterLogic), 1e3 * 1e6);
@@ -589,16 +589,16 @@ contract IntegrationTest is Test {
         vm.roll(bn += 5_256_000);
         // 8. Update debt and earmark
         vm.prank(address(0xbeef));
-        alchemist.poke(tokenId);
+        liquid.poke(tokenId);
     }
 
     function testAudit_RedemptionWeight() external {
         // Deposit 100_100e6 EULER_USDC, borrow 10_000 alUSD
         vm.startPrank(address(0xbeef));
-        IERC20(EULER_USDC).approve(address(alchemist), 100_000e6);
-        alchemist.deposit(100_000e6, address(0xbeef), 0);
-        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(address(0xbeef), address(alchemistNFT));
-        alchemist.mint(tokenId, 10_000e18, address(0xbeef));
+        IERC20(EULER_USDC).approve(address(liquid), 100_000e6);
+        liquid.deposit(100_000e6, address(0xbeef), 0);
+        uint256 tokenId = LiquidNFTHelper.getFirstTokenId(address(0xbeef), address(liquidNFT));
+        liquid.mint(tokenId, 10_000e18, address(0xbeef));
         vm.stopPrank();
         vm.startPrank(address(0xdad));
         IERC20(alUSD).approve(address(transmuterLogic), 3000e18);
@@ -615,7 +615,7 @@ contract IntegrationTest is Test {
         // Claim the second redemption
         transmuterLogic.claimRedemption(2);
         vm.stopPrank();
-        (uint256 collateral, uint256 debt, uint256 earmarked) = alchemist.getCDP(tokenId);
+        (uint256 collateral, uint256 debt, uint256 earmarked) = liquid.getCDP(tokenId);
         assertApproxEqAbs(debt, 10_000e18 - 2000e18, 1);
         assertEq(earmarked, 0);
     }

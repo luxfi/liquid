@@ -5,8 +5,8 @@ import "forge-std/Test.sol";
 
 // Adjust these imports to your layout  // <<<
 import {PeapodsETHStrategy, WETH, IERC4626} from "src/strategies/PeapodsETH.sol";
-import {MYTStrategy} from "src/MYTStrategy.sol";
-import {IMYTStrategy} from "src/interfaces/IMYTStrategy.sol";
+import {LiquidStrategy} from "src/LiquidStrategy.sol";
+import {ILiquidStrategy} from "src/interfaces/ILiquidStrategy.sol";
 import {IVaultV2} from "lib/vault-v2/src/interfaces/IVaultV2.sol";
 
 interface IERC20 {
@@ -22,7 +22,7 @@ contract PeapodsETHStrategyTest is Test {
     IERC4626 public vault;
     PeapodsETHStrategy public strat;
 
-    address public constant MYT = address(0xbeef);
+    address public constant VAULT = address(0xbeef);
 
     uint256 private _forkId;
 
@@ -34,18 +34,18 @@ contract PeapodsETHStrategyTest is Test {
         weth = WETH(WETH_ADDRESS);
         vault = IERC4626(vaultAddr);
 
-        IMYTStrategy.StrategyParams memory params = IMYTStrategy.StrategyParams({
+        ILiquidStrategy.StrategyParams memory params = ILiquidStrategy.StrategyParams({
             owner: address(this),
             name: "peapodsETH",
             protocol: "peapods",
-            riskClass: IMYTStrategy.RiskClass.HIGH,
+            riskClass: ILiquidStrategy.RiskClass.HIGH,
             cap: type(uint256).max,
             globalCap: type(uint256).max,
             estimatedYield: 0,
             additionalIncentives: false
         });
 
-        strat = new PeapodsETHStrategy(MYT, params, vaultAddr, WETH_ADDRESS);
+        strat = new PeapodsETHStrategy(VAULT, params, vaultAddr, WETH_ADDRESS);
 
         strat.setWhitelistedAllocator(address(0xbeef), true);
 
@@ -64,7 +64,7 @@ contract PeapodsETHStrategyTest is Test {
         // uint256 sharesOut = strat.allocate{value: ethAmt}(ethAmt);
         bytes memory prevAllocationAmount = abi.encode(0);
 
-        (bytes32[] memory strategyIds, int256 change) = strat.allocate(prevAllocationAmount, ethAmt, "", address(MYT));
+        (bytes32[] memory strategyIds, int256 change) = strat.allocate(prevAllocationAmount, ethAmt, "", address(VAULT));
 
         // assert positive change
         assertGt(change, int256(0), "positive change");
@@ -79,11 +79,11 @@ contract PeapodsETHStrategyTest is Test {
         deal(WETH_ADDRESS, address(strat), ethAmt);
         vm.startPrank(address(0xbeef));
         bytes memory prevAllocationAmount = abi.encode(0);
-        strat.allocate(prevAllocationAmount, ethAmt, "", address(MYT));
+        strat.allocate(prevAllocationAmount, ethAmt, "", address(VAULT));
         IERC20(address(vault)).approve(address(strat), ethAmt);
         uint256 beforeBal = address(0xbeef).balance;
         bytes memory prevAllocationAmount2 = abi.encode(ethAmt);
-        (bytes32[] memory strategyIds, int256 change) = strat.deallocate(prevAllocationAmount2, ethAmt, "", address(MYT));
+        (bytes32[] memory strategyIds, int256 change) = strat.deallocate(prevAllocationAmount2, ethAmt, "", address(VAULT));
         vm.stopPrank();
         assertLt(change, int256(0), "redeem returned 0");
     }
@@ -96,7 +96,7 @@ contract PeapodsETHStrategyTest is Test {
         vm.startPrank(address(0xbeef));
         // strat.allocate{value: ethAmt}(ethAmt);
         bytes memory prevAllocationAmount = abi.encode(0);
-        strat.allocate(prevAllocationAmount, ethAmt, "", address(MYT));
+        strat.allocate(prevAllocationAmount, ethAmt, "", address(VAULT));
 
         // First snapshot seeds lastIndex; first return commonly 0
         uint256 first = strat.snapshotYield();
