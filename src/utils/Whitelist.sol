@@ -6,7 +6,7 @@ import "../../lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import "../libraries/Sets.sol";
 
 /// @title  Whitelist
-/// @author Alchemix Finance
+/// @author Lux Liquid
 contract Whitelist is IWhitelist, Ownable {
     using Sets for Sets.AddressSet;
 

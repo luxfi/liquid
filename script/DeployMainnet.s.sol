@@ -2,16 +2,16 @@
 pragma solidity ^0.8.28;
 
 import {Script, console} from "forge-std/Script.sol";
-import {AlchemistV3} from "../src/AlchemistV3.sol";
-import {AlchemistV3Position} from "../src/AlchemistV3Position.sol";
-import {Transmuter} from "../src/Transmuter.sol";
-import {AlchemistETHVault} from "../src/AlchemistETHVault.sol";
-import {IAlchemistV3, AlchemistInitializationParams} from "../src/interfaces/IAlchemistV3.sol";
-import {IAlchemicToken} from "../src/interfaces/IAlchemicToken.sol";
-import {ITransmuter} from "../src/interfaces/ITransmuter.sol";
+import {Liquid} from "../src/Liquid.sol";
+import {LiquidPosition} from "../src/LiquidPosition.sol";
+import {LiquidTransmuter} from "../src/LiquidTransmuter.sol";
+import {LiquidETHVault} from "../src/LiquidETHVault.sol";
+import {ILiquid, LiquidInitializationParams} from "../src/interfaces/ILiquid.sol";
+import {ILiquidMintable} from "../src/interfaces/ILiquidMintable.sol";
+import {ILiquidTransmuter} from "../src/interfaces/ILiquidTransmuter.sol";
 
 /// @title DeployMainnet
-/// @notice Deploys AlchemistV3 system for ETH on Lux Mainnet
+/// @notice Deploys Liquid system for ETH on Lux Mainnet
 /// @dev Run dry: forge script script/DeployMainnet.s.sol --rpc-url lux_mainnet_public -vvvv
 ///      Broadcast: forge script script/DeployMainnet.s.sol --rpc-url lux_mainnet_public --broadcast -vvvv
 contract DeployMainnet is Script {
@@ -30,7 +30,7 @@ contract DeployMainnet is Script {
     uint256 constant LIQUIDATOR_FEE = 500; // 5% in BPS
     uint256 constant REPAYMENT_FEE = 100; // 1% in BPS
 
-    // --- Transmuter parameters ---
+    // --- LiquidTransmuter parameters ---
     uint256 constant TIME_TO_TRANSMUTE = 90 days / 2; // ~90 days in blocks at 2s
     uint256 constant TRANSMUTATION_FEE = 50; // 0.5% in BPS
     uint256 constant EXIT_FEE = 200; // 2% in BPS
@@ -40,7 +40,7 @@ contract DeployMainnet is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
 
-        console.log("=== Lux Mainnet Deployment: AlchemistV3 for ETH ===");
+        console.log("=== Lux Mainnet Deployment: Liquid for ETH ===");
         console.log("Deployer:", deployer);
         console.log("Chain ID:", block.chainid);
         console.log("LETH:", LETH);
@@ -48,16 +48,16 @@ contract DeployMainnet is Script {
 
         vm.startBroadcast(deployerPrivateKey);
 
-        // 1. Deploy AlchemistV3 (proxy-pattern: empty constructor + initialize)
-        AlchemistV3 alchemist = new AlchemistV3();
-        console.log("AlchemistV3 deployed:", address(alchemist));
+        // 1. Deploy Liquid (proxy-pattern: empty constructor + initialize)
+        Liquid liquid = new Liquid();
+        console.log("Liquid deployed:", address(liquid));
 
-        // 2. Deploy AlchemistV3Position NFT (needs alchemist address)
-        AlchemistV3Position position = new AlchemistV3Position(address(alchemist));
-        console.log("AlchemistV3Position deployed:", address(position));
+        // 2. Deploy LiquidPosition NFT (needs liquid address)
+        LiquidPosition position = new LiquidPosition(address(liquid));
+        console.log("LiquidPosition deployed:", address(position));
 
-        // 3. Deploy Transmuter for ETH
-        ITransmuter.TransmuterInitializationParams memory transmuterParams = ITransmuter.TransmuterInitializationParams({
+        // 3. Deploy LiquidTransmuter for ETH
+        ILiquidTransmuter.TransmuterInitializationParams memory transmuterParams = ILiquidTransmuter.TransmuterInitializationParams({
             syntheticToken: LETH,
             feeReceiver: deployer,
             timeToTransmute: TIME_TO_TRANSMUTE,
@@ -65,20 +65,20 @@ contract DeployMainnet is Script {
             exitFee: EXIT_FEE,
             graphSize: GRAPH_SIZE
         });
-        Transmuter transmuter = new Transmuter(transmuterParams);
-        console.log("Transmuter deployed:", address(transmuter));
+        LiquidTransmuter transmuter = new LiquidTransmuter(transmuterParams);
+        console.log("LiquidTransmuter deployed:", address(transmuter));
 
-        // 4. Deploy ETH Vault (weth, alchemist, owner)
-        AlchemistETHVault vault = new AlchemistETHVault(WLUX, address(alchemist), deployer);
-        console.log("AlchemistETHVault deployed:", address(vault));
+        // 4. Deploy ETH Vault (weth, liquid, owner)
+        LiquidETHVault vault = new LiquidETHVault(WLUX, address(liquid), deployer);
+        console.log("LiquidETHVault deployed:", address(vault));
 
-        // 5. Initialize AlchemistV3
+        // 5. Initialize Liquid
         //    Note: tokenAdapter must be set separately after adapter deployment
-        AlchemistInitializationParams memory params = AlchemistInitializationParams({
+        LiquidInitializationParams memory params = LiquidInitializationParams({
             admin: deployer,
             debtToken: LETH,
             underlyingToken: WLUX,
-            yieldToken: WLUX, // Initially set to WLUX; update to MYT yield token post-deploy
+            yieldToken: WLUX, // Initially set to WLUX; update to VAULT yield token post-deploy
             depositCap: DEPOSIT_CAP,
             blocksPerYear: BLOCKS_PER_YEAR,
             minimumCollateralization: MIN_COLLATERALIZATION,
@@ -91,41 +91,41 @@ contract DeployMainnet is Script {
             liquidatorFee: LIQUIDATOR_FEE,
             repaymentFee: REPAYMENT_FEE
         });
-        alchemist.initialize(params);
-        console.log("AlchemistV3 initialized");
+        liquid.initialize(params);
+        console.log("Liquid initialized");
 
-        // 6. Set position NFT on alchemist
-        alchemist.setAlchemistPositionNFT(address(position));
-        console.log("Position NFT set on AlchemistV3");
+        // 6. Set position NFT on liquid
+        liquid.setLiquidPositionNFT(address(position));
+        console.log("Position NFT set on Liquid");
 
-        // 7. Set alchemist on transmuter
-        transmuter.setAlchemist(address(alchemist));
-        console.log("Alchemist set on Transmuter");
+        // 7. Set liquid on transmuter
+        transmuter.setLiquid(address(liquid));
+        console.log("Liquid set on LiquidTransmuter");
 
-        // 8. Whitelist AlchemistV3 as minter on LETH
-        IAlchemicToken(LETH).setWhitelist(address(alchemist), true);
-        console.log("AlchemistV3 whitelisted as LETH minter");
+        // 8. Whitelist Liquid as minter on LETH
+        ILiquidMintable(LETH).setWhitelist(address(liquid), true);
+        console.log("Liquid whitelisted as LETH minter");
 
-        // 9. Set mint ceiling for AlchemistV3 on LETH
-        IAlchemicToken(LETH).setCeiling(address(alchemist), DEPOSIT_CAP);
-        console.log("LETH mint ceiling set for AlchemistV3");
+        // 9. Set mint ceiling for Liquid on LETH
+        ILiquidMintable(LETH).setCeiling(address(liquid), DEPOSIT_CAP);
+        console.log("LETH mint ceiling set for Liquid");
 
         vm.stopBroadcast();
 
         // --- Deployment Summary ---
         console.log("\n=== Deployment Summary ===");
-        console.log("AlchemistV3:         ", address(alchemist));
-        console.log("AlchemistV3Position: ", address(position));
-        console.log("Transmuter:          ", address(transmuter));
-        console.log("AlchemistETHVault:   ", address(vault));
+        console.log("Liquid:         ", address(liquid));
+        console.log("LiquidPosition: ", address(position));
+        console.log("LiquidTransmuter:          ", address(transmuter));
+        console.log("LiquidETHVault:   ", address(vault));
         console.log("LETH (debt token):   ", LETH);
         console.log("WLUX (underlying):   ", WLUX);
         console.log("Min Collat (90% LTV):", MIN_COLLATERALIZATION);
 
         console.log("\n=== Post-Deploy Steps ===");
-        console.log("1. Deploy TokenAdapter for yield token and call alchemist.setTokenAdapter()");
-        console.log("2. Update yieldToken if using MYT strategy (not raw WLUX)");
-        console.log("3. Deploy AlchemistCurator, AlchemistAllocator, and strategies");
+        console.log("1. Deploy TokenAdapter for yield token and call liquid.setTokenAdapter()");
+        console.log("2. Update yieldToken if using VAULT strategy (not raw WLUX)");
+        console.log("3. Deploy LiquidCurator, LiquidAllocator, and strategies");
         console.log("4. Transfer admin to multisig/timelock");
     }
 }

@@ -1,7 +1,7 @@
 pragma solidity >=0.5.0;
 
 /// @title  ITokenAdapter
-/// @author Alchemix Finance
+/// @author Lux Liquid
 interface ITokenAdapter {
     /// @notice Gets the current version.
     ///

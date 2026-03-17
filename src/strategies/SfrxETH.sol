@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity 0.8.28;
-// import {MYTStrategy} from "../MYTStrategy.sol";
+// import {LiquidStrategy} from "../LiquidStrategy.sol";
 
 import {IWETH} from "../interfaces/IWETH.sol";
 import {TokenUtils} from "../libraries/TokenUtils.sol";
-import {MYTStrategy} from "../MYTStrategy.sol";
-import {IMYTStrategy} from "../interfaces/IMYTStrategy.sol";
+import {LiquidStrategy} from "../LiquidStrategy.sol";
+import {ILiquidStrategy} from "../interfaces/ILiquidStrategy.sol";
 
 interface FraxMinter {
     function submitAndDeposit(address recipient) external payable returns (uint256);
@@ -24,13 +24,13 @@ interface StakedFraxEth {
     function balanceOf(address account) external view returns (uint256);
 }
 
-contract SfrxETHStrategy is MYTStrategy {
+contract SfrxETHStrategy is LiquidStrategy {
     FraxMinter public immutable minter;
     FraxRedemptionQueue public immutable redemptionQueue;
     StakedFraxEth public immutable sfrxEth;
     address public immutable WETH = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
 
-    constructor(address _myt, StrategyParams memory _params, address _sfrxEth, address _fraxMinter, address _redemptionQueue) MYTStrategy(_myt, _params) {
+    constructor(address _vault, StrategyParams memory _params, address _sfrxEth, address _fraxMinter, address _redemptionQueue) LiquidStrategy(_vault, _params) {
         minter = FraxMinter(_fraxMinter);
         redemptionQueue = FraxRedemptionQueue(_redemptionQueue);
         sfrxEth = StakedFraxEth(_sfrxEth);

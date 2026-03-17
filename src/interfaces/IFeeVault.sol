@@ -1,7 +1,7 @@
 pragma solidity >=0.5.0;
 
 /// @title  IFeeVault
-/// @author Alchemix Finance
+/// @author Lux Liquid
 interface IFeeVault {
     /**
      * @notice Get the ERC20 token managed by this vault

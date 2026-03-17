@@ -42,18 +42,18 @@ contract InvariantBaseTest is InvariantsTest {
         fakeUnderlyingToken.approve(address(fakeYieldToken), amount);
         fakeYieldToken.mint(amount, onBehalf);
 
-        alchemist.deposit(amount, onBehalf, tokenId);
+        liquid.deposit(amount, onBehalf, tokenId);
         vm.stopPrank();
     }
 
     function _borrow(uint256 tokenId, uint256 amount, address onBehalf) internal logCall("borrow") {
         vm.prank(onBehalf);
-        alchemist.mint(tokenId, amount, onBehalf);
+        liquid.mint(tokenId, amount, onBehalf);
     }
 
     function _withdraw(uint256 tokenId, uint256 amount, address onBehalf) internal logCall("withdraw") {
         vm.prank(onBehalf);
-        alchemist.withdraw(amount, onBehalf, tokenId);
+        liquid.withdraw(amount, onBehalf, tokenId);
     }
 
     function _repay(uint256 tokenId, uint256 amount, address onBehalf) internal logCall("repay") {
@@ -62,13 +62,13 @@ contract InvariantBaseTest is InvariantsTest {
         fakeUnderlyingToken.approve(address(fakeYieldToken), amount);
         fakeYieldToken.mint(amount, onBehalf);
 
-        alchemist.repay(amount, tokenId);
+        liquid.repay(amount, tokenId);
         vm.stopPrank();
     }
 
     function _burn(uint256 tokenId, uint256 amount, address onBehalf) internal logCall("burn") {
         vm.prank(onBehalf);
-        alchemist.burn(amount, tokenId);
+        liquid.burn(amount, tokenId);
     }
 
     function _stake(uint256 amount, address onBehalf) internal logCall("stake") {
@@ -82,7 +82,7 @@ contract InvariantBaseTest is InvariantsTest {
     function _claim(uint256 amount) internal logCall("stake") {
         vm.roll(block.number + 10);
         vm.startPrank(address(transmuterLogic));
-        alchemist.redeem(amount);
+        liquid.redeem(amount);
         vm.stopPrank();
     }
 
@@ -97,8 +97,8 @@ contract InvariantBaseTest is InvariantsTest {
 
         uint256 tokenId;
 
-        try AlchemistNFTHelper.getFirstTokenId(onBehalf, address(alchemistNFT)) {
-            tokenId = AlchemistNFTHelper.getFirstTokenId(onBehalf, address(alchemistNFT));
+        try LiquidNFTHelper.getFirstTokenId(onBehalf, address(liquidNFT)) {
+            tokenId = LiquidNFTHelper.getFirstTokenId(onBehalf, address(liquidNFT));
         } catch {
             tokenId = 0;
         }
@@ -110,12 +110,12 @@ contract InvariantBaseTest is InvariantsTest {
         address onBehalf = _randomWithdrawer(targetSenders(), onBehalfSeed);
         if (onBehalf == address(0)) return;
 
-        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(onBehalf, address(alchemistNFT));
+        uint256 tokenId = LiquidNFTHelper.getFirstTokenId(onBehalf, address(liquidNFT));
 
-        (uint256 collat, uint256 debt,) = alchemist.getCDP(tokenId);
-        uint256 debtToCollateral = alchemist.convertDebtTokensToYield(debt);
-        uint256 maxWithdraw = (collat * FIXED_POINT_SCALAR / alchemist.minimumCollateralization()) > debtToCollateral
-            ? (collat * FIXED_POINT_SCALAR / alchemist.minimumCollateralization()) - debtToCollateral
+        (uint256 collat, uint256 debt,) = liquid.getCDP(tokenId);
+        uint256 debtToCollateral = liquid.convertDebtTokensToYield(debt);
+        uint256 maxWithdraw = (collat * FIXED_POINT_SCALAR / liquid.minimumCollateralization()) > debtToCollateral
+            ? (collat * FIXED_POINT_SCALAR / liquid.minimumCollateralization()) - debtToCollateral
             : 0;
 
         amount = bound(amount, 0, maxWithdraw);
@@ -128,9 +128,9 @@ contract InvariantBaseTest is InvariantsTest {
         address onBehalf = _randomMinter(targetSenders(), onBehalfSeed);
         if (onBehalf == address(0)) return;
 
-        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(onBehalf, address(alchemistNFT));
+        uint256 tokenId = LiquidNFTHelper.getFirstTokenId(onBehalf, address(liquidNFT));
 
-        amount = bound(amount, 0, alchemist.getMaxBorrowable(tokenId));
+        amount = bound(amount, 0, liquid.getMaxBorrowable(tokenId));
         if (amount == 0) return;
 
         _borrow(tokenId, amount, onBehalf);
@@ -143,7 +143,7 @@ contract InvariantBaseTest is InvariantsTest {
         amount = bound(amount, 0, MAX_TEST_VALUE);
         if (amount == 0) return;
 
-        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(onBehalf, address(alchemistNFT));
+        uint256 tokenId = LiquidNFTHelper.getFirstTokenId(onBehalf, address(liquidNFT));
 
         _repay(tokenId, amount, onBehalf);
     }
@@ -155,7 +155,7 @@ contract InvariantBaseTest is InvariantsTest {
         amount = bound(amount, 0, MAX_TEST_VALUE);
         if (amount == 0) return;
 
-        uint256 tokenId = AlchemistNFTHelper.getFirstTokenId(onBehalf, address(alchemistNFT));
+        uint256 tokenId = LiquidNFTHelper.getFirstTokenId(onBehalf, address(liquidNFT));
 
         _burn(tokenId, amount, onBehalf);
     }
@@ -169,14 +169,14 @@ contract InvariantBaseTest is InvariantsTest {
         //     ? transmuterLogic.totalLocked() - fakeYieldToken.balanceOf(address(transmuterLogic))
         //    : 0;
 
-        amount = bound(amount, 0, alchemist.totalDebt());
+        amount = bound(amount, 0, liquid.totalDebt());
         if (amount == 0) return;
 
         _stake(amount, onBehalf);
     }
 
     function transmuterClaim(uint256 amount, uint256 onBehalfSeed) external {
-        // amount = bound(amount, 0, alchemist.totalDebt());
+        // amount = bound(amount, 0, liquid.totalDebt());
         // if (amount == 0) return;
         // // if (amount > )
 

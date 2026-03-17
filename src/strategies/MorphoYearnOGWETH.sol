@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {MYTStrategy} from "../MYTStrategy.sol";
-import {IMYTStrategy} from "../interfaces/IMYTStrategy.sol";
+import {LiquidStrategy} from "../LiquidStrategy.sol";
+import {ILiquidStrategy} from "../interfaces/ILiquidStrategy.sol";
 import {TokenUtils} from "../libraries/TokenUtils.sol";
 
 interface IERC20 {
@@ -27,13 +27,13 @@ interface IERC4626 {
     function withdraw(uint256 assets, address receiver, address owner) external returns (uint256 shares);
 }
 
-contract MorphoYearnOGWETHStrategy is MYTStrategy {
+contract MorphoYearnOGWETHStrategy is LiquidStrategy {
     WETH public immutable weth;
     IERC4626 public immutable vault;
 
-    constructor(address _myt, StrategyParams memory _params, address _vault, address _weth) MYTStrategy(_myt, _params) {
+    constructor(address _vault, StrategyParams memory _params, address _morphoVault, address _weth) LiquidStrategy(_vault, _params) {
         weth = WETH(_weth);
-        vault = IERC4626(_vault);
+        vault = IERC4626(_morphoVault);
         require(vault.asset() == _weth, "Vault asset != WETH");
     }
 

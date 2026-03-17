@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {MYTStrategy} from "../MYTStrategy.sol";
+import {LiquidStrategy} from "../LiquidStrategy.sol";
 
 import {IERC4626} from "../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import {TokenUtils} from "../libraries/TokenUtils.sol";
@@ -12,11 +12,11 @@ interface WETH {
     function withdraw(uint256) external;
 }
 
-contract PeapodsETHStrategy is MYTStrategy {
+contract PeapodsETHStrategy is LiquidStrategy {
     IERC4626 public immutable peapodsEth;
     WETH public immutable weth;
 
-    constructor(address _myt, StrategyParams memory _params, address _peapodsEth, address _weth) MYTStrategy(_myt, _params) {
+    constructor(address _vault, StrategyParams memory _params, address _peapodsEth, address _weth) LiquidStrategy(_vault, _params) {
         peapodsEth = IERC4626(_peapodsEth);
         weth = WETH(_weth);
     }

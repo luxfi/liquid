@@ -1,7 +1,7 @@
 pragma solidity >=0.5.0;
 
 /// @title  IERC20Metadata
-/// @author Alchemix Finance
+/// @author Lux Liquid
 interface IERC20Metadata {
     /// @notice Gets the name of the token.
     ///

@@ -9,7 +9,7 @@
  */
 pragma solidity ^0.8.7;
 
-/* Fractional decay of Alchemist v3 positions via log2 weights in UQ136.120
+/* Fractional decay of Liquid v3 positions via log2 weights in UQ136.120
  * fixed point representation.
  * User earmark/redemption can be represented as a product of fractions,
  * that approach zero as users are earmarked and redeemed.

@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {MYTStrategy} from "../MYTStrategy.sol";
+import {LiquidStrategy} from "../LiquidStrategy.sol";
 import {TokenUtils} from "../libraries/TokenUtils.sol";
 
 interface EETH {
@@ -15,11 +15,11 @@ interface WETH {
     function withdraw(uint256) external;
 }
 
-contract EETHMYTStrategy is MYTStrategy {
+contract EETHLiquidStrategy is LiquidStrategy {
     EETH public immutable eeth;
     WETH public immutable weth;
 
-    constructor(address _myt, StrategyParams memory _params, address _eeth, address _weth) MYTStrategy(_myt, _params) {
+    constructor(address _vault, StrategyParams memory _params, address _eeth, address _weth) LiquidStrategy(_vault, _params) {
         eeth = EETH(_eeth);
         weth = WETH(_weth);
     }
