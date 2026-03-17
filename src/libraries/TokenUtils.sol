@@ -6,7 +6,7 @@ import "../interfaces/IERC20Burnable.sol";
 import "../interfaces/IERC20Mintable.sol";
 
 /// @title  TokenUtils
-/// @author Alchemix Finance
+/// @author Lux Liquid
 library TokenUtils {
     /// @notice An error used to indicate that a call to an ERC20 contract failed.
     ///

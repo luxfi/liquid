@@ -1,7 +1,7 @@
 pragma solidity ^0.8.23;
 
 /// @title  Whitelist
-/// @author Alchemix Finance
+/// @author Lux Liquid
 interface IWhitelist {
     /// @dev Emitted when a contract is added to the whitelist.
     ///

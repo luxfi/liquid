@@ -53,10 +53,10 @@ library NFTMetadataGenerator {
     function generateJSONString(uint256 tokenId, string memory svg) internal pure returns (string memory) {
         string memory json = Base64.encode(
             abi.encodePacked(
-                '{"name": "AlchemistV3 Position #',
+                '{"name": "Liquid Position #',
                 tokenId.toString(),
                 '", ',
-                '"description": "Position token for Alchemist V3", ',
+                '"description": "Position token for Liquid", ',
                 '"image": "data:image/svg+xml;base64,',
                 Base64.encode(bytes(svg)),
                 '"}'

@@ -8,7 +8,7 @@ import {IllegalState} from "../base/ErrorMessages.sol";
 import {IERC20Metadata} from "../interfaces/IERC20Metadata.sol";
 
 /// @title  SafeERC20
-/// @author Alchemix Finance
+/// @author Lux Liquid
 library SafeERC20 {
     /// @notice An error used to indicate that a call to an ERC20 contract failed.
     ///

@@ -6,7 +6,7 @@ import {IFeeVault} from "../interfaces/IFeeVault.sol";
 
 /**
  * @title AbstractVault
- * @notice Abstract base class for Alchemist vaults that handles authorization logic
+ * @notice Abstract base class for Liquid vaults that handles authorization logic
  * @dev Extend this to implement ETH or ERC20 token vaults
  */
 abstract contract AbstractFeeVault is IFeeVault, Ownable {
@@ -37,16 +37,16 @@ abstract contract AbstractFeeVault is IFeeVault, Ownable {
     /**
      * @notice Constructor to initialize the vault
      * @param _token The ERC20 token managed by this vault
-     * @param _alchemist The Alchemist contract address
+     * @param _liquid The Liquid contract address
      * @param _owner The vault owner address
      */
-    constructor(address _token, address _alchemist, address _owner) Ownable(_owner) {
+    constructor(address _token, address _liquid, address _owner) Ownable(_owner) {
         _checkNonZeroAddress(_token);
-        _checkNonZeroAddress(_alchemist);
+        _checkNonZeroAddress(_liquid);
         token = _token;
-        authorized[_alchemist] = true;
+        authorized[_liquid] = true;
         authorized[_owner] = true;
-        emit AuthorizationUpdated(_alchemist, true);
+        emit AuthorizationUpdated(_liquid, true);
     }
 
     /**

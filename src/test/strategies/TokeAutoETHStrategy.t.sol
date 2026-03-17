@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 
 // Adjust these imports to your layout
 import {TokeAutoEthStrategy} from "src/strategies/TokeAutoEth.sol";
-import {IMYTStrategy} from "src/interfaces/IMYTStrategy.sol";
+import {ILiquidStrategy} from "src/interfaces/ILiquidStrategy.sol";
 import {IMainRewarder, IAutopilotRouter} from "src/strategies/interfaces/ITokemac.sol";
 import {IERC4626} from "../../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 
@@ -28,7 +28,7 @@ contract TokeAutoEthStrategyTest is Test {
 
     TokeAutoEthStrategy public strat;
 
-    address public constant MYT = address(0xbeef);
+    address public constant VAULT = address(0xbeef);
 
     uint256 private _forkId;
 
@@ -41,18 +41,18 @@ contract TokeAutoEthStrategyTest is Test {
         router = IAutopilotRouter(ROUTER);
         rewarder = IMainRewarder(REWARDER);
 
-        IMYTStrategy.StrategyParams memory params = IMYTStrategy.StrategyParams({
+        ILiquidStrategy.StrategyParams memory params = ILiquidStrategy.StrategyParams({
             owner: address(this),
             name: "autoETH",
             protocol: "tokemak",
-            riskClass: IMYTStrategy.RiskClass.MEDIUM,
+            riskClass: ILiquidStrategy.RiskClass.MEDIUM,
             cap: type(uint256).max,
             globalCap: type(uint256).max,
             estimatedYield: 0,
             additionalIncentives: false
         });
 
-        strat = new TokeAutoEthStrategy(MYT, params, AUTOETH, ROUTER, REWARDER, WETH, ORACLE);
+        strat = new TokeAutoEthStrategy(VAULT, params, AUTOETH, ROUTER, REWARDER, WETH, ORACLE);
 
         strat.setWhitelistedAllocator(address(0xbeef), true);
 
@@ -68,7 +68,7 @@ contract TokeAutoEthStrategyTest is Test {
 
         vm.startPrank(address(0xbeef));
         bytes memory prevAllocationAmount = abi.encode(0);
-        (bytes32[] memory strategyIds, int256 change) = strat.allocate(prevAllocationAmount, ethAmt, "", address(MYT));
+        (bytes32[] memory strategyIds, int256 change) = strat.allocate(prevAllocationAmount, ethAmt, "", address(VAULT));
         vm.stopPrank();
 
         assertGt(change, int256(0), "positive change expected");
@@ -84,9 +84,9 @@ contract TokeAutoEthStrategyTest is Test {
         deal(WETH, address(strat), ethAmt);
         vm.startPrank(address(0xbeef));
         bytes memory prevAllocationAmount = abi.encode(0);
-        strat.allocate(prevAllocationAmount, ethAmt, "", address(MYT));
+        strat.allocate(prevAllocationAmount, ethAmt, "", address(VAULT));
         bytes memory prevAllocationAmount2 = abi.encode(ethAmt);
-        (bytes32[] memory strategyIds, int256 change) = strat.deallocate(prevAllocationAmount2, ethAmt, "", address(MYT));
+        (bytes32[] memory strategyIds, int256 change) = strat.deallocate(prevAllocationAmount2, ethAmt, "", address(VAULT));
         vm.stopPrank();
         assertLt(change, int256(0), "negative change expected");
         assertGt(strategyIds.length, 0, "strategyIds is empty");
@@ -116,7 +116,7 @@ contract TokeAutoEthStrategyTest is Test {
 
         vm.startPrank(address(0xbeef));
         bytes memory prevAllocationAmount = abi.encode(0);
-        (bytes32[] memory strategyIds, int256 change) = strat.allocate(prevAllocationAmount, ethAmt, "", address(MYT));
+        (bytes32[] memory strategyIds, int256 change) = strat.allocate(prevAllocationAmount, ethAmt, "", address(VAULT));
         vm.stopPrank();
 
         uint256 first = strat.snapshotYield();

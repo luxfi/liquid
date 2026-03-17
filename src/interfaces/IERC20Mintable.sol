@@ -3,7 +3,7 @@ pragma solidity >=0.5.0;
 import "../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 /// @title  IERC20Mintable
-/// @author Alchemix Finance
+/// @author Lux Liquid
 interface IERC20Mintable is IERC20 {
     /// @notice Mints `amount` tokens to `recipient`.
     ///
