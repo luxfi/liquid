@@ -1,6 +1,6 @@
 {
   "name": "@luxfi/liquid",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Liquid Protocol — Self-repaying loans for Lux Network",
   "license": "MIT",
   "repository": {
