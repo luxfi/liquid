@@ -28,6 +28,8 @@ import {TokenUtils} from "../libraries/TokenUtils.sol";
 
 // Tests for integration with Euler V2 Earn Vault
 contract IntegrationTest is Test {
+    bool private _skipFork;
+
     // Callable contract variables
     Liquid liquid;
     LiquidTransmuter transmuter;
@@ -105,6 +107,13 @@ contract IntegrationTest is Test {
     address EULER_USDC = 0x797DD80692c3b2dAdabCe8e30C07fDE5307D48a9;
 
     function setUp() external {
+        string memory rpc = vm.envOr("MAINNET_RPC_URL", string(""));
+        if (bytes(rpc).length == 0) {
+            _skipFork = true;
+            return;
+        }
+        vm.createSelectFork(rpc);
+
         // test maniplulation for convenience
         address caller = address(0xdead);
         address proxyOwner = address(this);
@@ -114,12 +123,7 @@ contract IntegrationTest is Test {
         vm.startPrank(caller);
 
         ILiquidTransmuter.TransmuterInitializationParams memory transParams = ILiquidTransmuter.TransmuterInitializationParams({
-            syntheticToken: alUSD,
-            feeReceiver: receiver,
-            timeToTransmute: 5_256_000,
-            transmutationFee: 100,
-            exitFee: 200,
-            graphSize: 52_560_000
+            syntheticToken: alUSD, feeReceiver: receiver, timeToTransmute: 5_256_000, transmutationFee: 100, exitFee: 200, graphSize: 52_560_000
         });
 
         // Contracts and logic contracts
@@ -197,6 +201,7 @@ contract IntegrationTest is Test {
     }
 
     function testRoundTrip() external {
+        vm.skip(_skipFork);
         vm.startPrank(address(0xbeef));
         IERC20(EULER_USDC).approve(address(liquid), 100_000e18);
         liquid.deposit(100_000e18, address(0xbeef), 0);
@@ -215,6 +220,7 @@ contract IntegrationTest is Test {
     }
 
     function testMint() external {
+        vm.skip(_skipFork);
         vm.startPrank(address(0xbeef));
         IERC20(EULER_USDC).approve(address(liquid), 100_000e6);
         liquid.deposit(100_000e6, address(0xbeef), 0);
@@ -229,6 +235,7 @@ contract IntegrationTest is Test {
     }
 
     function testRepay() external {
+        vm.skip(_skipFork);
         vm.startPrank(address(0xbeef));
         IERC20(EULER_USDC).approve(address(liquid), 100_000e6);
         liquid.deposit(100_000e6, address(0xbeef), 0);
@@ -251,6 +258,7 @@ contract IntegrationTest is Test {
     }
 
     function testRepayEarmarkedFull() external {
+        vm.skip(_skipFork);
         uint256 debtAmount = liquid.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
 
         vm.startPrank(address(0xbeef));
@@ -291,6 +299,7 @@ contract IntegrationTest is Test {
     }
 
     function testRepayEarmarkedPartialEarmarked() external {
+        vm.skip(_skipFork);
         uint256 debtAmount = liquid.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
 
         vm.startPrank(address(0xbeef));
@@ -331,6 +340,7 @@ contract IntegrationTest is Test {
     }
 
     function testRepayEarmarkedPartialRepayment() external {
+        vm.skip(_skipFork);
         uint256 debtAmount = liquid.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
 
         vm.startPrank(address(0xbeef));
@@ -371,6 +381,7 @@ contract IntegrationTest is Test {
     }
 
     function testRepayEarmarkedOverRepayment() external {
+        vm.skip(_skipFork);
         uint256 debtAmount = liquid.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
 
         vm.startPrank(address(0xbeef));
@@ -418,6 +429,7 @@ contract IntegrationTest is Test {
     }
 
     function testBurn() external {
+        vm.skip(_skipFork);
         vm.startPrank(address(0xbeef));
         IERC20(EULER_USDC).approve(address(liquid), 100_000e6);
         liquid.deposit(100_000e6, address(0xbeef), 0);
@@ -440,6 +452,7 @@ contract IntegrationTest is Test {
     }
 
     function testBurnWithEarmarkPartial() external {
+        vm.skip(_skipFork);
         uint256 debtAmount = liquid.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
 
         vm.startPrank(address(0xbeef));
@@ -484,6 +497,7 @@ contract IntegrationTest is Test {
     }
 
     function testBurnFullyEarmarked() external {
+        vm.skip(_skipFork);
         uint256 debtAmount = liquid.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
 
         vm.startPrank(address(0xbeef));
@@ -510,6 +524,7 @@ contract IntegrationTest is Test {
     }
 
     function testPositionToFullMaturity() external {
+        vm.skip(_skipFork);
         uint256 debtAmount = liquid.convertYieldTokensToDebt(100_000e6) * FIXED_POINT_SCALAR / 1_111_111_111_111_111_111;
 
         vm.startPrank(address(0xbeef));
@@ -548,6 +563,7 @@ contract IntegrationTest is Test {
     }
 
     function testAudit_Sync_IncorrectEarmarkWeightUpdate() external {
+        vm.skip(_skipFork);
         uint256 bn = block.number;
         // 1. Add collateral and mints 10,000 alUSD as debt
         vm.startPrank(address(0xbeef));
@@ -593,6 +609,7 @@ contract IntegrationTest is Test {
     }
 
     function testAudit_RedemptionWeight() external {
+        vm.skip(_skipFork);
         // Deposit 100_100e6 EULER_USDC, borrow 10_000 alUSD
         vm.startPrank(address(0xbeef));
         IERC20(EULER_USDC).approve(address(liquid), 100_000e6);
