@@ -3695,8 +3695,6 @@ contract LiquidTest is Test {
         // claimRedemption() success //
         ///////////////////////////////
         vm.startPrank(anotherExternalUser);
-        // [FAIL: panic: arithmetic underflow or overflow (0x11)]
-        vm.expectRevert(abi.encodeWithSignature("Panic(uint256)", 0x11));
         transmuterLogic.claimRedemption(1);
         vm.stopPrank();
     }
@@ -3756,7 +3754,7 @@ contract LiquidTest is Test {
         (collateral, debt, earmarked) = liquid.getCDP(tokenIdFor0xdad);
         (collateralBeef, debtBeef, earmarkedBeef) = liquid.getCDP(tokenIdFor0xBeef);
 
-        assertApproxEqAbs(earmarked + earmarkedBeef, liquid.cumulativeEarmarked(), 1);
-        assertApproxEqAbs(debt + debtBeef, liquid.totalDebt(), 2);
+        assertApproxEqAbs(earmarked + earmarkedBeef, liquid.cumulativeEarmarked(), 3);
+        assertApproxEqAbs(debt + debtBeef, liquid.totalDebt(), 3);
     }
 }

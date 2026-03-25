@@ -38,7 +38,6 @@ struct LiquidInitializationParams {
 /// @notice A user account.
 /// @notice This account struct is included in the main contract, Liquid.sol, to aid readability.
 struct Account {
-    uint256 accumulator;
     /// @notice User's collateral.
     uint256 collateralBalance;
     /// @notice User's debt.
@@ -49,8 +48,6 @@ struct Account {
     uint256 freeCollateral;
     /// @notice Last weight of earmark from most recent account sync.
     uint256 lastAccruedEarmarkWeight;
-    /// @notice Last weight of normalized earmark from most recent account sync.
-    uint256 lastAccruedNormalizedEarmarkWeight;
     /// @notice Last weight of redemption from most recent account sync.
     uint256 lastAccruedRedemptionWeight;
     /// @notice Last weight of collateral from most recent account sync.
@@ -63,6 +60,8 @@ struct Account {
     mapping(uint256 => mapping(address => uint256)) mintAllowances;
     /// @notice id used in the mintAllowances map which is incremented on reset.
     uint256 allowancesVersion;
+    /// @notice Snapshot of global _survivalAccumulator at last sync.
+    uint256 lastSurvivalAccumulator;
 }
 
 /// @notice Information associated with a redemption.
