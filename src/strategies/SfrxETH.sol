@@ -30,6 +30,9 @@ contract SfrxETHStrategy is LiquidStrategy {
     StakedFraxEth public immutable sfrxEth;
     address public immutable WETH = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
 
+    /// @notice DEX router for swaps; must be set before deallocate is called
+    address public dexRouter;
+
     constructor(address _vault, StrategyParams memory _params, address _sfrxEth, address _fraxMinter, address _redemptionQueue) LiquidStrategy(_vault, _params) {
         minter = FraxMinter(_fraxMinter);
         redemptionQueue = FraxRedemptionQueue(_redemptionQueue);
@@ -52,14 +55,19 @@ contract SfrxETHStrategy is LiquidStrategy {
         TokenUtils.safeTransfer(WETH, msg.sender, requestedAmount);
     }
 
+    /// @notice Set the DEX router address for swaps
+    /// @param _dexRouter The DEX router contract address
+    function setDexRouter(address _dexRouter) external onlyOwner {
+        require(_dexRouter != address(0), "Zero address");
+        dexRouter = _dexRouter;
+    }
+
     function _doDexSwap(uint256 amount) internal returns (uint256 amountReturned) {
-        // TODO: implement dex swap
-        address fakeDexAddress = address(0);
+        require(dexRouter != address(0), "DEX swap not configured -- set dexRouter");
         uint256 sfrxEthBalance = sfrxEth.balanceOf(address(this));
         uint256 adjusted = amount < sfrxEthBalance ? amount : sfrxEthBalance;
-        TokenUtils.safeApprove(address(sfrxEth), fakeDexAddress, adjusted);
-        // sfrxEth balance should for this address should now be reduced by amount
-        TokenUtils.safeTransfer(address(sfrxEth), fakeDexAddress, adjusted);
+        TokenUtils.safeApprove(address(sfrxEth), dexRouter, adjusted);
+        TokenUtils.safeTransfer(address(sfrxEth), dexRouter, adjusted);
         amountReturned = adjusted;
     }
 
