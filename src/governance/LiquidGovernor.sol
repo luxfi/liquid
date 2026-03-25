@@ -11,23 +11,13 @@ import "@openzeppelin/contracts/governance/extensions/GovernorTimelockControl.so
 /// @title LiquidGovernor
 /// @notice Minimal governance wrapper for the Liquid V3 Protocol
 /// @dev Uses OpenZeppelin Governor with standard extensions
-contract LiquidGovernor is
-    Governor,
-    GovernorSettings,
-    GovernorCountingSimple,
-    GovernorVotes,
-    GovernorVotesQuorumFraction,
-    GovernorTimelockControl
-{
-    constructor(
-        IVotes _token,
-        TimelockController _timelock
-    )
+contract LiquidGovernor is Governor, GovernorSettings, GovernorCountingSimple, GovernorVotes, GovernorVotesQuorumFraction, GovernorTimelockControl {
+    constructor(IVotes _token, TimelockController _timelock)
         Governor("Liquid Governor")
         GovernorSettings(
-            7200,   // 1 day voting delay (~12s blocks)
-            50400,  // 1 week voting period
-            0       // 0 proposal threshold
+            7200, // 1 day voting delay (~12s blocks)
+            50_400, // 1 week voting period
+            0 // 0 proposal threshold
         )
         GovernorVotes(_token)
         GovernorVotesQuorumFraction(4) // 4% quorum
@@ -60,32 +50,26 @@ contract LiquidGovernor is
         return super.proposalThreshold();
     }
 
-    function _queueOperations(
-        uint256 proposalId,
-        address[] memory targets,
-        uint256[] memory values,
-        bytes[] memory calldatas,
-        bytes32 descriptionHash
-    ) internal override(Governor, GovernorTimelockControl) returns (uint48) {
+    function _queueOperations(uint256 proposalId, address[] memory targets, uint256[] memory values, bytes[] memory calldatas, bytes32 descriptionHash)
+        internal
+        override(Governor, GovernorTimelockControl)
+        returns (uint48)
+    {
         return super._queueOperations(proposalId, targets, values, calldatas, descriptionHash);
     }
 
-    function _executeOperations(
-        uint256 proposalId,
-        address[] memory targets,
-        uint256[] memory values,
-        bytes[] memory calldatas,
-        bytes32 descriptionHash
-    ) internal override(Governor, GovernorTimelockControl) {
+    function _executeOperations(uint256 proposalId, address[] memory targets, uint256[] memory values, bytes[] memory calldatas, bytes32 descriptionHash)
+        internal
+        override(Governor, GovernorTimelockControl)
+    {
         super._executeOperations(proposalId, targets, values, calldatas, descriptionHash);
     }
 
-    function _cancel(
-        address[] memory targets,
-        uint256[] memory values,
-        bytes[] memory calldatas,
-        bytes32 descriptionHash
-    ) internal override(Governor, GovernorTimelockControl) returns (uint256) {
+    function _cancel(address[] memory targets, uint256[] memory values, bytes[] memory calldatas, bytes32 descriptionHash)
+        internal
+        override(Governor, GovernorTimelockControl)
+        returns (uint256)
+    {
         return super._cancel(targets, values, calldatas, descriptionHash);
     }
 

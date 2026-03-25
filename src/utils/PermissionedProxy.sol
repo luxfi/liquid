@@ -4,8 +4,8 @@ pragma solidity 0.8.28;
 
 contract PermissionedProxy {
     address admin;
-    mapping (address => bool) operators;
-    mapping (bytes4 => bool) permissionedCalls;
+    mapping(address => bool) operators;
+    mapping(bytes4 => bool) permissionedCalls;
 
     constructor(address _admin, address _operator) {
         require(_admin != address(0), "zero");
@@ -49,11 +49,11 @@ contract PermissionedProxy {
         bytes4 selector;
         require(data.length >= 4, "SEL");
         assembly {
-          selector := mload(add(data, 32))
+            selector := mload(add(data, 32))
         }
         require(!permissionedCalls[selector], "PD");
 
-        (bool success, ) = vault.call{value: msg.value}(data);
+        (bool success,) = vault.call{value: msg.value}(data);
         require(success, "failed");
     }
 }
