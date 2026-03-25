@@ -28,17 +28,18 @@ contract SfrxETHStrategy is LiquidStrategy {
     FraxMinter public immutable minter;
     FraxRedemptionQueue public immutable redemptionQueue;
     StakedFraxEth public immutable sfrxEth;
-    address public immutable WETH = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    address public immutable WETH;
 
     /// @notice DEX router for swaps; must be set before deallocate is called
     address public dexRouter;
 
-    constructor(address _vault, StrategyParams memory _params, address _sfrxEth, address _fraxMinter, address _redemptionQueue)
+    constructor(address _vault, StrategyParams memory _params, address _sfrxEth, address _fraxMinter, address _redemptionQueue, address _weth)
         LiquidStrategy(_vault, _params)
     {
         minter = FraxMinter(_fraxMinter);
         redemptionQueue = FraxRedemptionQueue(_redemptionQueue);
         sfrxEth = StakedFraxEth(_sfrxEth);
+        WETH = _weth;
     }
 
     function _allocate(uint256 amount) internal override returns (uint256 depositReturn) {
