@@ -242,8 +242,15 @@ contract LiquidTransmuter is ILiquidTransmuter, ERC721 {
 
         if (amountToRedeem > 0) liquid.redeem(amountToRedeem);
 
-        uint256 feeAmount = scaledTransmuted * transmutationFee / BPS;
-        uint256 claimAmount = scaledTransmuted - feeAmount;
+        uint256 totalYield = liquid.convertDebtTokensToYield(scaledTransmuted);
+
+        // Cap to what we actually hold now (handles redeem() rounding shortfalls).
+        uint256 balAfterRedeem = TokenUtils.safeBalanceOf(liquid.yieldToken(), address(this));
+        uint256 distributable = totalYield <= balAfterRedeem ? totalYield : balAfterRedeem;
+
+        // Split distributable amount. Round fee down; claimant gets the remainder.
+        uint256 feeYield = distributable * transmutationFee / BPS;
+        uint256 claimYield = distributable - feeYield;
 
         uint256 syntheticFee = amountNottransmuted * exitFee / BPS;
         uint256 syntheticReturned = amountNottransmuted - syntheticFee;
@@ -251,8 +258,8 @@ contract LiquidTransmuter is ILiquidTransmuter, ERC721 {
         // Remove untransmuted amount from the staking graph
         if (blocksLeft > 0) _updateStakingGraph(-position.amount.toInt256() * BLOCK_SCALING_FACTOR / transmutationTime.toInt256(), blocksLeft);
 
-        TokenUtils.safeTransfer(liquid.yieldToken(), msg.sender, liquid.convertDebtTokensToYield(claimAmount));
-        TokenUtils.safeTransfer(liquid.yieldToken(), protocolFeeReceiver, liquid.convertDebtTokensToYield(feeAmount));
+        TokenUtils.safeTransfer(liquid.yieldToken(), msg.sender, claimYield);
+        TokenUtils.safeTransfer(liquid.yieldToken(), protocolFeeReceiver, feeYield);
 
         TokenUtils.safeTransfer(syntheticToken, msg.sender, syntheticReturned);
         TokenUtils.safeTransfer(syntheticToken, protocolFeeReceiver, syntheticFee);
@@ -264,7 +271,7 @@ contract LiquidTransmuter is ILiquidTransmuter, ERC721 {
 
         totalLocked -= position.amount;
 
-        emit PositionClaimed(msg.sender, claimAmount, syntheticReturned);
+        emit PositionClaimed(msg.sender, claimYield, syntheticReturned);
 
         delete _positions[id];
     }
