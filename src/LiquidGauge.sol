@@ -76,6 +76,10 @@ contract LiquidGauge is ReentrancyGuard {
     function vote(uint256 ytId, uint256[] calldata strategyIds, uint256[] calldata weights) external nonReentrant {
         require(strategyIds.length == weights.length && strategyIds.length > 0, "Invalid input");
 
+        uint256 totalWeight = 0;
+        for (uint256 i; i < weights.length; i++) totalWeight += weights[i];
+        require(totalWeight <= 10000, "Weights exceed 100%");
+
         uint256 lastAdded = lastStrategyAddedAt[ytId];
         Vote storage existing = votes[ytId][msg.sender];
         uint256 expiry;
@@ -195,7 +199,8 @@ contract LiquidGauge is ReentrancyGuard {
 
             // Global cap for risk group
             if (risk > 0) {
-                uint256 capGlobalLeft = (globalCap * totalIdleAssets) / 1e4 - totalRiskAllocated;
+                uint256 globalCapValue = (globalCap * totalIdleAssets) / 1e4;
+                uint256 capGlobalLeft = globalCapValue > totalRiskAllocated ? globalCapValue - totalRiskAllocated : 0;
                 if (target > capGlobalLeft) target = capGlobalLeft;
                 totalRiskAllocated += target;
             }

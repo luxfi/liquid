@@ -662,7 +662,7 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
     }
 
     /// @inheritdoc ILiquidActions
-    function poke(uint256 tokenId) external {
+    function poke(uint256 tokenId) external nonReentrant {
         _checkForValidAccountId(tokenId);
         _earmark();
         _sync(tokenId);
@@ -915,8 +915,9 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
         Account storage account = _accounts[accountId];
         // calculate repayment fee and deduct from account
         fee = repaidAmountInYield * repaymentFee / BPS;
-        account.collateralBalance -= fee > account.collateralBalance ? account.collateralBalance : fee;
-        return fee;
+        uint256 actualFee = fee > account.collateralBalance ? account.collateralBalance : fee;
+        account.collateralBalance -= actualFee;
+        return actualFee;
     }
 
     /// @dev Increases the debt by `amount` for the account owned by `tokenId`.
