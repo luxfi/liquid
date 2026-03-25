@@ -33,6 +33,56 @@ import {VmSafe} from "../../lib/forge-std/src/Vm.sol";
 import {TokenUtils} from "../libraries/TokenUtils.sol";
 import {AbstractFeeVault} from "../adapters/AbstractFeeVault.sol";
 
+/// @dev Minimal WETH mock for local testing (no mainnet fork required)
+contract MockWETH {
+    string public name = "Wrapped Ether";
+    string public symbol = "WETH";
+    uint8 public decimals = 18;
+
+    mapping(address => uint256) public balanceOf;
+    mapping(address => mapping(address => uint256)) public allowance;
+
+    function deposit() external payable {
+        balanceOf[msg.sender] += msg.value;
+    }
+
+    function withdraw(uint256 amount) external {
+        require(balanceOf[msg.sender] >= amount, "insufficient balance");
+        balanceOf[msg.sender] -= amount;
+        (bool ok,) = msg.sender.call{value: amount}("");
+        require(ok, "ETH transfer failed");
+    }
+
+    function totalSupply() external view returns (uint256) {
+        return address(this).balance;
+    }
+
+    function approve(address spender, uint256 amount) external returns (bool) {
+        allowance[msg.sender][spender] = amount;
+        return true;
+    }
+
+    function transfer(address to, uint256 amount) external returns (bool) {
+        require(balanceOf[msg.sender] >= amount, "insufficient balance");
+        balanceOf[msg.sender] -= amount;
+        balanceOf[to] += amount;
+        return true;
+    }
+
+    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
+        require(balanceOf[from] >= amount, "insufficient balance");
+        require(allowance[from][msg.sender] >= amount, "insufficient allowance");
+        allowance[from][msg.sender] -= amount;
+        balanceOf[from] -= amount;
+        balanceOf[to] += amount;
+        return true;
+    }
+
+    receive() external payable {
+        balanceOf[msg.sender] += msg.value;
+    }
+}
+
 contract LiquidETHVaultTest is Test {
     LiquidETHVault public ethVault;
     address public owner = address(1);
@@ -44,6 +94,11 @@ contract LiquidETHVaultTest is Test {
     uint256 public constant AMOUNT = 100 * 10 ** 18;
 
     function setUp() external {
+        // Deploy a mock WETH and etch it at the mainnet WETH address so tests
+        // work without a mainnet fork.
+        MockWETH mockWeth = new MockWETH();
+        vm.etch(weth, address(mockWeth).code);
+
         // Deploy vault
         vm.prank(owner);
         ethVault = new LiquidETHVault(address(weth), liquid, owner);

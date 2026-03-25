@@ -10,7 +10,9 @@ import {ILiquidStrategy} from "../../interfaces/ILiquidStrategy.sol";
 import {MorphoYearnOGWETHStrategy} from "../../strategies/MorphoYearnOGWETH.sol";
 
 contract MockMorphoYearnOGWETHStrategy is MorphoYearnOGWETHStrategy {
-    constructor(address _vault, StrategyParams memory _params, address _morphoVault, address _weth) MorphoYearnOGWETHStrategy(_vault, _params, _morphoVault, _weth) {}
+    constructor(address _vault, StrategyParams memory _params, address _morphoVault, address _weth)
+        MorphoYearnOGWETHStrategy(_vault, _params, _morphoVault, _weth)
+    {}
 }
 
 contract MorphoYearnOGWETHStrategyTest is Test {
@@ -20,8 +22,15 @@ contract MorphoYearnOGWETHStrategyTest is Test {
     address public WETH = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     address public admin = address(0x1111111111111111111111111111111111111111);
     address public curator = address(0x2222222222222222222222222222222222222222);
+    bool private _skipFork;
 
     function setUp() public {
+        string memory rpc = vm.envOr("MAINNET_RPC_URL", string(""));
+        if (bytes(rpc).length == 0) {
+            _skipFork = true;
+            return;
+        }
+        vm.createSelectFork(rpc);
         vm.startPrank(admin);
         vault = LiquidStrategyTestHelper._setupVault(WETH, admin, curator);
         ILiquidStrategy.StrategyParams memory params = ILiquidStrategy.StrategyParams({
@@ -39,6 +48,7 @@ contract MorphoYearnOGWETHStrategyTest is Test {
     }
 
     function test_allocate() public {
+        vm.skip(_skipFork);
         vm.startPrank(address(vault));
         uint256 amount = 100 ether;
         deal(WETH, address(liquidStrategy), amount);
@@ -52,6 +62,7 @@ contract MorphoYearnOGWETHStrategyTest is Test {
     }
 
     function test_allocated_position_generated_yield() public {
+        vm.skip(_skipFork);
         vm.startPrank(address(vault));
         uint256 amount = 100 ether;
         deal(WETH, address(liquidStrategy), amount);
@@ -66,6 +77,7 @@ contract MorphoYearnOGWETHStrategyTest is Test {
     }
 
     function test_deallocate() public {
+        vm.skip(_skipFork);
         vm.startPrank(address(vault));
         uint256 amount = 100 ether;
         deal(WETH, address(liquidStrategy), amount);
