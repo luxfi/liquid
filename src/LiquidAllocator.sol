@@ -10,6 +10,9 @@ import {ILiquidStrategy} from "./interfaces/ILiquidStrategy.sol";
 contract LiquidAllocator is PermissionedProxy, ILiquidAllocator {
     IVaultV2 immutable vault;
 
+    /// @notice Maximum allocation per strategy, configurable by admin
+    uint256 public maxAllocationPerStrategy = 1e24; // 1M tokens default cap
+
     constructor(address _vault, address _admin, address _operator) PermissionedProxy(_admin, _operator) {
         require(IVaultV2(_vault).asset() != address(0), "IV");
         vault = IVaultV2(_vault);
@@ -20,14 +23,22 @@ contract LiquidAllocator is PermissionedProxy, ILiquidAllocator {
         permissionedCalls[0x4b219d16] = true;
     }
 
+    /// @notice Set the maximum allocation per strategy
+    /// @param _cap The new cap value
+    function setMaxAllocationPerStrategy(uint256 _cap) external {
+        require(msg.sender == admin, "PD");
+        require(_cap > 0, "Zero cap");
+        maxAllocationPerStrategy = _cap;
+    }
+
     // Overriden vault actions
     function allocate(address adapter, uint256 amount) external {
         require(msg.sender == admin || operators[msg.sender], "PD");
+        require(amount <= maxAllocationPerStrategy, "Exceeds allocation cap");
         bytes32 id = ILiquidStrategy(adapter).adapterId();
         uint256 absoluteCap = vault.absoluteCap(id);
         uint256 relativeCap = vault.relativeCap(id);
-        // FIXME get this from the StrategyClassificationProxy for the respective risk class
-        uint256 daoTarget = type(uint256).max;
+        uint256 daoTarget = maxAllocationPerStrategy;
         uint256 adjusted = absoluteCap > relativeCap ? absoluteCap : relativeCap;
         if (msg.sender != admin) {
             // caller is operator
@@ -43,8 +54,7 @@ contract LiquidAllocator is PermissionedProxy, ILiquidAllocator {
         bytes32 id = ILiquidStrategy(adapter).adapterId();
         uint256 absoluteCap = vault.absoluteCap(id);
         uint256 relativeCap = vault.relativeCap(id);
-        // FIXME get this from the StrategyClassificationProxy for the respective risk class
-        uint256 daoTarget = type(uint256).max;
+        uint256 daoTarget = maxAllocationPerStrategy;
         uint256 adjusted = absoluteCap < relativeCap ? absoluteCap : relativeCap;
         if (msg.sender != admin) {
             // caller is operator

@@ -5,7 +5,6 @@ pragma solidity 0.8.28;
 import {IVaultV2} from "../lib/vault-v2/src/interfaces/IVaultV2.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import {ILiquidStrategy} from "./interfaces/ILiquidStrategy.sol";
-import "forge-std/console.sol";
 import {ISettlerActions} from "./external/interfaces/ISettlerActions.sol";
 import {IVelodromePair} from "./external/interfaces/IVelodromePair.sol";
 import {ISignatureTransfer} from "../lib/permit2/src/interfaces/ISignatureTransfer.sol";

@@ -13,6 +13,8 @@ contract LiquidGauge is ReentrancyGuard {
     event VoteUpdated(address indexed voter, uint256 ytId, uint256[] strategyIds, uint256[] weights, uint256 expiry);
     event AllocationExecuted(uint256 ytId, uint256[] strategyIds, uint256[] amounts);
     event VoterCleared(address indexed voter, uint256 ytId);
+    event StrategyRegistered(uint256 ytId, uint256 strategyId);
+    event KeeperUpdated(address indexed newKeeper);
 
     struct Vote {
         uint256[] strategyIds;
@@ -23,6 +25,9 @@ contract LiquidGauge is ReentrancyGuard {
     ILiquidStrategyClassifier public stratClassifier;
     ILiquidAllocatorProxy public allocatorProxy;
     IERC20 public votingToken;
+
+    address public admin;
+    address public keeper;
 
     uint256 public constant MAX_VOTE_DURATION = 365 days;
     uint256 public constant MIN_RESET_DURATION = 30 days;
@@ -39,11 +44,33 @@ contract LiquidGauge is ReentrancyGuard {
     // Track which strategies are in strategyList per ytId
     mapping(uint256 => mapping(uint256 => bool)) private strategyInList;
 
+    /// @notice Snapshot of voter power at vote time to prevent flash loan manipulation
+    mapping(address => mapping(uint256 => uint256)) public voterPower;
+
     constructor(address _stratClassifier, address _allocatorProxy, address _votingToken) {
         require(_stratClassifier != address(0) && _allocatorProxy != address(0) && _votingToken != address(0), "Bad address");
         stratClassifier = ILiquidStrategyClassifier(_stratClassifier);
         allocatorProxy = ILiquidAllocatorProxy(_allocatorProxy);
         votingToken = IERC20(_votingToken);
+        admin = msg.sender;
+    }
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Only admin");
+        _;
+    }
+
+    /// @notice Set a new keeper address
+    function setKeeper(address _keeper) external onlyAdmin {
+        require(_keeper != address(0), "Zero address");
+        keeper = _keeper;
+        emit KeeperUpdated(_keeper);
+    }
+
+    /// @notice Transfer admin role
+    function setAdmin(address _admin) external onlyAdmin {
+        require(_admin != address(0), "Zero address");
+        admin = _admin;
     }
 
     function vote(uint256 ytId, uint256[] calldata strategyIds, uint256[] calldata weights) external nonReentrant {
@@ -66,16 +93,18 @@ contract LiquidGauge is ReentrancyGuard {
 
         uint256 power = votingToken.balanceOf(msg.sender);
 
-        // 1. Remove old vote contribution from aggregate
+        // 1. Remove old vote contribution from aggregate using snapshotted power
         if (existing.strategyIds.length > 0 && existing.expiry > block.timestamp) {
+            uint256 oldPower = voterPower[msg.sender][ytId];
             for (uint256 i = 0; i < existing.strategyIds.length; i++) {
                 uint256 sid = existing.strategyIds[i];
-                uint256 prevWeighted = existing.weights[i] * power;
+                uint256 prevWeighted = existing.weights[i] * oldPower;
                 aggStrategyWeight[ytId][sid] -= prevWeighted;
             }
         }
 
-        // 2. Store new vote
+        // 2. Snapshot current power and store new vote
+        voterPower[msg.sender][ytId] = power;
         votes[ytId][msg.sender] = Vote({ strategyIds: strategyIds, weights: weights, expiry: expiry });
 
         // 3. Add new contribution and auto-register strategies
@@ -103,7 +132,7 @@ contract LiquidGauge is ReentrancyGuard {
         Vote storage v = votes[ytId][msg.sender];
         require(v.strategyIds.length > 0, "No vote");
 
-        uint256 power = votingToken.balanceOf(msg.sender);
+        uint256 power = voterPower[msg.sender][ytId];
 
         for (uint256 i = 0; i < v.strategyIds.length; i++) {
             uint256 sid = v.strategyIds[i];
@@ -112,12 +141,16 @@ contract LiquidGauge is ReentrancyGuard {
         }
 
         delete votes[ytId][msg.sender];
+        delete voterPower[msg.sender][ytId];
         emit VoterCleared(msg.sender, ytId);
     }
 
-    function registerNewStrategy(uint256 ytId, uint256 strategyId) external nonReentrant {
+    function registerNewStrategy(uint256 ytId, uint256 strategyId) external nonReentrant onlyAdmin {
+        require(!strategyInList[ytId][strategyId], "Already registered");
         lastStrategyAddedAt[ytId] = block.timestamp;
-        // TODO
+        strategyList[ytId].push(strategyId);
+        strategyInList[ytId][strategyId] = true;
+        emit StrategyRegistered(ytId, strategyId);
     }
 
     function getCurrentAllocations(uint256 ytId) public view
@@ -144,6 +177,7 @@ contract LiquidGauge is ReentrancyGuard {
     }
 
     function executeAllocation(uint256 ytId, uint256 totalIdleAssets) external nonReentrant {
+        require(msg.sender == admin || msg.sender == keeper, "Unauthorized");
         (uint256[] memory sIds, uint256[] memory weights) = getCurrentAllocations(ytId);
         require(sIds.length > 0, "No allocations");
 
@@ -169,7 +203,6 @@ contract LiquidGauge is ReentrancyGuard {
             }
 
             if (target > 0) {
-                // TODO double-check limits here?
                 allocatorProxy.allocate(sIds[i], target);
             }
 
