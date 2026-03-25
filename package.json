@@ -1,0 +1,21 @@
+{
+  "name": "@luxfi/liquid",
+  "version": "1.0.0",
+  "description": "Liquid Protocol — Self-repaying loans for Lux Network",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/luxfi/liquid.git"
+  },
+  "files": [
+    "src/**/*.sol",
+    "!src/test/**",
+    "!src/mocks/**"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
