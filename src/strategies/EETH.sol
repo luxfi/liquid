@@ -33,10 +33,26 @@ contract EETHLiquidStrategy is LiquidStrategy {
     }
 
     function _deallocate(uint256 amount) internal override returns (uint256 withdrawReturn) {
-        // TODO: implement dex swap
+        withdrawReturn = eeth.requestWithdraw(address(this), amount);
+        if (withdrawReturn > 0) {
+            weth.deposit{value: withdrawReturn}();
+            TokenUtils.safeTransfer(address(weth), msg.sender, withdrawReturn);
+        }
     }
 
-    function snapshotYield() public override returns (uint256) {
-        // TODO calculate & snapshot yield
+    function _computeBaseRatePerSecond() internal override returns (uint256 ratePerSec, uint256 newIndex) {
+        uint256 dt = lastSnapshotTime == 0 ? 0 : block.timestamp - lastSnapshotTime;
+        // eETH is 1:1 rebasing; use balance growth as index
+        uint256 currentBalance = TokenUtils.safeBalanceOf(address(eeth), address(this));
+        newIndex = currentBalance;
+        if (lastIndex == 0 || dt == 0 || currentBalance <= lastIndex) return (0, newIndex);
+        uint256 growth = (currentBalance - lastIndex) * FIXED_POINT_SCALAR / lastIndex;
+        ratePerSec = growth / dt;
     }
+
+    function realAssets() external view override returns (uint256) {
+        return TokenUtils.safeBalanceOf(address(eeth), address(this));
+    }
+
+    receive() external payable {}
 }
