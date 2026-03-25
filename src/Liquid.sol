@@ -17,11 +17,11 @@ import {Unauthorized, IllegalArgument, IllegalState, MissingInputData} from "./b
 import {IERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {ILiquidTokenVault} from "./interfaces/ILiquidTokenVault.sol";
 
-import {console} from "forge-std/console.sol";
+import {ReentrancyGuardUpgradeable} from "../lib/openzeppelin-contracts-upgradeable/contracts/utils/ReentrancyGuardUpgradeable.sol";
 
 /// @title  Liquid
 /// @author Lux Liquid
-contract Liquid is ILiquid, Initializable {
+contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
     using SafeCast for int256;
     using SafeCast for uint256;
     using SafeCast for int128;
@@ -167,6 +167,7 @@ contract Liquid is ILiquid, Initializable {
     constructor() initializer {}
 
     function initialize(LiquidInitializationParams memory params) external initializer {
+        __ReentrancyGuard_init();
         _checkArgument(params.protocolFee <= BPS);
         _checkArgument(params.liquidatorFee <= BPS);
         _checkArgument(params.repaymentFee <= BPS);
@@ -367,7 +368,7 @@ contract Liquid is ILiquid, Initializable {
     }
 
     /// @inheritdoc ILiquidActions
-    function deposit(uint256 amount, address recipient, uint256 tokenId) external returns (uint256) {
+    function deposit(uint256 amount, address recipient, uint256 tokenId) external nonReentrant returns (uint256) {
         _checkArgument(recipient != address(0));
         _checkArgument(amount > 0);
         _checkState(!depositsPaused);
@@ -393,7 +394,7 @@ contract Liquid is ILiquid, Initializable {
     }
 
     /// @inheritdoc ILiquidActions
-    function withdraw(uint256 amount, address recipient, uint256 tokenId) external returns (uint256) {
+    function withdraw(uint256 amount, address recipient, uint256 tokenId) external nonReentrant returns (uint256) {
         _checkArgument(recipient != address(0));
         _checkForValidAccountId(tokenId);
         _checkArgument(amount > 0);
@@ -420,7 +421,7 @@ contract Liquid is ILiquid, Initializable {
     }
 
     /// @inheritdoc ILiquidActions
-    function mint(uint256 tokenId, uint256 amount, address recipient) external {
+    function mint(uint256 tokenId, uint256 amount, address recipient) external nonReentrant {
         _checkArgument(recipient != address(0));
         _checkForValidAccountId(tokenId);
         _checkArgument(amount > 0);
@@ -438,7 +439,7 @@ contract Liquid is ILiquid, Initializable {
     }
 
     /// @inheritdoc ILiquidActions
-    function mintFrom(uint256 tokenId, uint256 amount, address recipient) external {
+    function mintFrom(uint256 tokenId, uint256 amount, address recipient) external nonReentrant {
         _checkArgument(amount > 0);
         _checkForValidAccountId(tokenId);
         _checkArgument(recipient != address(0));
@@ -457,7 +458,7 @@ contract Liquid is ILiquid, Initializable {
     }
 
     /// @inheritdoc ILiquidActions
-    function burn(uint256 amount, uint256 recipientId) external returns (uint256) {
+    function burn(uint256 amount, uint256 recipientId) external nonReentrant returns (uint256) {
         _checkArgument(amount > 0);
         _checkForValidAccountId(recipientId);
         // Check that the user did not mint in this same block
@@ -500,7 +501,7 @@ contract Liquid is ILiquid, Initializable {
     }
 
     /// @inheritdoc ILiquidActions
-    function repay(uint256 amount, uint256 recipientTokenId) public returns (uint256) {
+    function repay(uint256 amount, uint256 recipientTokenId) public nonReentrant returns (uint256) {
         _checkArgument(amount > 0);
         _checkForValidAccountId(recipientTokenId);
         Account storage account = _accounts[recipientTokenId];
@@ -551,7 +552,7 @@ contract Liquid is ILiquid, Initializable {
     }
 
     /// @inheritdoc ILiquidActions
-    function liquidate(uint256 accountId) external override returns (uint256 yieldAmount, uint256 feeInYield, uint256 feeInUnderlying) {
+    function liquidate(uint256 accountId) external override nonReentrant returns (uint256 yieldAmount, uint256 feeInYield, uint256 feeInUnderlying) {
         _checkForValidAccountId(accountId);
         (yieldAmount, feeInYield, feeInUnderlying) = _liquidate(accountId);
         if (yieldAmount > 0) {
@@ -566,6 +567,7 @@ contract Liquid is ILiquid, Initializable {
     /// @inheritdoc ILiquidActions
     function batchLiquidate(uint256[] memory accountIds)
         external
+        nonReentrant
         returns (uint256 totalAmountLiquidated, uint256 totalFeesInYield, uint256 totalFeesInUnderlying)
     {
         if (accountIds.length == 0) {

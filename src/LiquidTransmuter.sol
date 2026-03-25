@@ -16,8 +16,6 @@ import {Unauthorized, IllegalArgument, IllegalState, InsufficientAllowance} from
 import "./base/LiquidTransmuterErrors.sol";
 
 
-import {console} from "forge-std/console.sol";
-
 /// @title Lux LiquidV3 Transmuter
 ///
 /// @notice A contract which facilitates the exchange of alAssets to yield bearing assets.
@@ -272,7 +270,6 @@ contract LiquidTransmuter is ILiquidTransmuter, ERC721 {
 
     /// @inheritdoc ILiquidTransmuter
     function queryGraph(uint256 startBlock, uint256 endBlock) external view returns (uint256) {
-        console.log(_stakingGraph.size);
         int256 queried = _stakingGraph.queryStake(startBlock, endBlock);
 
         if (queried == 0) return 0;
