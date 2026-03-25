@@ -36,6 +36,9 @@ contract LiquidGauge is ReentrancyGuard {
     // Aggregate weighted votes per VAULT + strategy
     mapping(uint256 => mapping(uint256 => uint256)) private aggStrategyWeight;
 
+    // Track which strategies are in strategyList per ytId
+    mapping(uint256 => mapping(uint256 => bool)) private strategyInList;
+
     constructor(address _stratClassifier, address _allocatorProxy, address _votingToken) {
         require(_stratClassifier != address(0) && _allocatorProxy != address(0) && _votingToken != address(0), "Bad address");
         stratClassifier = ILiquidStrategyClassifier(_stratClassifier);
@@ -75,11 +78,16 @@ contract LiquidGauge is ReentrancyGuard {
         // 2. Store new vote
         votes[ytId][msg.sender] = Vote({ strategyIds: strategyIds, weights: weights, expiry: expiry });
 
-        // 3. Add new contribution
+        // 3. Add new contribution and auto-register strategies
         for (uint256 i = 0; i < strategyIds.length; i++) {
             uint256 sid = strategyIds[i];
             uint256 newWeighted = weights[i] * power;
             aggStrategyWeight[ytId][sid] += newWeighted;
+
+            if (!strategyInList[ytId][sid]) {
+                strategyList[ytId].push(sid);
+                strategyInList[ytId][sid] = true;
+            }
         }
 
         // 4. Track voter in registry

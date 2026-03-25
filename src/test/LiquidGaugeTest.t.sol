@@ -168,8 +168,9 @@ contract LiquidGaugeTest is Test {
         gauge.vote(1, _arr(1), _arr(100));
 
         (uint256[] memory sIds, uint256[] memory weights) = gauge.getCurrentAllocations(1);
-        assertEq(sIds.length, 0, "strategyList not populated yet");
-        // because registerNewStrategy not complete TODO in contract
+        assertEq(sIds.length, 1, "Strategy auto-registered on vote");
+        assertEq(sIds[0], 1);
+        assertEq(weights[0], 1e18, "Single strategy gets full weight");
     }
 
     function testVoteThenClear() public {
@@ -192,9 +193,6 @@ contract LiquidGaugeTest is Test {
 
     // --- Allocation Tests ---
     function testExecuteAllocationAppliesCaps() public {
-        // Add strategy slot
-        // FIXME gauge.strategyList(1).push(1); // direct storage modification in test (unsafe in prod)
-
         vm.prank(alice);
         gauge.vote(1, _arr(1), _arr(100));
 
@@ -208,9 +206,6 @@ contract LiquidGaugeTest is Test {
     }
 
     function testMultipleVotersAggregate() public {
-        // Add strategy slot
-        // FIXME gauge.strategyList(1).push(1);
-
         vm.prank(alice);
         gauge.vote(1, _arr(1), _arr(100));
 
