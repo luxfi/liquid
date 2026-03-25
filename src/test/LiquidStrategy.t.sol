@@ -91,12 +91,7 @@ contract LiquidStrategyTest is Test {
         alToken = new LiquidMintableToken("Liquid Mintable Token", "AL", 0);
 
         ILiquidTransmuter.TransmuterInitializationParams memory transParams = ILiquidTransmuter.TransmuterInitializationParams({
-            syntheticToken: address(alToken),
-            feeReceiver: address(this),
-            timeToTransmute: 5_256_000,
-            transmutationFee: 10,
-            exitFee: 20,
-            graphSize: 52_560_000
+            syntheticToken: address(alToken), feeReceiver: address(this), timeToTransmute: 5_256_000, transmutationFee: 10, exitFee: 20, graphSize: 52_560_000
         });
 
         // Contracts and logic contracts
@@ -169,7 +164,7 @@ contract LiquidStrategyTest is Test {
         vm.prank(admin);
         strategy.setWhitelistedAllocator(address(allocator), true);
     }
-    /* 
+    /*
     // Test that only whitelisted allocators can call allocate
     function test_onlyWhitelistedAllocatorCanAllocate() public {
         // Non-whitelisted address should fail

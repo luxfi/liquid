@@ -66,13 +66,9 @@ contract MockLiquid {
         }
     }
 
-    function reduceSyntheticsIssued(uint256 amount) external {
-        
-    }
+    function reduceSyntheticsIssued(uint256 amount) external {}
 
-    function setTransmuterTokenBalance(uint256 amount) external {
-
-    }
+    function setTransmuterTokenBalance(uint256 amount) external {}
 
     function yieldToken() external view returns (address) {
         return address(collateral);
@@ -124,7 +120,7 @@ contract TransmuterTest is Test {
 
     function testSetAdmin() public {
         transmuter.setPendingAdmin(address(0xbeef));
-        
+
         vm.prank(address(0xbeef));
         transmuter.acceptAdmin();
 
@@ -133,13 +129,12 @@ contract TransmuterTest is Test {
 
     function testSetAdminWrongAddress() public {
         transmuter.setPendingAdmin(address(0xbeef));
-        
+
         vm.startPrank(address(0xbeef123));
         vm.expectRevert();
         transmuter.acceptAdmin();
         vm.stopPrank();
     }
-
 
     function testURI() public {
         vm.prank(address(0xbeef));
@@ -470,18 +465,18 @@ contract TransmuterTest is Test {
         transmuter.createRedemption(100e18);
         vm.roll(block.number + 5_256_000); // Mature the staking position
         liquid.setUnderlyingValue(0); // Simulate all users exiting with 0 underlying left
-        emit log_named_uint("total token there",liquid.getTotalUnderlyingValue());
+        emit log_named_uint("total token there", liquid.getTotalUnderlyingValue());
         vm.prank(address(0xbeef));
         transmuter.claimRedemption(1);
     }
 
     function test_delta_overflow() public {
-        int256 amount = (2**111) - 1;
+        int256 amount = (2 ** 111) - 1;
         uint32 start = 1000;
         uint32 duration = 10;
 
         graph.addStake(amount / 10, start, duration);
-        
+
         int256 result = graph.queryStake(start, start + duration);
 
         assertApproxEqAbs(result, amount, 10);

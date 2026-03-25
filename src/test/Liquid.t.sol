@@ -139,12 +139,7 @@ contract LiquidTest is Test {
         alToken = new LiquidMintableToken(_name, _symbol, _flashFee);
 
         ILiquidTransmuter.TransmuterInitializationParams memory transParams = ILiquidTransmuter.TransmuterInitializationParams({
-            syntheticToken: address(alToken),
-            feeReceiver: address(this),
-            timeToTransmute: 5_256_000,
-            transmutationFee: 10,
-            exitFee: 20,
-            graphSize: 52_560_000
+            syntheticToken: address(alToken), feeReceiver: address(this), timeToTransmute: 5_256_000, transmutationFee: 10, exitFee: 20, graphSize: 52_560_000
         });
 
         // Contracts and logic contracts
@@ -782,10 +777,9 @@ contract LiquidTest is Test {
 
         assertApproxEqAbs(
             liquid.getMaxBorrowable(tokenId),
-            (
-                liquid.normalizeUnderlyingTokensToDebt(fakeYieldToken.price() * amount / FIXED_POINT_SCALAR) * FIXED_POINT_SCALAR
-                    / liquid.minimumCollateralization()
-            ) - (amount * ltv) / FIXED_POINT_SCALAR,
+            (liquid.normalizeUnderlyingTokensToDebt(fakeYieldToken.price() * amount / FIXED_POINT_SCALAR)
+                    * FIXED_POINT_SCALAR
+                    / liquid.minimumCollateralization()) - (amount * ltv) / FIXED_POINT_SCALAR,
             1
         );
 
@@ -895,10 +889,9 @@ contract LiquidTest is Test {
 
         assertApproxEqAbs(
             liquid.getMaxBorrowable(tokenId),
-            (
-                liquid.normalizeUnderlyingTokensToDebt(fakeYieldToken.price() * amount / FIXED_POINT_SCALAR) * FIXED_POINT_SCALAR
-                    / liquid.minimumCollateralization()
-            ) - (amount * ltv) / FIXED_POINT_SCALAR,
+            (liquid.normalizeUnderlyingTokensToDebt(fakeYieldToken.price() * amount / FIXED_POINT_SCALAR)
+                    * FIXED_POINT_SCALAR
+                    / liquid.minimumCollateralization()) - (amount * ltv) / FIXED_POINT_SCALAR,
             1
         );
 
@@ -2634,9 +2627,7 @@ contract LiquidTest is Test {
 
         // ensure depositedCollateral is reduced only by the repayment of max earmarked amount
         vm.assertApproxEqAbs(
-            depositedCollateral,
-            prevCollateral - liquid.convertDebtTokensToYield(earmarked) - protocolFeeInYield - repaymentFee,
-            minimumDepositOrWithdrawalLoss
+            depositedCollateral, prevCollateral - liquid.convertDebtTokensToYield(earmarked) - protocolFeeInYield - repaymentFee, minimumDepositOrWithdrawalLoss
         );
 
         // ensure assets is equal to repayment of max earmarked amount
@@ -3039,9 +3030,7 @@ contract LiquidTest is Test {
         liquid.deposit(amount, anotherExternalUser, 0);
         // a single position nft would have been minted to anotherExternalUser
         uint256 tokenIdForExternalUser = LiquidNFTHelper.getFirstTokenId(anotherExternalUser, address(liquidNFT));
-        liquid.mint(
-            tokenIdForExternalUser, liquid.totalValue(tokenIdForExternalUser) * FIXED_POINT_SCALAR / minimumCollateralization, anotherExternalUser
-        );
+        liquid.mint(tokenIdForExternalUser, liquid.totalValue(tokenIdForExternalUser) * FIXED_POINT_SCALAR / minimumCollateralization, anotherExternalUser);
         vm.stopPrank();
 
         // let another user liquidate the previous user position
@@ -3075,9 +3064,7 @@ contract LiquidTest is Test {
         liquid.deposit(amount, anotherExternalUser, 0);
         // a single position nft would have been minted to anotherExternalUser
         uint256 tokenIdForExternalUser = LiquidNFTHelper.getFirstTokenId(anotherExternalUser, address(liquidNFT));
-        liquid.mint(
-            tokenIdForExternalUser, liquid.totalValue(tokenIdForExternalUser) * FIXED_POINT_SCALAR / minimumCollateralization, anotherExternalUser
-        );
+        liquid.mint(tokenIdForExternalUser, liquid.totalValue(tokenIdForExternalUser) * FIXED_POINT_SCALAR / minimumCollateralization, anotherExternalUser);
         vm.stopPrank();
 
         // let another user batch liquidate with an empty array
@@ -3106,10 +3093,7 @@ contract LiquidTest is Test {
         uint256 baseFeeInYield = liquid.convertDebtTokensToYield(baseFee);
 
         result = CalculateLiquidationResult({
-            liquidationAmountInYield: liquidationAmountInYield,
-            debtToBurn: debtToBurn,
-            outSourcedFee: outSourcedFee,
-            baseFeeInYield: baseFeeInYield
+            liquidationAmountInYield: liquidationAmountInYield, debtToBurn: debtToBurn, outSourcedFee: outSourcedFee, baseFeeInYield: baseFeeInYield
         });
 
         return result;
@@ -3245,8 +3229,7 @@ contract LiquidTest is Test {
         for (uint256 i = 1; i <= 2; i++) {
             console.log("[*] redemption no: ", i);
             // calculate bad debt ratio
-            uint256 currentBadDebt =
-                liquid.totalSyntheticsIssued() * 10 ** TokenUtils.expectDecimals(liquid.yieldToken()) / liquid.getTotalUnderlyingValue();
+            uint256 currentBadDebt = liquid.totalSyntheticsIssued() * 10 ** TokenUtils.expectDecimals(liquid.yieldToken()) / liquid.getTotalUnderlyingValue();
             console.log("current bad debt ratio before redemption: ", currentBadDebt);
             // 0xdad claim redemption
             vm.startPrank(address(0xdad));

@@ -136,11 +136,7 @@ contract StakingPools is ReentrancyGuard {
 
         _pools.push(
             Pool.Data({
-                token: _token,
-                totalDeposited: 0,
-                rewardWeight: 0,
-                accumulatedRewardWeight: FixedPointMath.FixedDecimal(0),
-                lastUpdatedBlock: block.number
+                token: _token, totalDeposited: 0, rewardWeight: 0, accumulatedRewardWeight: FixedPointMath.FixedDecimal(0), lastUpdatedBlock: block.number
             })
         );
 

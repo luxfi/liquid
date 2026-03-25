@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 /**
  * @title ZeroXSwapVerifier
  * @dev Verifies 0x permit swap calldata and validates token whitelist and amount bounds
@@ -15,7 +16,6 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  * 4. Target token and amount match expected values
  */
 library ZeroXSwapVerifier {
-
     // Constants for 0x Settler function selectors
     bytes4 private constant EXECUTE_SELECTOR = 0xcf71ff4f; // execute(SlippageAndActions,bytes[])
     bytes4 private constant EXECUTE_META_TXN_SELECTOR = 0x0476baab; // executeMetaTxn(SlippageAndActions,bytes[],address,bytes)
@@ -74,8 +74,6 @@ library ZeroXSwapVerifier {
      * @param targetAmount The expected amount that should be matched
      */
     function decodeAndVerifyActions(bytes calldata calldata_, address owner, address targetToken, uint256 targetAmount) internal view {
-
-
         bytes4 selector = bytes4(calldata_[0:4]);
 
         if (selector == EXECUTE_SELECTOR) {
@@ -87,7 +85,6 @@ library ZeroXSwapVerifier {
         }
     }
 
-
     /**
      * @dev Main verification function for 0x swap calldata
      * @param calldata_ The complete calldata from 0x API
@@ -96,11 +93,7 @@ library ZeroXSwapVerifier {
      * @param targetAmount The expected amount that should be matched
      * @return verified Whether the swap passes all checks
      */
-    function verifySwapCalldata(bytes calldata calldata_, address owner, address targetToken, uint256 targetAmount)
-        external
-        view
-        returns (bool verified)
-    {
+    function verifySwapCalldata(bytes calldata calldata_, address owner, address targetToken, uint256 targetAmount) external view returns (bool verified) {
         if (calldata_.length < 4) {
             return false;
         }
@@ -114,8 +107,6 @@ library ZeroXSwapVerifier {
         return true;
     }
 
-
-
     /**
      * @dev Verify execute() function calldata
      * @param data The function parameters (without selector)
@@ -124,7 +115,7 @@ library ZeroXSwapVerifier {
      */
     function _verifyExecuteCalldata(bytes calldata data, address owner, address targetToken, uint256 targetAmount) internal view {
         // Decode SlippageAndActions struct and actions array
-        (SlippageAndActions memory saa, ) = abi.decode(data, (SlippageAndActions, bytes));
+        (SlippageAndActions memory saa,) = abi.decode(data, (SlippageAndActions, bytes));
         // TODO shall we also verify saa.buyToken ?
         _verifyActions(saa.actions, owner, targetToken, targetAmount);
     }
@@ -137,7 +128,7 @@ library ZeroXSwapVerifier {
      */
     function _verifyExecuteMetaTxnCalldata(bytes calldata data, address owner, address targetToken, uint256 targetAmount) internal view {
         // Decode parameters: (SlippageAndActions, bytes[], address, bytes)
-        (SlippageAndActions memory saa, , , ) = abi.decode(data, (SlippageAndActions, bytes[], address, bytes));
+        (SlippageAndActions memory saa,,,) = abi.decode(data, (SlippageAndActions, bytes[], address, bytes));
         // TODO shall we also verify saa.buyToken ?
         _verifyActions(saa.actions, owner, targetToken, targetAmount);
     }
@@ -193,10 +184,7 @@ library ZeroXSwapVerifier {
      * Format: basicSellToPool(IERC20 sellToken, uint256 bps, address pool, uint256 offset, bytes data)
      */
     function _verifyBasicSellToPool(bytes memory action, address owner, address targetToken, uint256 targetAmount) internal view {
-        (address sellToken, uint256 bps, , , ) = abi.decode(
-            _slice(action, 4),
-            (address, uint256, address, uint256, bytes)
-        );
+        (address sellToken, uint256 bps,,,) = abi.decode(_slice(action, 4), (address, uint256, address, uint256, bytes));
 
         require(sellToken == targetToken, "IT");
         require(IERC20(targetToken).balanceOf(owner) == targetAmount, "IA");
@@ -207,10 +195,7 @@ library ZeroXSwapVerifier {
      * Format: uniswapV3VIP(address recipient, uint256 bps, uint256 feeOrTickSpacing, bool feeOnTransfer, bytes fills)
      */
     function _verifyUniswapV3VIP(bytes memory action, address owner, address targetToken, uint256 targetAmount) internal view {
-        (, uint256 bps, , , bytes memory fills) = abi.decode(
-            _slice(action, 4),
-            (address, uint256, uint256, bool, bytes)
-        );
+        (, uint256 bps,,, bytes memory fills) = abi.decode(_slice(action, 4), (address, uint256, uint256, bool, bytes));
 
         // Extract token from fills data - this requires parsing the UniswapV3 fill structure
         address sellToken = _extractTokenFromUniswapFills(fills);
@@ -236,10 +221,7 @@ library ZeroXSwapVerifier {
      * Format: transferFrom(IERC20 token, address from, address to, uint256 amount)
      */
     function _verifyTransferFrom(bytes memory action, address owner, address targetToken, uint256 targetAmount) internal view {
-        (address token, , , uint256 amount) = abi.decode(
-            _slice(action, 4),
-            (address, address, address, uint256)
-        );
+        (address token,,, uint256 amount) = abi.decode(_slice(action, 4), (address, address, address, uint256));
 
         require(token == targetToken, "IT");
         require(IERC20(targetToken).balanceOf(owner) == targetAmount, "IA");
@@ -249,10 +231,7 @@ library ZeroXSwapVerifier {
      * @dev Verify SELL_TO_LIQUIDITY_PROVIDER action
      */
     function _verifySellToLiquidityProvider(bytes memory action, address owner, address targetToken, uint256 targetAmount) internal view {
-        (address sellToken, , uint256 sellAmount, , ) = abi.decode(
-            _slice(action, 4),
-            (address, address, uint256, uint256, bytes)
-        );
+        (address sellToken,, uint256 sellAmount,,) = abi.decode(_slice(action, 4), (address, address, uint256, uint256, bytes));
 
         require(sellToken == targetToken, "IT");
         require(IERC20(targetToken).balanceOf(owner) == targetAmount, "IA");
@@ -262,17 +241,11 @@ library ZeroXSwapVerifier {
      * @dev Verify VELODROME_V2_VIP action
      */
     function _verifyVelodromeV2VIP(bytes memory action, address owner, address targetToken, uint256 targetAmount) internal view {
-        (address sellToken, uint256 bps, , , , ) = abi.decode(
-            _slice(action, 4),
-            (address, uint256, bool, uint256, uint256, bytes)
-        );
-
+        (address sellToken, uint256 bps,,,,) = abi.decode(_slice(action, 4), (address, uint256, bool, uint256, uint256, bytes));
 
         require(sellToken == targetToken, "IT");
         require(IERC20(targetToken).balanceOf(owner) == targetAmount, "IA");
     }
-
-
 
     /**
      * @dev Extract token from UniswapV3 fills data
@@ -297,5 +270,4 @@ library ZeroXSwapVerifier {
         }
         revert("unimplemented");
     }
-
 }

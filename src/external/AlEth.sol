@@ -65,6 +65,7 @@ contract AlEth is ERC20("Alchemix ETH", "alETH") {
     function setWhitelist(address _toWhitelist, bool _state) external {
         whiteList[_toWhitelist] = _state;
     }
+
     /// This function reverts if the caller does not have the admin role.
     ///
     /// @param _newSentinel the account to set as sentinel.
