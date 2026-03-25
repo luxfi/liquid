@@ -128,8 +128,11 @@ contract MockERC20Test is Test {
         vm.startPrank(alice);
         assertTrue(ierc20.approve(bob, 100e18));
         assertTrue(ierc20.transfer(charlie, 10e18));
-        assertTrue(ierc20.transferFrom(alice, bob, 10e18));
         vm.stopPrank();
+
+        // Bob calls transferFrom using the allowance alice granted
+        vm.prank(bob);
+        assertTrue(ierc20.transferFrom(alice, bob, 10e18));
     }
 }
 

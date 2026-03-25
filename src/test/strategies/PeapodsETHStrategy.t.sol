@@ -25,9 +25,14 @@ contract PeapodsETHStrategyTest is Test {
     address public constant VAULT = address(0xbeef);
 
     uint256 private _forkId;
+    bool private _skipFork;
 
     function setUp() public {
-        string memory rpc = vm.envString("MAINNET_RPC_URL");
+        string memory rpc = vm.envOr("MAINNET_RPC_URL", string(""));
+        if (bytes(rpc).length == 0) {
+            _skipFork = true;
+            return;
+        }
         _forkId = vm.createFork(rpc, 22_089_302);
         vm.selectFork(_forkId);
 
@@ -56,6 +61,7 @@ contract PeapodsETHStrategyTest is Test {
     }
 
     function testAllocate() public {
+        vm.skip(_skipFork);
         uint256 ethAmt = 0.2 ether;
         // vm.deal(address(0xbeef), ethAmt);
         deal(WETH_ADDRESS, address(strat), ethAmt);
@@ -75,6 +81,7 @@ contract PeapodsETHStrategyTest is Test {
     }
 
     function testDeallocate() public {
+        vm.skip(_skipFork);
         uint256 ethAmt = 0.15 ether;
         deal(WETH_ADDRESS, address(strat), ethAmt);
         vm.startPrank(address(0xbeef));
@@ -89,6 +96,7 @@ contract PeapodsETHStrategyTest is Test {
     }
 
     function testSnapshotYield() public {
+        vm.skip(_skipFork);
         uint256 ethAmt = 0.2 ether;
         // vm.deal(address(0xbeef), ethAmt);
         deal(WETH_ADDRESS, address(strat), ethAmt);
