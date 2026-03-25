@@ -15,6 +15,9 @@ on:
     # Run weekly on Sunday at midnight
     - cron: '0 0 * * 0'
 
+env:
+  FOUNDRY_PROFILE: ci
+
 jobs:
   # ═══════════════════════════════════════════════════════════════════════════
   # SLITHER - Static Analysis
@@ -33,10 +36,9 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: nightly
+          version: stable
 
       - name: Build contracts
-        continue-on-error: true
         run: forge build --build-info
 
       - name: Run Slither
@@ -49,12 +51,19 @@ jobs:
           sarif: results.sarif
         continue-on-error: true
 
+      - name: Create empty SARIF if missing
+        if: always()
+        run: |
+          if [ ! -f results.sarif ]; then
+            echo '{"version":"2.1.0","$schema":"https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json","runs":[{"tool":{"driver":{"name":"Slither","version":"0.0.0"}},"results":[]}]}' > results.sarif
+          fi
+
       - name: Upload SARIF file
         uses: github/codeql-action/upload-sarif@v3
-        continue-on-error: true
         with:
           sarif_file: results.sarif
         if: always()
+        continue-on-error: true
 
       - name: Create Slither Report
         if: always()
@@ -90,10 +99,9 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: nightly
+          version: stable
 
       - name: Build contracts
-        continue-on-error: true
         run: forge build
 
       - name: Install Echidna
@@ -107,7 +115,7 @@ jobs:
           echo "## Echidna Fuzzing Results" >> $GITHUB_STEP_SUMMARY
 
           # Run Echidna on contracts with invariant tests
-          for contract in src/test/fuzz/*.sol; do
+          for contract in test/fuzz/*.sol; do
             if [ -f "$contract" ]; then
               name=$(basename "$contract" .sol)
               echo "Running Echidna on $name..." >> $GITHUB_STEP_SUMMARY
@@ -138,10 +146,9 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: nightly
+          version: stable
 
       - name: Build contracts
-        continue-on-error: true
         run: forge build
 
       - name: Install Medusa
@@ -219,6 +226,13 @@ jobs:
           echo "Semgrep scan completed" >> $GITHUB_STEP_SUMMARY
         continue-on-error: true
 
+      - name: Create empty SARIF if missing
+        if: always()
+        run: |
+          if [ ! -f semgrep-results.sarif ]; then
+            echo '{"version":"2.1.0","$schema":"https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json","runs":[{"tool":{"driver":{"name":"Semgrep","version":"0.0.0"}},"results":[]}]}' > semgrep-results.sarif
+          fi
+
       - name: Upload Semgrep SARIF
         uses: github/codeql-action/upload-sarif@v3
         with:
@@ -271,10 +285,9 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: nightly
+          version: stable
 
       - name: Build contracts
-        continue-on-error: true
         run: forge build
 
       - name: Install Aderyn
@@ -319,12 +332,12 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: nightly
+          version: stable
 
       - name: Run Forge fuzz tests
         run: |
           echo "## Forge Fuzz Test Results" >> $GITHUB_STEP_SUMMARY
-          forge test --match-path "src/test/fuzz/*.sol" -vv --fuzz-runs 1000 2>&1 | tee fuzz-results.txt || true
+          forge test --match-path "test/fuzz/*.sol" -vv --fuzz-runs 1000 2>&1 | tee fuzz-results.txt || true
 
           # Extract summary
           tail -30 fuzz-results.txt >> $GITHUB_STEP_SUMMARY
