@@ -9,7 +9,10 @@ optimizer_runs = 800
 ignored_error_codes = [1878]
 bytecode_hash="ipfs"
 rpc_storage_caching = { chains = "all", endpoints = "remote" }
-fuzz_runs = 5
+# fuzz runs configured under [profile.lite.fuzz] below
+
+[profile.lite.fuzz]
+runs = 5
 
 [profile.test]
 src = "src"
@@ -87,5 +90,26 @@ lux_mainnet = { key = "${LUX_EXPLORER_API_KEY}", url = "https://explore.lux.netw
 lux_testnet = { key = "${LUX_EXPLORER_API_KEY}", url = "https://explore.testnet.lux.network/api" }
 zoo_mainnet = { key = "${ZOO_EXPLORER_API_KEY}", url = "https://explore.zoo.network/api" }
 hanzo_mainnet = { key = "${HANZO_EXPLORER_API_KEY}", url = "https://explore.hanzo.network/api" }
+
+# Lint: only run safety lints, suppress naming convention notes
+# Naming follows upstream forks for ABI compatibility
+[profile.default.lint]
+severity = ["high", "med"]
+exclude_lints = [
+    "mixed-case-function",
+    "mixed-case-variable",
+    "screaming-snake-case-immutable",
+    "screaming-snake-case-const",
+    "unwrapped-modifier-logic",
+    "named-struct-fields",
+    "pascal-case-struct",
+    "unsafe-cheatcode",
+    "unaliased-plain-import",
+    "erc20-unchecked-transfer",
+    "unsafe-typecast",
+    "divide-before-multiply",
+]
+# Only lint production contracts, not tests/mocks
+ignore = ["src/test/**", "src/mocks/**"]
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config

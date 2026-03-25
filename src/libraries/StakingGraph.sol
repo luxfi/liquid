@@ -14,23 +14,22 @@ pragma solidity 0.8.28;
  */
 
 library StakingGraph {
-
     //112/144 bit split for delta and product storage, providing 32 bits for start/expiration
     uint256 private constant DELTA_BITS = 112;
 
     //Derive related constants from DELTA_BITS
-    uint256 private constant DELTA_MASK = (2**DELTA_BITS)-1;
-    uint256 private constant DELTA_SIGNBIT = 2**(DELTA_BITS-1);
-    uint256 private constant PRODUCT_BITS = 256-DELTA_BITS;
+    uint256 private constant DELTA_MASK = (2 ** DELTA_BITS) - 1;
+    uint256 private constant DELTA_SIGNBIT = 2 ** (DELTA_BITS - 1);
+    uint256 private constant PRODUCT_BITS = 256 - DELTA_BITS;
 
     //MIN/MAX constants for DELTA and PRODUCT
-    int256 private constant DELTA_MAX = int256(2**DELTA_BITS - 1)-1;
-    int256 private constant DELTA_MIN = -int256(2**DELTA_BITS - 1);
-    int256 private constant PRODUCT_MAX = int256(2**PRODUCT_BITS - 1)-1;
-    int256 private constant PRODUCT_MIN = -int256(2**PRODUCT_BITS - 1);
-    
+    int256 private constant DELTA_MAX = int256(2 ** DELTA_BITS - 1) - 1;
+    int256 private constant DELTA_MIN = -int256(2 ** DELTA_BITS - 1);
+    int256 private constant PRODUCT_MAX = int256(2 ** PRODUCT_BITS - 1) - 1;
+    int256 private constant PRODUCT_MIN = -int256(2 ** PRODUCT_BITS - 1);
+
     //Maximum graph size as per bit-split, 32-bit for 112 DELTA_BITS
-    uint256 private constant GRAPH_MAX = 2**(PRODUCT_BITS-DELTA_BITS);
+    uint256 private constant GRAPH_MAX = 2 ** (PRODUCT_BITS - DELTA_BITS);
 
     //Structure containing full graph state
     struct Graph {
@@ -50,13 +49,13 @@ library StakingGraph {
     function addStake(Graph storage g, int256 amount, uint256 start, uint256 duration) internal {
         unchecked {
             require(amount <= DELTA_MAX && amount >= DELTA_MIN);
-            require(start < GRAPH_MAX-1);
+            require(start < GRAPH_MAX - 1);
 
             uint256 expiration = start + duration;
-            require(expiration < GRAPH_MAX-1);
+            require(expiration < GRAPH_MAX - 1);
 
             uint256 graphSize = g.size;
-            
+
             //check if the tree must be expanded
 
             uint256 newSize = expiration + 2;
@@ -67,7 +66,8 @@ library StakingGraph {
                 newSize |= newSize >> 4;
                 newSize |= newSize >> 8;
                 newSize |= newSize >> 16;
-                if (GRAPH_MAX > 2**32) {//handle GRAPH_MAX > 32-bit
+                if (GRAPH_MAX > 2 ** 32) {
+                    //handle GRAPH_MAX > 32-bit
                     newSize |= newSize >> 32;
                     newSize |= newSize >> 64;
                     newSize |= newSize >> 128;
@@ -77,7 +77,7 @@ library StakingGraph {
                 //DEBUG: uncomment for maximum tree size
                 //newSize = GRAPH_MAX;
 
-                require (newSize <= GRAPH_MAX);
+                require(newSize <= GRAPH_MAX);
 
                 if (graphSize != 0) {
                     //if the graph isn't null, copy the last entry up to the new end
@@ -111,15 +111,15 @@ library StakingGraph {
         int256 endDelta;
         int256 endProd;
         unchecked {
-            require (end <= GRAPH_MAX); //catch overflow
+            require(end <= GRAPH_MAX); //catch overflow
 
             start--;
-            require (start <= GRAPH_MAX); //catch overflow and underflow
+            require(start <= GRAPH_MAX); //catch overflow and underflow
 
             end = end > g.size ? g.size : end;
 
-            (begDelta,begProd) = query(g.g, start);
-            (endDelta,endProd) = query(g.g, end);
+            (begDelta, begProd) = query(g.g, start);
+            (endDelta, endProd) = query(g.g, end);
 
             return ((int256(end) * endDelta) - endProd) - ((int256(start) * begDelta) - begProd);
         }
@@ -141,20 +141,20 @@ library StakingGraph {
                 int256 ap;
 
                 //unpack values
-                if ((packed&DELTA_SIGNBIT) != 0) {
+                if ((packed & DELTA_SIGNBIT) != 0) {
                     ad = int256(packed | ~DELTA_MASK); //extend set sign bit
                 } else {
                     ad = int256(packed & DELTA_MASK); //extend zero sign bit
                 }
-                ap = int256(packed)>>DELTA_BITS; //automatic sign extension
+                ap = int256(packed) >> DELTA_BITS; //automatic sign extension
 
-                ad+=delta;
-                ap+=deltaProd;
+                ad += delta;
+                ap += deltaProd;
 
                 //pack and store new values
                 require(ad <= DELTA_MAX && ad >= DELTA_MIN);
                 require(ap <= PRODUCT_MAX && ap >= PRODUCT_MIN);
-                graph[index] = (uint256(ad)&DELTA_MASK)|uint256(ap<<DELTA_BITS);
+                graph[index] = (uint256(ad) & DELTA_MASK) | uint256(ap << DELTA_BITS);
 
                 assembly {
                     index := add(index, and(index, sub(0, index)))
@@ -169,7 +169,7 @@ library StakingGraph {
      *
      * For internal use within the library for index validation
      */
-     function query(uint256[GRAPH_MAX + 1] storage graph, uint256 index) private view returns (int256 sum, int256 sumProd) {
+    function query(uint256[GRAPH_MAX + 1] storage graph, uint256 index) private view returns (int256 sum, int256 sumProd) {
         unchecked {
             index += 1;
             while (index > 0) {
@@ -179,12 +179,12 @@ library StakingGraph {
                 int256 ap;
 
                 //unpack values
-                if ((packed&(2**(DELTA_BITS-1))) != 0) {
+                if ((packed & (2 ** (DELTA_BITS - 1))) != 0) {
                     ad = int256(packed | ~DELTA_MASK); //extend set sign bit
                 } else {
                     ad = int256(packed & DELTA_MASK); //extend zero sign bit
                 }
-                ap = int256(packed)>>DELTA_BITS; //automatic sign extension
+                ap = int256(packed) >> DELTA_BITS; //automatic sign extension
 
                 sum += ad;
                 sumProd += ap;

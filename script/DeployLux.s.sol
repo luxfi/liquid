@@ -20,12 +20,12 @@ import {ILiquidTransmuter} from "../src/interfaces/ILiquidTransmuter.sol";
 /// @dev Supports LUX, Zoo, and Hanzo networks
 contract DeployLux is Script {
     // Lux Network chain IDs
-    uint256 constant LUX_MAINNET = 96369;
-    uint256 constant LUX_TESTNET = 96368;
-    uint256 constant ZOO_MAINNET = 200200;
-    uint256 constant ZOO_TESTNET = 200201;
-    uint256 constant HANZO_MAINNET = 36963;
-    uint256 constant HANZO_TESTNET = 36962;
+    uint256 constant LUX_MAINNET = 96_369;
+    uint256 constant LUX_TESTNET = 96_368;
+    uint256 constant ZOO_MAINNET = 200_200;
+    uint256 constant ZOO_TESTNET = 200_201;
+    uint256 constant HANZO_MAINNET = 36_963;
+    uint256 constant HANZO_TESTNET = 36_962;
 
     // Blocks per year (approx 2s block time on Lux)
     uint256 constant BLOCKS_PER_YEAR = 15_768_000;
@@ -173,11 +173,7 @@ contract DeployLux is Script {
 
         // 4. Deploy Vault (constructor: address _weth, address _liquid, address _owner)
         console.log("Deploying LiquidETHVault...");
-        LiquidETHVault vault = new LiquidETHVault(
-            config.underlyingToken,
-            deployed.liquid,
-            config.admin
-        );
+        LiquidETHVault vault = new LiquidETHVault(config.underlyingToken, deployed.liquid, config.admin);
         deployed.vault = address(vault);
         console.log("  LiquidETHVault:", deployed.vault);
 

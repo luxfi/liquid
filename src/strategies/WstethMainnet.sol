@@ -27,7 +27,9 @@ contract WstethMainnetStrategy is LiquidStrategy {
     wstETH public immutable wsteth;
     unstETH public immutable unsteth;
 
-    constructor(address _vault, StrategyParams memory _params, address _stETH, address _wstETH, address _unstETH, address _referral) LiquidStrategy(_vault, _params) {
+    constructor(address _vault, StrategyParams memory _params, address _stETH, address _wstETH, address _unstETH, address _referral)
+        LiquidStrategy(_vault, _params)
+    {
         steth = stETH(_stETH);
         wsteth = wstETH(_wstETH);
         unsteth = unstETH(_unstETH);
@@ -39,9 +41,7 @@ contract WstethMainnetStrategy is LiquidStrategy {
         // require(depositReturn == amount);
     }
 
-    function _deallocate(uint256 amount) internal override returns (uint256 requestId) {
-        
-    }
+    function _deallocate(uint256 amount) internal override returns (uint256 requestId) {}
 
     function snapshotYield() public override returns (uint256) {
         // TODO calculate & snapshot yield

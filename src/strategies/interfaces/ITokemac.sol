@@ -5,18 +5,18 @@ import {IERC4626} from "../../../lib/openzeppelin-contracts/contracts/interfaces
 
 interface IBaseRewarder {
     // actions
-    function getReward() external;                              // claim for msg.sender
-    function stake(address account, uint256 amount) external;   // stake vault shares on behalf of `account`
+    function getReward() external; // claim for msg.sender
+    function stake(address account, uint256 amount) external; // stake vault shares on behalf of `account`
 
     // views
     function earned(address account) external view returns (uint256);
     function rewardPerToken() external view returns (uint256);
-    function rewardRate() external view returns (uint256);      // rate-per-block style
+    function rewardRate() external view returns (uint256); // rate-per-block style
     function tokeLockDuration() external view returns (uint256);
     function lastBlockRewardApplicable() external view returns (uint256);
-    function totalSupply() external view returns (uint256);     // total staked
+    function totalSupply() external view returns (uint256); // total staked
     function balanceOf(address account) external view returns (uint256);
-    function rewardToken() external view returns (address);     // e.g., TOKE
+    function rewardToken() external view returns (address); // e.g., TOKE
 
     // admin/ops (usually not needed by integrators, left for completeness)
     function queueNewRewards(uint256 newRewards) external;
@@ -36,7 +36,7 @@ interface IMainRewarder is IBaseRewarder {
     // full withdraw that can optionally claim extras too
     function withdraw(address account, uint256 amount, bool claim) external;
 
-    function stake(address account, uint256 amount) external; 
+    function stake(address account, uint256 amount) external;
 
     // claim to a recipient; toggle whether to also pull from linked extra rewarders
     function getReward(address account, address recipient, bool claimExtras) external;

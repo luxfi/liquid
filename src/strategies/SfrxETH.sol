@@ -33,7 +33,9 @@ contract SfrxETHStrategy is LiquidStrategy {
     /// @notice DEX router for swaps; must be set before deallocate is called
     address public dexRouter;
 
-    constructor(address _vault, StrategyParams memory _params, address _sfrxEth, address _fraxMinter, address _redemptionQueue) LiquidStrategy(_vault, _params) {
+    constructor(address _vault, StrategyParams memory _params, address _sfrxEth, address _fraxMinter, address _redemptionQueue)
+        LiquidStrategy(_vault, _params)
+    {
         minter = FraxMinter(_fraxMinter);
         redemptionQueue = FraxRedemptionQueue(_redemptionQueue);
         sfrxEth = StakedFraxEth(_sfrxEth);

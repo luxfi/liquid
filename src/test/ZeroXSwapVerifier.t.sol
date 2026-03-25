@@ -28,172 +28,111 @@ contract ZeroXSwapVerifierTest is Test {
     bytes4 private constant VELODROME_V2_VIP = 0xb8df6d4d;
     bytes4 private constant DODOV2_VIP = 0xd92aadfb;
 
-
     function setUp() public {
         token = new TestERC20(1000e18, 18);
         deal(address(token), owner, 100e18);
         deal(address(token), spender, 100e18);
     }
-    
+
     // Test basic sell to pool
     function testVerifyBasicSellToPool() public {
         bytes memory _calldata = _buildBasicSellToPoolCalldata(token, spender);
-        bool verified = ZeroXSwapVerifier.verifySwapCalldata(
-            _calldata,
-            owner, 
-            address(token), 
-            100e18
-        );
+        bool verified = ZeroXSwapVerifier.verifySwapCalldata(_calldata, owner, address(token), 100e18);
         assertTrue(verified);
     }
-    
+
     // Test Uniswap V3 VIP
     function testVerifyUniswapV3VIP() public {
         bytes memory _calldata = _buildUniswapV3VIPCalldata(token, spender);
-        bool verified = ZeroXSwapVerifier.verifySwapCalldata(
-            _calldata,
-            owner, 
-            address(token), 
-            100e18
-        );
+        bool verified = ZeroXSwapVerifier.verifySwapCalldata(_calldata, owner, address(token), 100e18);
         assertTrue(verified);
     }
-    
+
     // Test RFQ VIP
     function testVerifyRFQVIP() public {
         bytes memory _calldata = _buildRFQVIPCalldata(token, spender);
-        bool verified = ZeroXSwapVerifier.verifySwapCalldata(
-            _calldata,
-            owner, 
-            address(token), 
-            100e18
-        );
+        bool verified = ZeroXSwapVerifier.verifySwapCalldata(_calldata, owner, address(token), 100e18);
         assertTrue(verified);
     }
-    
+
     // Test transfer from
     function testVerifyTransferFrom() public {
         bytes memory _calldata = _buildTransferFromCalldata(token, spender);
-        bool verified = ZeroXSwapVerifier.verifySwapCalldata(
-            _calldata,
-            owner, 
-            address(token), 
-            100e18
-        );
+        bool verified = ZeroXSwapVerifier.verifySwapCalldata(_calldata, owner, address(token), 100e18);
         assertTrue(verified);
     }
-    
+
     // Test sell to liquidity provider
     function testVerifySellToLiquidityProvider() public {
         bytes memory _calldata = _buildSellToLiquidityProviderCalldata(token, spender);
-        bool verified = ZeroXSwapVerifier.verifySwapCalldata(
-            _calldata,
-            owner, 
-            address(token), 
-            100e18
-        );
+        bool verified = ZeroXSwapVerifier.verifySwapCalldata(_calldata, owner, address(token), 100e18);
         assertTrue(verified);
     }
-    
+
     // Test Velodrome V2 VIP
     function testVerifyVelodromeV2VIP() public {
         bytes memory _calldata = _buildVelodromeV2VIPCalldata(token, spender);
-        bool verified = ZeroXSwapVerifier.verifySwapCalldata(
-            _calldata,
-            owner, 
-            address(token), 
-            100e18
-        );
+        bool verified = ZeroXSwapVerifier.verifySwapCalldata(_calldata, owner, address(token), 100e18);
         assertTrue(verified);
     }
-    
+
     // Test unsupported action
     function testVerifyUnsupportedAction() public {
         bytes memory _calldata = _buildUnsupportedActionCalldata();
         vm.expectRevert(bytes("IAC"));
-        bool verified = ZeroXSwapVerifier.verifySwapCalldata(
-            _calldata,
-            owner, 
-            address(token), 
-            100e18
-        );
+        bool verified = ZeroXSwapVerifier.verifySwapCalldata(_calldata, owner, address(token), 100e18);
     }
-    
+
     // Test invalid selector
     function testVerifyInvalidSelector() public {
         bytes memory _calldata = _buildInvalidSelectorCalldata();
         vm.expectRevert(bytes("IS"));
-        bool verified = ZeroXSwapVerifier.verifySwapCalldata(
-            _calldata,
-            owner, 
-            address(token), 
-            100e18
-        );
+        bool verified = ZeroXSwapVerifier.verifySwapCalldata(_calldata, owner, address(token), 100e18);
     }
-    
+
     // Test token mismatch
     function testVerifyTokenMismatch() public {
         TestERC20 anotherToken = new TestERC20(1000e18, 18);
         bytes memory _calldata = _buildBasicSellToPoolCalldata(token, spender);
         vm.expectRevert(bytes("IT"));
-        bool verified = ZeroXSwapVerifier.verifySwapCalldata(
-            _calldata,
-            owner, 
-            address(anotherToken), 
-            100e18
-        );
+        bool verified = ZeroXSwapVerifier.verifySwapCalldata(_calldata, owner, address(anotherToken), 100e18);
     }
-    
+
     // Test amount mismatch
     function testVerifyAmountMismatch() public {
         bytes memory _calldata = _buildBasicSellToPoolCalldata(token, spender);
         vm.expectRevert(bytes("IA"));
         bool verified = ZeroXSwapVerifier.verifySwapCalldata(
             _calldata,
-            owner, 
-            address(token), 
-            200e18  // Different amount
+            owner,
+            address(token),
+            200e18 // Different amount
         );
     }
-    
+
     // Test empty calldata
     function testVerifyEmptyCalldata() public {
         bytes memory _calldata = new bytes(0);
-        bool verified = ZeroXSwapVerifier.verifySwapCalldata(
-            _calldata,
-            owner, 
-            address(token), 
-            100e18
-        );
+        bool verified = ZeroXSwapVerifier.verifySwapCalldata(_calldata, owner, address(token), 100e18);
         assertFalse(verified);
     }
-    
+
     // Test calldata too short
     function testVerifyCalldataTooShort() public {
         bytes memory _calldata = new bytes(3);
-        bool verified = ZeroXSwapVerifier.verifySwapCalldata(
-            _calldata,
-            owner, 
-            address(token), 
-            100e18
-        );
+        bool verified = ZeroXSwapVerifier.verifySwapCalldata(_calldata, owner, address(token), 100e18);
         assertFalse(verified);
     }
-    
+
     // Test executeMetaTxn selector
     function testVerifyExecuteMetaTxn() public {
         bytes memory _calldata = _buildExecuteMetaTxnCalldata(token, spender);
-        bool verified = ZeroXSwapVerifier.verifySwapCalldata(
-            _calldata,
-            owner, 
-            address(token), 
-            100e18
-        );
+        bool verified = ZeroXSwapVerifier.verifySwapCalldata(_calldata, owner, address(token), 100e18);
         assertTrue(verified);
     }
-    
+
     // Helper functions to build calldata
-    
+
     function _buildBasicSellToPoolCalldata(TestERC20 _token, address recipient) internal pure returns (bytes memory) {
         bytes memory action = abi.encodeWithSelector(
             BASIC_SELL_TO_POOL,
@@ -203,7 +142,7 @@ contract ZeroXSwapVerifierTest is Test {
             0,
             ""
         );
-        
+
         ZeroXSwapVerifier.SlippageAndActions memory saa = ZeroXSwapVerifier.SlippageAndActions({
             recipient: recipient,
             buyToken: address(0), // Not used in this test
@@ -211,10 +150,10 @@ contract ZeroXSwapVerifierTest is Test {
             actions: new bytes[](1)
         });
         saa.actions[0] = action;
-        
+
         return abi.encodeWithSelector(EXECUTE_SELECTOR, saa, new bytes[](0));
     }
-    
+
     function _buildUniswapV3VIPCalldata(TestERC20 _token, address recipient) internal pure returns (bytes memory) {
         bytes memory fills = abi.encode(address(_token), 100e18);
         bytes memory action = abi.encodeWithSelector(
@@ -225,18 +164,14 @@ contract ZeroXSwapVerifierTest is Test {
             false, // feeOnTransfer
             fills
         );
-        
-        ZeroXSwapVerifier.SlippageAndActions memory saa = ZeroXSwapVerifier.SlippageAndActions({
-            recipient: recipient,
-            buyToken: address(0),
-            minAmountOut: 0,
-            actions: new bytes[](1)
-        });
+
+        ZeroXSwapVerifier.SlippageAndActions memory saa =
+            ZeroXSwapVerifier.SlippageAndActions({recipient: recipient, buyToken: address(0), minAmountOut: 0, actions: new bytes[](1)});
         saa.actions[0] = action;
-        
+
         return abi.encodeWithSelector(EXECUTE_SELECTOR, saa, new bytes[](0));
     }
-    
+
     function _buildRFQVIPCalldata(TestERC20 _token, address recipient) internal pure returns (bytes memory) {
         bytes memory fillData = abi.encode(address(_token), 100e18);
         bytes memory action = abi.encodeWithSelector(
@@ -244,59 +179,34 @@ contract ZeroXSwapVerifierTest is Test {
             0, // info
             fillData
         );
-        
-        ZeroXSwapVerifier.SlippageAndActions memory saa = ZeroXSwapVerifier.SlippageAndActions({
-            recipient: recipient,
-            buyToken: address(0),
-            minAmountOut: 0,
-            actions: new bytes[](1)
-        });
+
+        ZeroXSwapVerifier.SlippageAndActions memory saa =
+            ZeroXSwapVerifier.SlippageAndActions({recipient: recipient, buyToken: address(0), minAmountOut: 0, actions: new bytes[](1)});
         saa.actions[0] = action;
-        
+
         return abi.encodeWithSelector(EXECUTE_SELECTOR, saa, new bytes[](0));
     }
-    
+
     function _buildTransferFromCalldata(TestERC20 _token, address recipient) internal pure returns (bytes memory) {
-        bytes memory action = abi.encodeWithSelector(
-            TRANSFER_FROM,
-            address(_token),
-            owner,
-            recipient,
-            100e18
-        );
-        
-        ZeroXSwapVerifier.SlippageAndActions memory saa = ZeroXSwapVerifier.SlippageAndActions({
-            recipient: recipient,
-            buyToken: address(0),
-            minAmountOut: 0,
-            actions: new bytes[](1)
-        });
+        bytes memory action = abi.encodeWithSelector(TRANSFER_FROM, address(_token), owner, recipient, 100e18);
+
+        ZeroXSwapVerifier.SlippageAndActions memory saa =
+            ZeroXSwapVerifier.SlippageAndActions({recipient: recipient, buyToken: address(0), minAmountOut: 0, actions: new bytes[](1)});
         saa.actions[0] = action;
-        
+
         return abi.encodeWithSelector(EXECUTE_SELECTOR, saa, new bytes[](0));
     }
-    
+
     function _buildSellToLiquidityProviderCalldata(TestERC20 _token, address recipient) internal pure returns (bytes memory) {
-        bytes memory action = abi.encodeWithSelector(
-            SELL_TO_LIQUIDITY_PROVIDER,
-            address(_token),
-            recipient,
-            100e18,
-            0,
-            ""
-        );
-        
-        ZeroXSwapVerifier.SlippageAndActions memory saa = ZeroXSwapVerifier.SlippageAndActions({
-            recipient: recipient,
-            buyToken: address(0),
-            minAmountOut: 0,
-            actions: new bytes[](1)
-        });
+        bytes memory action = abi.encodeWithSelector(SELL_TO_LIQUIDITY_PROVIDER, address(_token), recipient, 100e18, 0, "");
+
+        ZeroXSwapVerifier.SlippageAndActions memory saa =
+            ZeroXSwapVerifier.SlippageAndActions({recipient: recipient, buyToken: address(0), minAmountOut: 0, actions: new bytes[](1)});
         saa.actions[0] = action;
-        
+
         return abi.encodeWithSelector(EXECUTE_SELECTOR, saa, new bytes[](0));
     }
-    
+
     function _buildVelodromeV2VIPCalldata(TestERC20 _token, address recipient) internal pure returns (bytes memory) {
         bytes memory action = abi.encodeWithSelector(
             VELODROME_V2_VIP,
@@ -307,36 +217,28 @@ contract ZeroXSwapVerifierTest is Test {
             0, // deadline
             ""
         );
-        
-        ZeroXSwapVerifier.SlippageAndActions memory saa = ZeroXSwapVerifier.SlippageAndActions({
-            recipient: recipient,
-            buyToken: address(0),
-            minAmountOut: 0,
-            actions: new bytes[](1)
-        });
+
+        ZeroXSwapVerifier.SlippageAndActions memory saa =
+            ZeroXSwapVerifier.SlippageAndActions({recipient: recipient, buyToken: address(0), minAmountOut: 0, actions: new bytes[](1)});
         saa.actions[0] = action;
-        
+
         return abi.encodeWithSelector(EXECUTE_SELECTOR, saa, new bytes[](0));
     }
-    
+
     function _buildUnsupportedActionCalldata() internal pure returns (bytes memory) {
         bytes memory action = abi.encodeWithSelector(0x12345678, address(0), 0);
-        
-        ZeroXSwapVerifier.SlippageAndActions memory saa = ZeroXSwapVerifier.SlippageAndActions({
-            recipient: address(0),
-            buyToken: address(0),
-            minAmountOut: 0,
-            actions: new bytes[](1)
-        });
+
+        ZeroXSwapVerifier.SlippageAndActions memory saa =
+            ZeroXSwapVerifier.SlippageAndActions({recipient: address(0), buyToken: address(0), minAmountOut: 0, actions: new bytes[](1)});
         saa.actions[0] = action;
-        
+
         return abi.encodeWithSelector(EXECUTE_SELECTOR, saa, new bytes[](0));
     }
-    
+
     function _buildInvalidSelectorCalldata() internal pure returns (bytes memory) {
         return abi.encodePacked(bytes4(0xffffffff));
     }
-    
+
     function _buildExecuteMetaTxnCalldata(TestERC20 _token, address recipient) internal pure returns (bytes memory) {
         bytes memory action = abi.encodeWithSelector(
             BASIC_SELL_TO_POOL,
@@ -346,21 +248,11 @@ contract ZeroXSwapVerifierTest is Test {
             0,
             ""
         );
-        
-        ZeroXSwapVerifier.SlippageAndActions memory saa = ZeroXSwapVerifier.SlippageAndActions({
-            recipient: recipient,
-            buyToken: address(0),
-            minAmountOut: 0,
-            actions: new bytes[](1)
-        });
+
+        ZeroXSwapVerifier.SlippageAndActions memory saa =
+            ZeroXSwapVerifier.SlippageAndActions({recipient: recipient, buyToken: address(0), minAmountOut: 0, actions: new bytes[](1)});
         saa.actions[0] = action;
-        
-        return abi.encodeWithSelector(
-            EXECUTE_META_TXN_SELECTOR,
-            saa, 
-            new bytes[](0), 
-            address(0), 
-            ""
-        );
+
+        return abi.encodeWithSelector(EXECUTE_META_TXN_SELECTOR, saa, new bytes[](0), address(0), "");
     }
 }
