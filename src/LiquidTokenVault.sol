@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {TokenUtils} from "./libraries/TokenUtils.sol";
 import "./base/Errors.sol";
 import "./adapters/AbstractFeeVault.sol";
 
@@ -25,7 +26,7 @@ contract LiquidTokenVault is AbstractFeeVault {
      */
     function deposit(uint256 amount) external {
         _checkNonZeroAmount(amount);
-        IERC20(token).transferFrom(msg.sender, address(this), amount);
+        TokenUtils.safeTransferFrom(token, msg.sender, address(this), amount);
         emit Deposited(msg.sender, amount);
     }
 
@@ -38,7 +39,7 @@ contract LiquidTokenVault is AbstractFeeVault {
         _checkNonZeroAddress(recipient);
         _checkNonZeroAmount(amount);
 
-        IERC20(token).transfer(recipient, amount);
+        TokenUtils.safeTransfer(token, recipient, amount);
         emit Withdrawn(recipient, amount);
     }
 
