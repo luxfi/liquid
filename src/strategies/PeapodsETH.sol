@@ -52,6 +52,10 @@ contract PeapodsETHStrategy is LiquidStrategy {
         return (ratePerSec, newIndex);
     }
 
+    function realAssets() external view override returns (uint256) {
+        return peapodsEth.convertToAssets(peapodsEth.balanceOf(address(this)));
+    }
+
     receive() external payable {
         require(msg.sender == address(weth), "Only WETH unwrap");
     }
