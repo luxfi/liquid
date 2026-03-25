@@ -44,6 +44,7 @@ contract LiquidAllocator is PermissionedProxy, ILiquidAllocator {
             // caller is operator
             adjusted = adjusted > daoTarget ? adjusted : daoTarget;
         }
+        require(amount <= adjusted, "Exceeds vault cap");
         // pass the old allocation to the adapter
         bytes memory oldAllocation = abi.encode(vault.allocation(id));
         vault.allocate(adapter, oldAllocation, amount);
