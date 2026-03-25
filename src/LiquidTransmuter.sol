@@ -11,6 +11,7 @@ import {NFTMetadataGenerator} from "./libraries/NFTMetadataGenerator.sol";
 import {SafeCast} from "./libraries/SafeCast.sol";
 import {StakingGraph} from "./libraries/StakingGraph.sol";
 import {TokenUtils} from "./libraries/TokenUtils.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import {Unauthorized, IllegalArgument, IllegalState, InsufficientAllowance} from "./base/Errors.sol";
 import "./base/LiquidTransmuterErrors.sol";
@@ -18,7 +19,7 @@ import "./base/LiquidTransmuterErrors.sol";
 /// @title Lux LiquidV3 Transmuter
 ///
 /// @notice A contract which facilitates the exchange of alAssets to yield bearing assets.
-contract LiquidTransmuter is ILiquidTransmuter, ERC721 {
+contract LiquidTransmuter is ILiquidTransmuter, ERC721, ReentrancyGuard {
     using StakingGraph for StakingGraph.Graph;
     using SafeCast for int256;
     using SafeCast for uint256;
@@ -169,7 +170,7 @@ contract LiquidTransmuter is ILiquidTransmuter, ERC721 {
     }
 
     /// @inheritdoc ILiquidTransmuter
-    function createRedemption(uint256 syntheticDepositAmount) external {
+    function createRedemption(uint256 syntheticDepositAmount) external nonReentrant {
         if (syntheticDepositAmount == 0) {
             revert DepositZeroAmount();
         }
@@ -197,7 +198,7 @@ contract LiquidTransmuter is ILiquidTransmuter, ERC721 {
     }
 
     /// @inheritdoc ILiquidTransmuter
-    function claimRedemption(uint256 id) external {
+    function claimRedemption(uint256 id) external nonReentrant {
         StakingPosition storage position = _positions[id];
 
         if (position.maturationBlock == 0) {
