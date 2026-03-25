@@ -47,9 +47,8 @@ jobs:
         with:
           target: 'src/'
           slither-args: '--exclude-dependencies --exclude-informational --sarif results.sarif'
-          fail-on: none
+          fail-on: medium
           sarif: results.sarif
-        continue-on-error: true
 
       - name: Create empty SARIF if missing
         if: always()
@@ -63,7 +62,6 @@ jobs:
         with:
           sarif_file: results.sarif
         if: always()
-        continue-on-error: true
 
       - name: Create Slither Report
         if: always()
@@ -74,7 +72,6 @@ jobs:
           if [ -f slither-report.json ]; then
             echo "See artifacts for detailed report" >> $GITHUB_STEP_SUMMARY
           fi
-        continue-on-error: true
 
       - name: Upload Slither Report
         uses: actions/upload-artifact@v4
@@ -122,7 +119,6 @@ jobs:
               echidna . --contract "$name" --config echidna.yaml --test-mode assertion || true
             fi
           done
-        continue-on-error: true
 
       - name: Upload Echidna corpus
         uses: actions/upload-artifact@v4
@@ -176,7 +172,6 @@ jobs:
           timeout 600 medusa fuzz --config medusa.json || true
 
           echo "Medusa fuzzing completed" >> $GITHUB_STEP_SUMMARY
-        continue-on-error: true
 
       - name: Upload Medusa corpus
         uses: actions/upload-artifact@v4
@@ -211,7 +206,6 @@ jobs:
             p/security-audit
         env:
           SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
-        continue-on-error: true
 
       - name: Run Semgrep (local rules)
         run: |
@@ -224,7 +218,6 @@ jobs:
             src/ || true
 
           echo "Semgrep scan completed" >> $GITHUB_STEP_SUMMARY
-        continue-on-error: true
 
       - name: Create empty SARIF if missing
         if: always()
@@ -238,7 +231,6 @@ jobs:
         with:
           sarif_file: semgrep-results.sarif
         if: always()
-        continue-on-error: true
 
   # ═══════════════════════════════════════════════════════════════════════════
   # CODEQL - Deep Analysis
@@ -294,21 +286,19 @@ jobs:
         run: |
           curl -L https://raw.githubusercontent.com/Cyfrin/aderyn/main/cyfrinup/install | bash
           source ~/.bashrc
-          ~/.cyfrin/bin/cyfrinup || true
+          ~/.cyfrin/bin/cyfrinup
           echo "$HOME/.cyfrin/bin" >> $GITHUB_PATH
-        continue-on-error: true
 
       - name: Run Aderyn
         run: |
           export PATH=$PATH:$HOME/.cyfrin/bin
           echo "## Aderyn Analysis Results" >> $GITHUB_STEP_SUMMARY
 
-          aderyn . --output aderyn-report.md || true
+          aderyn . --output aderyn-report.md
 
           if [ -f aderyn-report.md ]; then
             cat aderyn-report.md >> $GITHUB_STEP_SUMMARY
           fi
-        continue-on-error: true
 
       - name: Upload Aderyn Report
         uses: actions/upload-artifact@v4

@@ -41,7 +41,7 @@ contract LiquidGovernorTest is Test {
     function test_GovernorSettings() public view {
         assertEq(governor.name(), "Liquid Governor");
         assertEq(governor.votingDelay(), 7200);
-        assertEq(governor.votingPeriod(), 50400);
+        assertEq(governor.votingPeriod(), 50_400);
         assertEq(governor.proposalThreshold(), 0);
     }
 

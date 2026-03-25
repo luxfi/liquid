@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { ILiquidStrategyClassifier } from "./interfaces/ILiquidStrategyClassifier.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ILiquidStrategyClassifier} from "./interfaces/ILiquidStrategyClassifier.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 interface ILiquidAllocatorProxy {
@@ -105,7 +105,7 @@ contract LiquidGauge is ReentrancyGuard {
 
         // 2. Snapshot current power and store new vote
         voterPower[msg.sender][ytId] = power;
-        votes[ytId][msg.sender] = Vote({ strategyIds: strategyIds, weights: weights, expiry: expiry });
+        votes[ytId][msg.sender] = Vote({strategyIds: strategyIds, weights: weights, expiry: expiry});
 
         // 3. Add new contribution and auto-register strategies
         for (uint256 i = 0; i < strategyIds.length; i++) {
@@ -153,9 +153,7 @@ contract LiquidGauge is ReentrancyGuard {
         emit StrategyRegistered(ytId, strategyId);
     }
 
-    function getCurrentAllocations(uint256 ytId) public view
-        returns (uint256[] memory strategyIds, uint256[] memory normalizedWeights)
-    {
+    function getCurrentAllocations(uint256 ytId) public view returns (uint256[] memory strategyIds, uint256[] memory normalizedWeights) {
         uint256 n = strategyList[ytId].length;
         strategyIds = new uint256[](n);
         normalizedWeights = new uint256[](n);

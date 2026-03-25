@@ -21,3 +21,13 @@ docs/
 # Dotenv file
 .env
 .aider*
+
+# Security tooling artifacts
+.venv/
+slither-report.json
+semgrep-results.sarif
+aderyn-report.md
+
+# Python
+__pycache__/
+*.pyc

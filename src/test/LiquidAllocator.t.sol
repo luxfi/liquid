@@ -38,7 +38,9 @@ contract LiquidAllocatorTest is Test {
     function setUp() public {
         vm.startPrank(admin);
         vault = LiquidStrategyTestHelper._setupVault(mockVaultCollateral, admin, curator);
-        liquidStrategy = LiquidStrategyTestHelper._setupStrategy(address(vault), mockStrategyYieldToken, admin, "MockToken", "MockTokenProtocol", ILiquidStrategy.RiskClass.LOW);
+        liquidStrategy = LiquidStrategyTestHelper._setupStrategy(
+            address(vault), mockStrategyYieldToken, admin, "MockToken", "MockTokenProtocol", ILiquidStrategy.RiskClass.LOW
+        );
         allocator = new MockLiquidAllocator(address(vault), admin, operator);
         vm.stopPrank();
         vm.startPrank(curator);

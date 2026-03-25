@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import { ILiquidStrategyClassifier } from "./interfaces/ILiquidStrategyClassifier.sol";
+import {ILiquidStrategyClassifier} from "./interfaces/ILiquidStrategyClassifier.sol";
 
 contract LiquidStrategyClassifier is ILiquidStrategyClassifier {
     address public admin;
@@ -13,7 +13,7 @@ contract LiquidStrategyClassifier is ILiquidStrategyClassifier {
      */
     struct RiskClass {
         uint256 globalCap; // Max allocation for all strategies in this class combined
-        uint256 localCap;  // Max allocation for this single strategy in the class
+        uint256 localCap; // Max allocation for this single strategy in the class
     }
 
     /// riskLevel => RiskClass data

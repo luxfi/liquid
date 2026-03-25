@@ -14,11 +14,7 @@ contract LiquidToken is ERC20, ERC20Burnable, ERC20Permit, ERC20Votes, Ownable {
     /// @notice Maximum supply cap (100 million tokens)
     uint256 public constant MAX_SUPPLY = 100_000_000 * 1e18;
 
-    constructor(address initialOwner)
-        ERC20("Liquid", "LIQ")
-        ERC20Permit("Liquid")
-        Ownable(initialOwner)
-    {}
+    constructor(address initialOwner) ERC20("Liquid", "LIQ") ERC20Permit("Liquid") Ownable(initialOwner) {}
 
     /// @notice Mint new tokens (owner only)
     /// @param to Recipient address

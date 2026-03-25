@@ -33,7 +33,9 @@ contract LiquidCuratorTest is Test {
         vm.startPrank(admin);
         liquidCuratorProxy = new MockLiquidCurator(admin, operator);
         vault = LiquidStrategyTestHelper._setupVault(mockVaultCollateral, admin, address(liquidCuratorProxy));
-        liquidStrategy = LiquidStrategyTestHelper._setupStrategy(address(vault), mockStrategyYieldToken, admin, "MockToken", "MockTokenProtocol", ILiquidStrategy.RiskClass.LOW);
+        liquidStrategy = LiquidStrategyTestHelper._setupStrategy(
+            address(vault), mockStrategyYieldToken, admin, "MockToken", "MockTokenProtocol", ILiquidStrategy.RiskClass.LOW
+        );
         vm.stopPrank();
     }
 

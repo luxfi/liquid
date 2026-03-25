@@ -15,7 +15,6 @@ import {TokenUtils} from "./libraries/TokenUtils.sol";
 import {Unauthorized, IllegalArgument, IllegalState, InsufficientAllowance} from "./base/Errors.sol";
 import "./base/LiquidTransmuterErrors.sol";
 
-
 /// @title Lux LiquidV3 Transmuter
 ///
 /// @notice A contract which facilitates the exchange of alAssets to yield bearing assets.
@@ -27,7 +26,7 @@ contract LiquidTransmuter is ILiquidTransmuter, ERC721 {
     uint256 public constant BPS = 10_000;
     uint256 public constant FIXED_POINT_SCALAR = 1e18;
     int256 public constant BLOCK_SCALING_FACTOR = 1e8;
-    
+
     /// @inheritdoc ILiquidTransmuter
     string public constant version = "3.0.0";
 
@@ -221,13 +220,15 @@ contract LiquidTransmuter is ILiquidTransmuter, ERC721 {
 
         // Burn position NFT
         _burn(id);
-        
+
         // Ratio of total synthetics issued by the liquid / underlingying value of collateral stored in the liquid
         // If the system experiences bad debt we use this ratio to scale back the value of yield tokens that are transmuted
         uint256 yieldTokenBalance = TokenUtils.safeBalanceOf(liquid.yieldToken(), address(this));
         // Avoid divide by 0
-        uint256 denominator = liquid.getTotalUnderlyingValue() + liquid.convertYieldTokensToUnderlying(yieldTokenBalance) > 0 ? liquid.getTotalUnderlyingValue() + liquid.convertYieldTokensToUnderlying(yieldTokenBalance) : 1;
-        uint256 badDebtRatio = liquid.totalSyntheticsIssued() * 10**TokenUtils.expectDecimals(liquid.yieldToken()) / denominator;
+        uint256 denominator = liquid.getTotalUnderlyingValue() + liquid.convertYieldTokensToUnderlying(yieldTokenBalance) > 0
+            ? liquid.getTotalUnderlyingValue() + liquid.convertYieldTokensToUnderlying(yieldTokenBalance)
+            : 1;
+        uint256 badDebtRatio = liquid.totalSyntheticsIssued() * 10 ** TokenUtils.expectDecimals(liquid.yieldToken()) / denominator;
 
         uint256 scaledTransmuted = amountTransmuted;
 

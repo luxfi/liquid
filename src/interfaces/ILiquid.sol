@@ -79,7 +79,6 @@ interface ILiquidActions {
     /// @param tokenId The tokenId of account granting approval.
     /// @param spender The address that will be approved to mint.
     /// @param amount  The amount of tokens that `spender` will be allowed to mint.
-
     function approveMint(uint256 tokenId, address spender, uint256 amount) external;
 
     /// @notice Synchronizes the state of the account owned by `owner`.

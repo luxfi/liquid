@@ -117,12 +117,7 @@ contract InvariantsTest is Test {
         alToken = new LiquidMintableToken(_name, _symbol, _flashFee);
 
         ILiquidTransmuter.TransmuterInitializationParams memory transParams = ILiquidTransmuter.TransmuterInitializationParams({
-            syntheticToken: address(alToken),
-            feeReceiver: address(this),
-            timeToTransmute: 5_256_000,
-            transmutationFee: 10,
-            exitFee: 20,
-            graphSize: 52_560_000
+            syntheticToken: address(alToken), feeReceiver: address(this), timeToTransmute: 5_256_000, transmutationFee: 10, exitFee: 20, graphSize: 52_560_000
         });
 
         // Contracts and logic contracts

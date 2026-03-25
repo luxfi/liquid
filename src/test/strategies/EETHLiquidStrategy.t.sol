@@ -9,7 +9,9 @@ import {ILiquidStrategy} from "../../interfaces/ILiquidStrategy.sol";
 import {EETHLiquidStrategy} from "../../strategies/EETH.sol";
 
 contract MockEETHLiquidStrategy is EETHLiquidStrategy {
-    constructor(address _vault, ILiquidStrategy.StrategyParams memory _params, address _eeth, address _weth) EETHLiquidStrategy(_vault, _params, _eeth, _weth) {}
+    constructor(address _vault, ILiquidStrategy.StrategyParams memory _params, address _eeth, address _weth)
+        EETHLiquidStrategy(_vault, _params, _eeth, _weth)
+    {}
 }
 
 contract EETHLiquidStrategyTest is Test {
