@@ -145,7 +145,8 @@ contract DeployLocal is Script {
             repaymentFee: 100        // 1% in BPS
         });
         liquid.initialize(initParams);
-        console.log("Liquid initialized");
+        liquid.setLiquidPositionNFT(address(position));
+        console.log("Liquid initialized + Position NFT set");
 
         // 7. Deploy SecurityTokenAdapter for IBIT
         SecurityTokenAdapter ibitAdapter = new SecurityTokenAdapter(
