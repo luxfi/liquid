@@ -26,6 +26,7 @@ contract DeployLux is Script {
     uint256 constant ZOO_TESTNET = 200_201;
     uint256 constant HANZO_MAINNET = 36_963;
     uint256 constant HANZO_TESTNET = 36_962;
+    uint256 constant LOCAL_DEV = 1337;
 
     // Blocks per year (approx 2s block time on Lux)
     uint256 constant BLOCKS_PER_YEAR = 15_768_000;
@@ -83,6 +84,8 @@ contract DeployLux is Script {
             deployZooNetwork(deployer);
         } else if (block.chainid == HANZO_MAINNET || block.chainid == HANZO_TESTNET) {
             deployHanzoNetwork(deployer);
+        } else if (block.chainid == LOCAL_DEV) {
+            deployLuxMainnet(deployer);
         } else {
             revert("Unsupported network");
         }
@@ -93,10 +96,15 @@ contract DeployLux is Script {
     function deployLuxMainnet(address deployer) internal {
         console.log("\n=== Deploying to Lux Network ===");
 
-        // Note: These addresses need to be set for the actual deployment
-        // For now, using placeholder addresses that would be replaced
-        address wlux = address(0); // WLUX address
-        address yieldToken = address(0); // VAULT yield token address
+        address wlux;
+        address yieldToken;
+        if (block.chainid == LOCAL_DEV) {
+            wlux = 0x5FbDB2315678afecb367f032d93F642f64180aa3;
+            yieldToken = wlux; // Use WLUX as yield token for dev
+        } else {
+            wlux = address(0); // Set for mainnet deployment
+            yieldToken = address(0);
+        }
 
         DeploymentConfig memory config = DeploymentConfig({
             admin: deployer,
@@ -106,7 +114,7 @@ contract DeployLux is Script {
             tokenAdapter: address(0), // Will be deployed
             protocolFeeReceiver: deployer,
             debtTokenName: "Lux Liquid LUX",
-            debtTokenSymbol: "alLUX"
+            debtTokenSymbol: "LUSD"
         });
 
         _deployFullStack(config);
