@@ -10,8 +10,8 @@ import {SfrxETHStrategy} from "../../strategies/SfrxETH.sol";
 import {ILiquidStrategy} from "../../interfaces/ILiquidStrategy.sol";
 
 contract MockSfrxETHStrategy is SfrxETHStrategy {
-    constructor(address _vault, StrategyParams memory _params, address _sfrxEth, address _fraxMinter, address _redemptionQueue)
-        SfrxETHStrategy(_vault, _params, _sfrxEth, _fraxMinter, _redemptionQueue)
+    constructor(address _vault, StrategyParams memory _params, address _sfrxEth, address _fraxMinter, address _redemptionQueue, address _weth)
+        SfrxETHStrategy(_vault, _params, _sfrxEth, _fraxMinter, _redemptionQueue, _weth)
     {}
 }
 
@@ -45,7 +45,7 @@ contract SfrxETHStrategyTest is Test {
             estimatedYield: 100 ether,
             additionalIncentives: false
         });
-        liquidStrategy = new MockSfrxETHStrategy(address(vault), params, sfrxEth, fraxMinter, redemptionQueue);
+        liquidStrategy = new MockSfrxETHStrategy(address(vault), params, sfrxEth, fraxMinter, redemptionQueue, WETH);
         vm.stopPrank();
     }
 
