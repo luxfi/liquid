@@ -1,218 +1,328 @@
-## Solidity Development Template(Foundry)
+# Liquid Protocol
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![CI Status](https://github.com/alchemix-finance/alchemix-sol-template/actions/workflows/test/badge.svg)](https://github.com/alchemix-finance/alchemix-sol-template/actions)
+[![Solidity](https://img.shields.io/badge/Solidity-0.8.28-363636.svg)](https://soliditylang.org/)
+[![Foundry](https://img.shields.io/badge/Built%20with-Foundry-FFDB1C.svg)](https://getfoundry.sh/)
 
-This template repo is a quick and easy way to get started with a new Solidity project. It comes with a number of features that are useful for developing and deploying smart contracts. Such as pre-commit hooks for formatting, auto generated documentation, and more
+Self-repaying lending on Lux. Deposit yield-bearing collateral, borrow synthetic
+debt against it, and let yield retire the debt over time. No liquidation
+spirals, no manual repayments — the position pays itself off.
 
-This template is inspired by and largely based on Polygon's [Foundry Template](https://github.com/0xPolygon/foundry-template). We express our thanks to Polygon and their smart contracts and security teams for publicly publishing their work for general use.
+- **Core**: [`src/Liquid.sol`](src/Liquid.sol) — lending engine (UUPS-style proxy, `initialize` pattern)
+- **Synthetic debt**: LETH (`alETH`-style 1:1-pegged synthetic), redeemable for the
+  underlying via the Transmuter on a time-decay schedule
+- **Yield routing**: VaultV2 + curated strategy adapters (Aave, Compound, Lido,
+  EtherFi, Pendle, Morpho, Yearn, Ethena, EigenLayer, Maker DSR, plus native
+  Lux-side strategies)
+- **Compliance**: optional `LiquidComplianceGate` for whitelisted/KYC'd
+  redemption flows on regulated collateral
 
-#### Table of Contents
+---
 
-- [Install and Quickstart](#install-and-quickstart)
-- [Pre-commit Hooks](#pre-commit-hooks)
-- [Actions](#actions)
-- [Audits](#audits)
-- [Branching](#branching)
-  - [Main](#main)
-  - [Staging](#staging)
-  - [Dev](#dev)
-  - [Feature](#feature)
-  - [Fix](#fix)
-- [Code Practices](#code-practices)
-  - [Code Style](#code-style)
-  - [Interfaces](#interfaces)
-  - [NatSpec and Comments](#natspec-and-comments)
-  - [Scripts](#scripts)
-- [Versioning](#versioning)
-- [Testing](#testing)
-  - [Deployer Template](#deployer-template)
-- [Deployment](#deployment)
-  - [Deployer Template](#deployer-template-1)
-  - [Deployment](#deployment-1)
-  - [Deployment Info Generation](#deployment-info-generation)
-- [Deployer Template Script](#deployer-template-script)
-- [Releases](#releases)
-- [Docs](#docs)
-- [License](#license)
+## How it works
 
-## Install and Quickstart
+```
+                              ┌──────────────────────────┐
+   user deposits yield asset  │        Liquid.sol        │  mints LETH
+   ─────────────────────────▶ │   (lending + position)   │ ─────────────▶ user
+                              └─────────┬────────────────┘
+                                        │ accounts position as ERC-721
+                                        ▼
+                              ┌──────────────────────────┐
+                              │     LiquidPosition       │   NFT id ↔ owner
+                              └──────────────────────────┘
+                                        │
+                                  yield │ (continuous)
+                                        ▼
+                              ┌──────────────────────────┐
+                              │     LiquidTransmuter     │  burns LETH,
+   LETH holders stake here ──▶│  (Fenwick / StakingGraph)│  releases yield-token
+                              └──────────────────────────┘
+```
 
-Follow these steps to set up your local environment for development:
+1. **Deposit** a yield-bearing asset (wstETH, sfrxETH, weETH, sDAI, …) into
+   `Liquid`. You receive an ERC-721 *position* via `LiquidPosition`.
+2. **Mint** LETH against the position up to the protocol's collateralization
+   floor. LETH is a transferable, fungible synthetic.
+3. **Yield** earned by the deposited collateral is harvested into the
+   `LiquidTransmuter`, which burns LETH 1:1 against the yield asset over time.
+4. **Self-repayment**: as yield accrues, the position's debt is automatically
+   reduced — no liquidation needed as long as the collateral keeps yielding.
+5. **Transmute**: LETH holders can stake LETH in the Transmuter to redeem the
+   underlying yield asset on a linear, block-weighted schedule (Fenwick tree
+   accounting in [`StakingGraph`](src/libraries/StakingGraph.sol)).
 
-- [Install foundry](https://book.getfoundry.sh/getting-started/installation)
-- Install dependencies: `forge install` (TODO: consider Soldeer)
-- [Install pre-commit](https://pre-commit.com/#installation)
-- Install pre commit hooks: `pre-commit install`
-- Build contracts: `forge build`
-- Test contracts: `forge test`
-- Run coverage: `forge coverage`
+Risk is bounded because debt is always backed by the same asset that produces
+the yield repaying it. Liquidations exist as a backstop for tail-risk
+de-pegging only.
 
-Note: the CI badge above is configured to run from `github.com/alchemix-finance/alchemix-sol-template/`. When forking to use this template, the badge should be modified (via the url embedded in the Markdown at the beginning of the README) to point at the target repo.
+---
 
-## Pre-commit Hooks
+## Contracts
 
-Follow the [installation steps](#install) to enable pre-commit hooks. To ensure consistency in our formatting `pre-commit` is used to check whether code was formatted properly and the documentation is up to date. Whenever a commit does not meet the checks implemented by pre-commit, the commit will fail and the pre-commit checks will modify the files to make the commits pass. Include these changes in your commit for the next commit attempt to succeed. On pull requests the CI checks whether all pre-commit hooks were run correctly.
-This repo includes the following pre-commit hooks that are defined in the `.pre-commit-config.yaml`:
+### Core lending
 
-- `mixed-line-ending`: This hook ensures that all files have the same line endings (LF).
-- `format`: This hook uses `forge fmt` to format all Solidity files.
-- `doc`: This hook uses `forge doc` to automatically generate documentation for all Solidity files whenever the NatSpec documentation changes. The `script/util/doc_gen.sh` script is used to generate documentation. Forge updates the commit hash in the documentation automatically. To only generate new documentation when the documentation has actually changed, the script checks whether more than just the hash has changed in the documentation and discard all changes if only the hash has changed.
-- `prettier`: All remaining files are formatted using prettier.
+| Contract | Purpose |
+|----------|---------|
+| [`Liquid.sol`](src/Liquid.sol) | Lending engine. Holds positions, mints/burns synthetic debt, harvests yield, enforces collateralization. UUPS-initializable; constructor empty. |
+| [`LiquidPosition.sol`](src/LiquidPosition.sol) | ERC-721 representing a user's collateral+debt position. Only `Liquid` can mint/burn. |
+| [`LiquidTransmuter.sol`](src/LiquidTransmuter.sol) | Converts synthetic LETH → underlying yield-token over time. Uses a Fenwick tree (`StakingGraph`) for O(log n) per-block accrual. ERC-721 tickets per stake. |
 
-## Actions
+### Vaults & fees
 
-Scripts for [GitHub Actions](https://docs.github.com/en/actions) is included in `.github/workflows/`. `test.yaml` is run on any PR, and runs all forge tests, inspects coverage, and runs [Slither](https://github.com/crytic/slither). There is also a script barring PRs to main from anywhere other than the staging branch, and another running the pre-commit hooks before a PR.
+| Contract | Purpose |
+|----------|---------|
+| [`LiquidETHVault.sol`](src/LiquidETHVault.sol) | Native ETH/WETH fee vault. Owner-gated withdrawals, anyone-deposits. |
+| [`LiquidTokenVault.sol`](src/LiquidTokenVault.sol) | ERC-20 fee vault counterpart. |
+| [`adapters/AbstractFeeVault.sol`](src/adapters/AbstractFeeVault.sol) | Shared base — auth, accounting, events. |
 
-## Audits
+### Yield routing
 
-Any audit reports received on the codebase should be added to the repo in a top-level `audits/` directory.
+| Contract | Purpose |
+|----------|---------|
+| [`LiquidStrategy.sol`](src/LiquidStrategy.sol) | Base strategy that wraps a `vault-v2` adapter. APR/APY snapshotting, kill-switch, allocator whitelist, 0x-swap verification via [`ZeroXSwapVerifier`](src/utils/ZeroXSwapVerifier.sol). |
+| [`LiquidCurator.sol`](src/LiquidCurator.sol) | DAO-only contract that sets absolute and relative caps on each adapter. Permissioned proxy pattern. |
+| [`LiquidAllocator.sol`](src/LiquidAllocator.sol) | Routes capital from the underlying VaultV2 into approved strategy adapters. Per-strategy allocation cap. |
+| [`LiquidStrategyClassifier.sol`](src/LiquidStrategyClassifier.sol) | Risk-class registry (per-class `globalCap`/`localCap`). |
+| [`LiquidGauge.sol`](src/LiquidGauge.sol) | Token-weighted gauge for voting strategy weights; keeper executes the weighted allocation each epoch. |
 
-## Branching
+### Strategy adapters ([`src/strategies/`](src/strategies/))
 
-This section outlines the branching strategy of this repo.
+DeFi blue-chips: `AaveV3Strategy`, `CompoundV3Strategy`, `LidoStrategy` (stETH/wstETH),
+`EETH` (EtherFi weETH), `SfrxETH` (Frax), `MakerDSRStrategy` (sDAI),
+`MorphoStrategy`, `MorphoYearnOGWETH`, `YearnV3Strategy`, `PendleStrategy`,
+`EthenaStrategy` (sUSDe), `EigenLayerStrategy`, `PeapodsETH`, `TokeAutoEth`,
+plus `LuxNative` for Lux-chain native staking.
 
-### Main
+Each adapter is a thin wrapper that conforms to `ITokenAdapter` and is risk-classified by the
+classifier before the curator approves it for allocation.
 
-The main branch is supposed to reflect the deployed state on all networks. Any pull requests into this branch MUST come from the staging branch. The main branch is protected and requires a separate code review whenever it is updated. Whenever the main branch is updated, a new release is created with the latest version. For more information on versioning, check [here](#versioning).
+### Governance
 
-### Staging
+| Contract | Purpose |
+|----------|---------|
+| [`governance/LiquidToken.sol`](src/governance/LiquidToken.sol) | Governance token (LIQUID). |
+| [`governance/LiquidGovernor.sol`](src/governance/LiquidGovernor.sol) | OZ Governor over `LiquidToken`. Sets caps, classes, transmuter parameters, and curator/allocator admins. |
 
-The staging branch reflects new code complete deployments or upgrades containing fixes and/or features. Any pull requests into this branch MUST come from the dev branch. The staging branch is used for security audits and deployments. Once the deployment is complete the branch can be merged into main. For more information on the deployment check [here](#deployment--versioning).
+### Compliance & access
 
-TODO: deployment docgen/logging
+| Contract | Purpose |
+|----------|---------|
+| [`LiquidGate.sol`](src/LiquidGate.sol) | Per-vault, per-account allowlist for redemptions. |
+| [`LiquidComplianceGate.sol`](src/LiquidComplianceGate.sol) | KYC-tier gate (0=none, 1=basic, 2=accredited Reg D, 3=qualified purchaser Reg S). Set per-vault required level. Used for regulated-collateral deployments. |
+| [`adapters/SecurityTokenAdapter.sol`](src/adapters/SecurityTokenAdapter.sol) | Adapter for tokenized securities collateral, paired with the compliance gate. |
+| [`utils/Whitelist.sol`](src/utils/Whitelist.sol) | Generic whitelist primitive. |
+| [`utils/PermissionedProxy.sol`](src/utils/PermissionedProxy.sol) | Selector-gated proxy used by curator/allocator. |
 
-### Dev
+### Libraries
 
-This is the active development branch. All pull requests into this branch MUST come from fix or feature branches. Upon code completion this branch is merged into staging for auditing and deployment.
+[`PositionDecay`](src/libraries/PositionDecay.sol),
+[`StakingGraph`](src/libraries/StakingGraph.sol) (Fenwick tree),
+[`FixedPointMath`](src/libraries/FixedPointMath.sol),
+[`SafeCast`](src/libraries/SafeCast.sol),
+[`SafeERC20`](src/libraries/SafeERC20.sol),
+[`TokenUtils`](src/libraries/TokenUtils.sol),
+[`Sets`](src/libraries/Sets.sol),
+[`NFTMetadataGenerator`](src/libraries/NFTMetadataGenerator.sol).
 
-### Feature
+---
 
-Any new feature should be developed on a separate branch. The naming convention for these branches is `feat/*`. Once the feature is complete, a pull request into the dev branch can be created.
+## Canonical deployments (Lux mainnet)
 
-### Fix
+| Token | Address |
+|-------|---------|
+| LETH (synthetic) | `0x60E0a8167FC13dE89348978860466C9ceC24B9ba` |
+| WLUX            | `0x4888E4a2Ee0F03051c72D2BD3ACf755eD3498B3E` |
+| LBTC            | `0x1E48D32a4F5e9f08DB9aE4959163300FaF8A6C8e` |
 
-Any bug fixes should be developed on a separate branch. The naming convention for these branches is `fix/*`. Once the fix is complete, a pull request into the dev branch can be created.
+Network IDs supported by [`script/DeployLux.s.sol`](script/DeployLux.s.sol):
+Lux mainnet/testnet/devnet, plus Liquidity chain IDs `8675309/10/11`,
+local dev `1337`/`31337`.
 
-## Code Practices
+---
 
-### Code Style
+## Quickstart
 
-The repo follows the official [Solidity Style Guide](https://docs.soliditylang.org/en/latest/style-guide.html). In addition to that, this repo also borrows the following rules from [OpenZeppelin](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/GUIDELINES.md#solidity-conventions):
+```bash
+git clone https://github.com/luxfi/liquid.git
+cd liquid
+forge install
+forge build
+forge test -vv
+```
 
-- Internal or private state variables or functions should have an underscore prefix.
+### Run a full local stack
 
-  ```solidity
-  contract TestContract {
-      uint256 private _privateVar;
-      uint256 internal _internalVar;
-      function _testInternal() internal { ... }
-      function _testPrivate() private { ... }
-  }
-  ```
+End-to-end deploy + smoke flow on Anvil or a local `luxd`:
 
-- Events should generally be emitted immediately after the state change that they
-  represent, and should be named in the past tense. Some exceptions may be made for gas
-  efficiency if the result doesn't affect observable ordering of events.
+```bash
+anvil --chain-id 1337 &
+forge script script/DeployLocal.s.sol --rpc-url http://127.0.0.1:8545 --broadcast
+forge script script/TestFlow.s.sol    --rpc-url http://127.0.0.1:8545 --broadcast
+```
 
-  ```solidity
-  function _burn(address who, uint256 value) internal {
-      super._burn(who, value);
-      emit TokensBurned(who, value);
-  }
-  ```
+`DeployLocal` brings up: Liquid + Position + Transmuter + ETHVault + Curator +
+StrategyClassifier + ComplianceGate, plus dev tokens (WLUX, LUSD, mock
+securities) and a `SecurityTokenAdapter` so the regulated-collateral path is
+exercisable locally.
 
-- Interface names should have a capital I prefix.
+### Deploy to a network
 
-  ```solidity
-  interface IERC777 {
-  ```
+```bash
+make deploy-devnet    # api.lux-dev.network
+make deploy-testnet   # api.lux-test.network
+make deploy-mainnet   # api.lux.network (uses canonical LETH/WLUX/LBTC)
+```
 
-- Contracts not intended to be used standalone should be marked abstract
-  so they are required to be inherited to other contracts.
+Set `LUX_MNEMONIC` in `.env`. Add `--verify` (and the appropriate verifier
+key) for explorer verification.
 
-  ```solidity
-  abstract contract AccessControl is ..., {
-  ```
+---
 
-- Unchecked arithmetic blocks should contain comments explaining why overflow is guaranteed not to happen. If the reason is immediately apparent from the line above the unchecked block, the comment may be omitted.
+## Deployment order (canonical)
 
-### Interfaces
+```solidity
+// 1. core
+Liquid liquid                = new Liquid();                              // empty ctor
+LiquidPosition position      = new LiquidPosition(address(liquid));
+LiquidTransmuter transmuter  = new LiquidTransmuter(transmuterParams);    // needs debtToken
+LiquidETHVault feeVault      = new LiquidETHVault(WETH, address(liquid), owner);
 
-Every contract MUST implement their corresponding interface that includes all externally callable functions, errors and events.
+// 2. wire
+liquid.initialize(LiquidInitializationParams({ ... transmuter: address(transmuter) ... }));
+liquid.setLiquidPositionNFT(address(position));
+transmuter.setLiquid(address(liquid));
 
-### NatSpec and Comments
+// 3. authorize the engine to mint synthetic debt
+ILiquidMintable(LETH).setMinter(address(liquid), true);
 
-Interfaces should be the entrypoint for all contracts. When exploring the a contract within the repository, the interface MUST contain all relevant information to understand the functionality of the contract in the form of NatSpec comments. This includes all externally callable functions, errors and events. The NatSpec documentation MUST be added to the functions (including view/pure functions), errors and events within the interface. This allows a reader to understand the functionality of a function before moving on to the implementation. The implementing functions MUST point to the NatSpec documentation in the interface using `@inheritdoc`. Internal and private functions do not require function-level NatSpec documentation. While code should be kept readable and self-explanatory to the extent possible, additional comments are welcome for explaining design reasoning, algorithms and calculations, or adding context.
+// 4. yield routing (optional but typical)
+LiquidStrategyClassifier classifier = new LiquidStrategyClassifier(admin);
+LiquidCurator curator               = new LiquidCurator(admin, operator);
+LiquidAllocator allocator           = new LiquidAllocator(vaultV2, admin, operator);
+```
 
-### Scripts
+See [`script/DeployMainnet.s.sol`](script/DeployMainnet.s.sol) for the full,
+parameterized version with collateralization floors, fee BPS, and block-rate
+constants.
 
-Any scripts needed for the usage of the code being written and/or running tests should be updated as the code is written and merged in. This includes deployment scripts and scripts for updating prxies when their implementation changes.
+---
+
+## Building on Liquid
+
+### Open a position (yield-bearing collateral → LETH)
+
+```solidity
+IERC20(yieldToken).approve(address(liquid), amount);
+uint256 tokenId = 0;                              // 0 = mint a new position NFT
+uint256 shares  = liquid.deposit(amount, msg.sender, tokenId);
+liquid.mint(tokenId, debtAmount, msg.sender);     // borrow LETH against position
+```
+
+### Repay or withdraw
+
+```solidity
+liquid.burn(tokenId, repayAmount);                // burn LETH, reduce debt
+liquid.repay(tokenId, repayAmount);               // alt: repay in underlying yield-asset
+liquid.withdraw(tokenId, shares, msg.sender);
+```
+
+### Transmute LETH → underlying
+
+```solidity
+IERC20(LETH).approve(address(transmuter), amount);
+uint256 ticketId = transmuter.createRedemption(amount);
+// ... time passes ...
+transmuter.claimRedemption(ticketId);             // proportionally vested
+```
+
+### Add a strategy adapter
+
+1. Implement `ITokenAdapter` (or extend [`LiquidStrategy`](src/LiquidStrategy.sol) for VaultV2-backed flows).
+2. Register risk class with `LiquidStrategyClassifier.setStrategyRiskLevel(strategyId, riskLevel)`.
+3. Curator sets caps: `LiquidCurator.setCaps(adapter, abs, rel)`.
+4. Allocator routes flow: `LiquidAllocator.allocate(adapter, data, assets)`.
+5. (Optional) wire into `LiquidGauge` for token-vote-weighted allocation.
+
+### Deploy a regulated variant
+
+Pair `SecurityTokenAdapter` with `LiquidComplianceGate`:
+
+```solidity
+gate.setRequiredLevel(vault, 2);                  // accredited (Reg D)
+gate.approve(investor, /*level*/ 2);
+gate.setAuthorization(vault, investor, true);
+```
+
+The standard ERC-20 LETH path stays open for deposits; redemption and
+collateral-backed mints route through the gate.
+
+---
+
+## Build, test, audit
+
+```bash
+make build         # forge build
+make test          # forge test --summary
+make test-fuzz     # fuzz suite (1000 runs)
+make coverage      # IR-min coverage summary
+make halmos        # symbolic execution on `check_*` properties
+
+# static analysis (slither + semgrep + aderyn, set up via uv venv)
+make security
+make audit         # lint + test + security
+```
+
+`Liquid.t.sol`, `LiquidTransmuter.t.sol`, fuzz/, and integration tests live in
+[`src/test/`](src/test/). Fork-mode strategy tests (SfrxETH, MorphoYearnOGWETH,
+PeapodsETH, TokeAutoEth, IntegrationTest) require `MAINNET_RPC_URL`.
+
+---
+
+## Layout
+
+```
+src/
+  Liquid.sol                     LiquidPosition.sol     LiquidTransmuter.sol
+  LiquidETHVault.sol             LiquidTokenVault.sol
+  LiquidStrategy.sol             LiquidCurator.sol      LiquidAllocator.sol
+  LiquidStrategyClassifier.sol   LiquidGauge.sol
+  LiquidGate.sol                 LiquidComplianceGate.sol
+  adapters/      AbstractFeeVault, EulerUSDCAdapter, SecurityTokenAdapter
+  governance/    LiquidToken, LiquidGovernor
+  strategies/    Aave/Compound/Lido/EETH/SfrxETH/Pendle/Morpho/Yearn/Ethena/…
+  libraries/     StakingGraph, PositionDecay, FixedPointMath, SafeCast, …
+  interfaces/    ILiquid*, ITokenAdapter, IWETH, IYieldToken, …
+  utils/         PermissionedProxy, Whitelist, ZeroXSwapVerifier
+  external/      AlEth (canonical synthetic), interfaces
+  test/          unit + fuzz + integration
+script/
+  DeployLux.s.sol     multi-network (mainnet/testnet/devnet + Liquidity IDs)
+  DeployMainnet.s.sol Lux mainnet, canonical LETH/WLUX/LBTC
+  DeployLocal.s.sol   end-to-end local stack on Anvil/luxd
+  TestFlow.s.sol      smoke test against a deployed local stack
+lib/
+  forge-std, openzeppelin-{contracts,upgradeable}, vault-v2,
+  permit2, solmate, chainlink-brownie-contracts, halmos-cheatcodes
+```
+
+---
 
 ## Versioning
 
-This repo utilizes [semantic versioning](https://semver.org/) for smart contracts. An `IVersioned` interface is included in the [interfaces directory](src/interface/IVersioned.sol) exposing a unified versioning interface for all contracts. This version MUST be included in all contracts, whether they are upgradeable or not, to be able to easily match deployed versions. For example, in the case of a non-upgradeable contract one version could be deployed to a network and later a new version might be deployed to another network.
+`IVersioned` is implemented across core contracts. Liquid + Transmuter are at
+`3.0.0`. Update only the version of the contract that changed.
 
-Whenever contracts are modified, only the version of the changed contracts should be updated. Unmodified contracts should remain on the version of their last change.
+## Audits
 
-## Testing
+Drop received reports under `audits/` at the repo root. Static analyzers
+(Slither, Semgrep, Aderyn) and Halmos symbolic execution run via `make
+security` / `make halmos`.
 
-Pull Requests to `dev` should have at least 95% branch coverage, optimally more. Rules should be set blocking merges with less coverage, where possible.
+## Security
 
-While branch coverage is a good start, care must be taken to ensure that tests actually test the invariants of the system. Scenario tests simulating common flows usage of the contracts in sufficiently realistic conditions are needed. In addition, forge's native testing features, fuzzing and invariant testing, should be leveraged wherever possible. Special attention should be given to properly articulating invariants.
-
-Helper functions for common tasks inside tests and commonly used constants should be set up and included in a base test contract inherited by other test contracts. NatSpec should be used on these functions, and for constants that are not immediately obvious.
-
-### Review
-
-Review should be required prior to any merge into `dev`. Optimially, at least two other parties should review. This can be subject to change based on team size. In an organization with a dedicated Security team, Security shold participate in the reviews.
-
-Review includes inspection of what production code has changed, verifying that the tests assert intended behavior and absence of unintended effects, and running the tests.
-
-### Deployment
-
-This repo sets up the following RPCs in the `foundry.toml` file:
-
-- mainnet: Ethereum Mainnet
-- sepolia: Ethereum Sepolia
-
-To deploy the contracts, provide the `--broadcast` flag to the forge script command. Should the etherscan verification time out, it can be picked up again by replacing the `--broadcast` flag with `--resume`.
-Deploy the contracts to one of the predefined networks by providing the according key with the `--rpc-url` flag. Most of the predefined networks require the `INFURA_KEY` environment variable to be set in the `.env` file.
-Including the `--verify` flag will verify deployed contracts on Etherscan. Define the appropriate environment variable for the Etherscan api key in the `.env` file.
-
-This repo utilizes versioned deployments. Any changes to a contract should update the version of this specific contract. A script is provided that extracts deployment information from the `run-latest.json` file within the `broadcast` directory generated while the forge script runs. From this information a JSON and markdown file is generated containing various information about the deployment itself as well as past deployments.
-
-Once everything is ready, contracts can be updated/deployed and verified using the following:
-
-```shell
-forge script script/Deploy.s.sol --broadcast --rpc-url <rpc_url> --verify
-```
-
-## Releases
-
-Releases should be created whenever the code on the main branch is updated to reflect a deployment or an upgrade on a network. The release should be named after the version of the contracts deployed or upgraded.
-The release should include the following:
-
-- In case of a MAJOR version
-  - changelog
-  - summary of breaking changes
-  - summary of new features
-  - summary of fixes
-- In case of a MINOR version
-  - changelog
-  - summary of new features
-  - summary of fixes
-- In case of a PATCH version
-  - changelog
-  - summary of fixes
-- Deployment information (can be copied from the generated log files)
-  - Addresses of the deployed contracts
-
-## Docs
-
-The documentation and architecture diagrams for the contracts within this repo can be found [here](docs/).
-Detailed documentation generated from the NatSpec documentation of the contracts can be found [here](docs/autogen/src/src/).
+Disclosure: see [`SECURITY.md`](SECURITY.md).
 
 ## License
 
-The MIT license is included at the root level, making it easy to designate repositories as being licensed under this license.
+MIT — see [`LICENSE`](LICENSE).
