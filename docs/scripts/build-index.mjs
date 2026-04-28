@@ -3,8 +3,7 @@
 // Output: build/search-index.json — chunked, tokenized, served as a static asset.
 // Runtime chat widget queries Hanzo Zen with the matching chunks as context.
 
-import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { glob } from "node:fs/promises";
+import { readFile, writeFile, mkdir, readdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 
@@ -44,7 +43,6 @@ function stripFrontmatter(src) {
 }
 
 async function* walk(dir) {
-  const { readdir } = await import("node:fs/promises");
   const ents = await readdir(dir, { withFileTypes: true });
   for (const e of ents) {
     const p = path.join(dir, e.name);
