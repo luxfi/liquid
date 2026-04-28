@@ -7,6 +7,7 @@
     "docusaurus": "docusaurus",
     "start": "docusaurus start",
     "build": "docusaurus build",
+    "index": "node scripts/build-index.mjs",
     "swizzle": "docusaurus swizzle",
     "deploy": "docusaurus deploy",
     "clear": "docusaurus clear",
@@ -45,6 +46,6 @@
     ]
   },
   "engines": {
-    "node": ">=20 <21"
+    "node": ">=20"
   }
 }
