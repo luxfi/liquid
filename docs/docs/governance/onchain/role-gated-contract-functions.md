@@ -8,7 +8,7 @@ sidebar_position: 7
 
 This section is meant to describe all function calls that require whitelisted permissions (Admin, SEntinel, Guardian, etc)
 
-## Alchemist and Transmuter Governance Controls
+## Liquid and Transmuter Governance Controls
 
 ### Role 1: Admin
 

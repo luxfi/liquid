@@ -2,13 +2,13 @@
 sidebar_position: 4
 ---
 
-# AlchemistAllocator
+# LiquidAllocator
 
 ## Description
 
-The AlchemistAllocator is a role-gated front controller for a specific Morpho V2 vault, allowing admins or operators to call `allocate(adapter, amount)` or `deallocate(adapter, amount)` and rebalance the allocations within the MYT.
+The LiquidAllocator is a role-gated front controller for a specific Morpho V2 vault, allowing admins or operators to call `allocate(adapter, amount)` or `deallocate(adapter, amount)` and rebalance the allocations within the MYT.
 Once calls to alloacte/deallocate are made, the MYT vault contract invokes individaul adapter’s (see MYTStrategy) allocate/deallocate functions to move funds in/out of individual strategies that comprise the MYT.<br/><br/>
-**Note:** AlchemistAllocator inherits from PermissionedProxy, which provides it's access control system (admin and operator roles) and the deny-list used to restrict certain calls. For details on these variables and functions, see PermissionedProxy.
+**Note:** LiquidAllocator inherits from PermissionedProxy, which provides it's access control system (admin and operator roles) and the deny-list used to restrict certain calls. For details on these variables and functions, see PermissionedProxy.
 
 ## Variables
 
@@ -18,8 +18,8 @@ Once calls to alloacte/deallocate are made, the MYT vault contract invokes indiv
   - **Description** - The immutable reference to the Morpho V2 vault that this allocator manages. All allocation and deallocation actions are performed through this vault.
   - **Type** - `IVaultV2`
   - **Used By**
-    - [`allocate(address adapter, uint256 amount)`](/dev/myt/alchemist-allocator-contract#AdminActions_allocate)
-    - [`deallocate(address adapter, uint256 amount)`](/dev/myt/alchemist-allocator-contract#AdminActions_deallocate)
+    - [`allocate(address adapter, uint256 amount)`](/dev/myt/liquid-allocator-contract#AdminActions_allocate)
+    - [`deallocate(address adapter, uint256 amount)`](/dev/myt/liquid-allocator-contract#AdminActions_deallocate)
   - **Updated By**
     - `constructor(address _vault, address _admin, address _operator)`
 </details>

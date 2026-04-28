@@ -10,14 +10,14 @@ import liquidations from '@site/static/img/liquidations-01.png';
 
 <img src={liquidations} alt="Liquidations" class="banner-spacing" />
 
-Liquidations in Liquid v3 are a system-wide safety valve, not a per-account punishment. Because loans and collateral are like-kind, with ETH backing alETH and USDC backing alUSD, market price swings do **not** force positions to close. The back-stop only activates if the Mix-Yield Token itself loses backing.
+Liquidations in Liquid v3 are a system-wide safety valve, not a per-account punishment. Because loans and collateral are like-kind, with ETH backing LETH and USDC backing LUSD, market price swings do **not** force positions to close. The back-stop only activates if the Mix-Yield Token itself loses backing.
 
 ## When liquidation does not occur
 
 | Event                              | Effect on your loan                                               |
 | ---------------------------------- | ----------------------------------------------------------------- |
 | ETH or USDC price volatility       | None, debt and collateral move together.                          |
-| alAsset drifting below peg on DEXs | None, protocol still values alAssets at face value for repayment. |
+| lAsset drifting below peg on DEXs | None, protocol still values lAssets at face value for repayment. |
 | Hitting the 90% LTV borrowing cap  | Borrowing stops, the position stays open and keeps earning yield. |
 
 ## What can trigger liquidation
@@ -43,7 +43,7 @@ The colored bar in the vault UI gives an at-a-glance view of three numbers:
 
 - **Current LTV** – your live leverage, updated in real time.
 
-- **Max LTV** – the borrowing ceiling on the vault. You cannot mint alAssets beyond this green marker.
+- **Max LTV** – the borrowing ceiling on the vault. You cannot mint lAssets beyond this green marker.
 
 - **Liq LTV** – the red marker shows the liquidation threshold right now. If MYT ever records a loss, the marker slides left to reflect the reduced backing. If your current LTV remains below this marker, you will not be liquidated.
 

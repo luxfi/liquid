@@ -12,9 +12,9 @@ A single vault deposit gives you immediate, auto-compounded yield through the Mi
 
 - **Stop after the deposit** – keep earning passive yield, zero management required.
 
-- **Continue to the borrow step** – mint alAssets and tap into self-repaying loans.
+- **Continue to the borrow step** – mint lAssets and tap into self-repaying loans.
 
-The instructions that follow are focused on the process of depositing assets and borrowing alAssets subsequently.
+The instructions that follow are focused on the process of depositing assets and borrowing lAssets subsequently.
 
 [If you only want MYT yield, visit the Passive MYT Yield tutorial →](./use-passive-myt.md)
 
@@ -56,7 +56,7 @@ Stay on Deposit / Borrow.
 
 ## Step 4 – Enter amounts
 
-Type the deposit size in the left box, then set the alAsset amount you plan to borrow. As you adjust the fields, keep an eye on three on-screen guides:
+Type the deposit size in the left box, then set the lAsset amount you plan to borrow. As you adjust the fields, keep an eye on three on-screen guides:
 
 - **LTV meter** – in the main context window, a colored bar shows your live and maximum loan-to-value. The hard cap (90%) or current cap is marked by a red line. To avoid liquidations, keep your LTV below the indicated liquidation level, the further the better.
 
@@ -64,7 +64,7 @@ Type the deposit size in the left box, then set the alAsset amount you plan to b
 
 - **Strategy ceilings** – in the same window, you’ll see the DAO-set maximum share percentage for each strategy that makes up the MYT vault. Therefore, there is a maximum allowed % of high risk strategies in each bucket.
 
-Enter the amount of the vault’s deposit asset you want to add, and the amount of alAsset you wish to borrow.
+Enter the amount of the vault’s deposit asset you want to add, and the amount of lAsset you wish to borrow.
 
 ## Step 5 – Queue or send
 

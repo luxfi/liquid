@@ -12,17 +12,17 @@ Use this page as a quick lookup for the questions we hear most often. It explain
 <details>
 
 <summary>
-  What is an alAsset?
+  What is an lAsset?
 </summary>
 
-An alAsset is the synthetic token you borrow from Liquid.
+An lAsset is the synthetic token you borrow from Liquid.
 
-- alUSD mirrors USDC.
-- alETH mirrors ETH.
+- LUSD mirrors USDC.
+- LETH mirrors ETH.
 
 They track their underlying asset but can trade below, or in rare circumstances above, 1:1 on the open market.
 
-[Learn more about alAssets →](./concepts/alAssets)
+[Learn more about lAssets →](./concepts/lAssets)
 
 </details>
 
@@ -32,7 +32,7 @@ They track their underlying asset but can trade below, or in rare circumstances 
 
 You can borrow up to 90% loan-to-value (LTV) of your deposited collateral. The exact limit is shown on each vault page.
 
-[Learn more about LTV →](./concepts/alAssets#ltv-sensitivity)
+[Learn more about LTV →](./concepts/lAssets#ltv-sensitivity)
 
 </details>
 
@@ -40,7 +40,7 @@ You can borrow up to 90% loan-to-value (LTV) of your deposited collateral. The e
 
 <summary>How does my loan repay itself?</summary>
 
-Your MYT collateral grows in value as its underlying strategies earn yield. When a redemption occurs, the Transmuter swaps a portion of that collateral, equal in value to the queued alAssets earmarked for your position, and applies the proceeds to your outstanding debt.
+Your MYT collateral grows in value as its underlying strategies earn yield. When a redemption occurs, the Transmuter swaps a portion of that collateral, equal in value to the queued lAssets earmarked for your position, and applies the proceeds to your outstanding debt.
 
 Each position has a maturity date, but redemptions can happen earlier or later depending on user activity. Until a redemption takes place, your full collateral balance continues compounding, and your debt remains unchanged unless you choose to borrow more.
 
@@ -84,7 +84,7 @@ TODO
 
 Yes. Open the Repay tab in a vault and choose:
 
-- alAsset to clear normal debt.
+- lAsset to clear normal debt.
 - MYT to clear earmarked or normal debt.
 - ETH or USDC for convenience.
 
@@ -94,12 +94,12 @@ Bundling with the cart icon lets you combine several actions in one transaction.
 
 <details>
 
-<summary>What happens if I borrow alAssets and immediately deposit them in the Transmuter?</summary>
+<summary>What happens if I borrow lAssets and immediately deposit them in the Transmuter?</summary>
 
 In this case, you interact with both sides of the system at once:
 
-- **Borrower side** – You mint alAssets and may “pay” a market discount, assuming the alAsset is below 1:1 at the time.
-- **Redeemer side** – You lock those alAssets for a fixed return and secure their full value.
+- **Borrower side** – You mint lAssets and may “pay” a market discount, assuming the lAsset is below 1:1 at the time.
+- **Redeemer side** – You lock those lAssets for a fixed return and secure their full value.
 
 Most of the time, the cost and reward cancel out, so the net effect is similar to leaving your collateral idle - if not net-negative due to fees. It can make sense when:
 
@@ -116,7 +116,7 @@ Most of the time, the cost and reward cancel out, so the net effect is similar t
 
 Yes, but an early exit applies a penalty that reduces your return. The pop-up shows the exact amount before you confirm.
 
-[Learn more about early exits →](./tutorials/redeem-alassets#manage-or-close-a-position)
+[Learn more about early exits →](./tutorials/redeem-lassets#manage-or-close-a-position)
 
 </details>
 
@@ -167,7 +167,7 @@ TODO
   Where can I see live data?
 </summary>
 
-Current redemption rate, queued alAssets, vault APRs, and historic term stats are displayed directly in the main dashboard and the Earn page.
+Current redemption rate, queued lAssets, vault APRs, and historic term stats are displayed directly in the main dashboard and the Earn page.
 
 [View live data →](https://app.lux.finance)
 
