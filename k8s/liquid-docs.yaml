@@ -1,0 +1,85 @@
+# liquid-docs — static SPA hosted on lux-k8s, fronted by hanzoai/ingress.
+#
+# Apply:
+#   kubectl --context lux-k8s apply -f k8s/liquid-docs.yaml
+#
+# DNS (Cloudflare or whoever owns lux.network):
+#   liquid.lux.network  → CNAME → ingress.lux.network (or A → LB IP)
+#
+# Image is published by hanzoai/docs CI on every push to main:
+#   ghcr.io/hanzoai/liquid-docs:latest          (multi-arch manifest)
+#   ghcr.io/hanzoai/liquid-docs:<sha>           (immutable per commit)
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: liquid-docs
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: liquid-docs
+  namespace: liquid-docs
+  labels: { app: liquid-docs }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: liquid-docs }
+  template:
+    metadata:
+      labels: { app: liquid-docs }
+    spec:
+      containers:
+        - name: spa
+          image: ghcr.io/hanzoai/liquid-docs:latest
+          imagePullPolicy: Always
+          ports:
+            - { name: http, containerPort: 3000 }
+          env:
+            - { name: PORT, value: "3000" }
+            - { name: SPA_ENV, value: "prod" }
+            - { name: SPA_API_HOST, value: "https://api.lux.network" }
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 2
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 10
+          resources:
+            requests: { cpu: "20m", memory: "32Mi" }
+            limits:   { cpu: "200m", memory: "128Mi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: liquid-docs
+  namespace: liquid-docs
+spec:
+  selector: { app: liquid-docs }
+  ports:
+    - { name: http, port: 80, targetPort: http }
+---
+# hanzoai/ingress — terminates TLS, routes liquid.lux.network → service above.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: liquid-docs
+  namespace: liquid-docs
+  annotations:
+    hanzoai.ingress/tls: "auto"
+    hanzoai.ingress/redirect-https: "true"
+spec:
+  ingressClassName: hanzoai
+  rules:
+    - host: liquid.lux.network
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: liquid-docs
+                port: { name: http }
+  tls:
+    - hosts: [liquid.lux.network]
+      secretName: liquid-docs-tls
