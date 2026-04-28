@@ -22,3 +22,9 @@
 [submodule "lib/vault-v2"]
 	path = lib/vault-v2
 	url = https://github.com/morpho-org/vault-v2
+[submodule "lib/erc-3643"]
+	path = lib/erc-3643
+	url = git@github.com:luxfi/erc-3643.git
+[submodule "lib/onchain-id"]
+	path = lib/onchain-id
+	url = git@github.com:luxfi/onchain-id.git
