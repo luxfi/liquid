@@ -158,8 +158,13 @@ contract DeployLocal is Script {
         LiquidComplianceGate gate = new LiquidComplianceGate(deployer);
         console.log("ComplianceGate:", address(gate));
 
-        // Whitelist deployer at level 2 (accredited)
-        gate.approve(deployer, 2);
+        // Compliance is now delegated to ERC-3643 IIdentityRegistry +
+        // ONCHAINID claim topics, configured per-vault via:
+        //   gate.setVaultRegistry(vault, identityRegistry)
+        //   gate.setRequiredTopics(vault, [topicId, ...])
+        //   gate.setCountryBlock(vault, countryCode, true)
+        // Local dev leaves vaults unconfigured; canRedeem returns false
+        // until an Identity Registry is wired up.
 
         vm.stopBroadcast();
 
