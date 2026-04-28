@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {StdCheats} from "forge-std/StdCheats.sol";
 
 import {Liquid} from "../Liquid.sol";
-import {AlEth} from "../external/AlEth.sol";
+import {LETH} from "../external/LETH.sol";
 import {LiquidTransmuter} from "../LiquidTransmuter.sol";
 import {StakingGraph} from "../libraries/StakingGraph.sol";
 import {console} from "../../lib/forge-std/src/console.sol";
@@ -15,14 +15,14 @@ import "../interfaces/ILiquidTransmuter.sol";
 import "../base/LiquidTransmuterErrors.sol";
 
 contract MockLiquid {
-    AlEth collateral;
+    LETH collateral;
 
     uint256 public constant FIXED_POINT_SCALAR = 1e18;
 
     uint256 public underlyingValue;
     uint256 public syntheticsIssued;
 
-    constructor(AlEth _collateral) {
+    constructor(LETH _collateral) {
         collateral = _collateral;
     }
 
@@ -86,9 +86,9 @@ contract MockLiquid {
 contract TransmuterTest is Test {
     using StakingGraph for StakingGraph.Graph;
 
-    AlEth public alETH;
-    AlEth public collateralToken;
-    AlEth public underlyingToken;
+    LETH public alETH;
+    LETH public collateralToken;
+    LETH public underlyingToken;
     LiquidTransmuter public transmuter;
 
     MockLiquid public liquid;
@@ -96,9 +96,9 @@ contract TransmuterTest is Test {
     StakingGraph.Graph private graph;
 
     function setUp() public {
-        alETH = new AlEth();
-        collateralToken = new AlEth();
-        underlyingToken = new AlEth();
+        alETH = new LETH();
+        collateralToken = new LETH();
+        underlyingToken = new LETH();
 
         liquid = new MockLiquid(collateralToken);
 
