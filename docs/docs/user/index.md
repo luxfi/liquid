@@ -18,7 +18,7 @@ Liquid is your unified platform for saving, earning, borrowing, and fixed-term f
 
 - **Borrow up to 90% LTV –** access liquidity now while your collateral grows with yield and your leverage is reduced over time through scheduled redemptions. No interest rates to monitor, no price-based liquidations.
 
-- **Earn fixed-rate yield –** lock in predictable returns through fixed-term redemptions of alETH or alUSD.
+- **Earn fixed-rate yield –** lock in predictable returns through fixed-term redemptions of LETH or LUSD.
 
 [Explore the Quick Start guide →](./quick-start.md)
 
@@ -46,7 +46,7 @@ Need liquidity but don’t want to sell your assets? Borrow Liquid’s synthetic
 
 |                  |                                                                                                                                                                                                                                                                                |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Borrowable asset | alETH or alUSD                                                                                                                                                                                                                                                                 |
+| Borrowable asset | LETH or LUSD                                                                                                                                                                                                                                                                 |
 | Maximum LTV      | 90% of deposited collateral                                                                                                                                                                                                                                                    |
 | Liquidations     | Liquidations only apply if the MYT value drops below your loan value **plus a buffer**. This occurs if a strategy returns a negative yield or, for example, a strategy gets hacked. Your ETH or USD is deposited into the MYT and the MYT becomes your collateral. Learn more. |
 | Early Repayment  | Optional at any time                                                                                                                                                                                                                                                           |
@@ -62,13 +62,13 @@ Typical uses include financing a purchase, leveraging/looping yield, or bridging
 
 ## 3. Lock In Fixed Returns with the Transmuter
 
-The Transmuter lets users deposit alAssets and, after a fixed term, redeem an equivalent amount of the underlying asset—via Mix-Yield Tokens (MYT), which act as an intermediary claim.
+The Transmuter lets users deposit lAssets and, after a fixed term, redeem an equivalent amount of the underlying asset—via Mix-Yield Tokens (MYT), which act as an intermediary claim.
 
 - **Predictable returns** – redemption price and date are known upfront.
-- **Peg stability** – arbitrage incentives help to keep alAssets near parity.
+- **Peg stability** – arbitrage incentives help to keep lAssets near parity.
 - **Protection for LPs** – stable asset prices and redemption opportunities help offset impermanent loss.
 
-**Example**: If alUSD trades at 0.98 USDC and the current redemption period is three months, purchasing alUSD and redeeming it yields an annualised return of roughly 8%.
+**Example**: If LUSD trades at 0.98 USDC and the current redemption period is three months, purchasing LUSD and redeeming it yields an annualised return of roughly 8%.
 
 Under normal conditions, the interface unwraps that MYT to the underlying token for you. If liquidity is momentarily tight **or has unexpected slippage**, the contract may return the MYT itself. You can either hold it until unwrapping is available or unwrap manually once the queue clears.
 

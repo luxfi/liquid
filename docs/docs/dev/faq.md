@@ -34,7 +34,7 @@ Liquid currently supports a variety of collateral types, including ETH, DAI, USD
 
 <summary>How much can I borrow against my deposited collateral?</summary>
 
-When you deposit collateral on Liquid, you can borrow up to 50% of the value of the corresponding synthetic alAsset. For example, if you deposit ETH, you can borrow alETH worth up to 50% of the value of your deposited ETH, even if the alETH to ETH ratio differs from 1:1.
+When you deposit collateral on Liquid, you can borrow up to 50% of the value of the corresponding synthetic lAsset. For example, if you deposit ETH, you can borrow LETH worth up to 50% of the value of your deposited ETH, even if the LETH to ETH ratio differs from 1:1.
 
 </details>
 
@@ -90,11 +90,11 @@ An up-to-date list of available networks may be viewed on the network selector a
 
 <details>
 
-<summary>What can I do with my alAssets?</summary>
+<summary>What can I do with my lAssets?</summary>
 
-The primary use case for your alAsset (e.g., alUSD, alETH) is to swap it for another asset. You can achieve this by utilizing decentralized exchanges, such as [curve.fi](https://curve.fi/), or popular swap aggregators like [Matcha](https://matcha.xyz/), [Zapper](https://zapper.xyz/), or [Paraswap](https://www.paraswap.io/). These platforms enable you to trade your alAssets for various other tokens, providing you with the flexibility to diversify your portfolios or acquire specific tokens based on your investment preferences.
+The primary use case for your lAsset (e.g., LUSD, LETH) is to swap it for another asset. You can achieve this by utilizing decentralized exchanges, such as [curve.fi](https://curve.fi/), or popular swap aggregators like [Matcha](https://matcha.xyz/), [Zapper](https://zapper.xyz/), or [Paraswap](https://www.paraswap.io/). These platforms enable you to trade your lAssets for various other tokens, providing you with the flexibility to diversify your portfolios or acquire specific tokens based on your investment preferences.
 
-In addition to swapping, you can leverage your alAssets to provide liquidity on certain decentralized exchanges, such as Curve, Saddle, and Velodrome, and earn gauge rewards. You can earn yield directly with your alAssets, should you choose. Keep up to date with the latest opportunities at [https://app.lux.finance/earn](https://app.lux.finance/earn)
+In addition to swapping, you can leverage your lAssets to provide liquidity on certain decentralized exchanges, such as Curve, Saddle, and Velodrome, and earn gauge rewards. You can earn yield directly with your lAssets, should you choose. Keep up to date with the latest opportunities at [https://app.lux.finance/earn](https://app.lux.finance/earn)
 
 </details>
 
@@ -110,7 +110,7 @@ Participating in the governance of Liquid allows you to actively contribute to t
 
 <summary>What is the Transmuter?</summary>
 
-The Transmuter is an alAsset price stability module. Users can deposit alAssets, and over time, the Transmuter will gradually convert the alAsset to the corresponding underlying token on a 1:1 basis. [Read more here](./transmuter/overview).
+The Transmuter is an lAsset price stability module. Users can deposit lAssets, and over time, the Transmuter will gradually convert the lAsset to the corresponding underlying token on a 1:1 basis. [Read more here](./transmuter/overview).
 
 </details>
 
@@ -118,7 +118,7 @@ The Transmuter is an alAsset price stability module. Users can deposit alAssets,
 
 <summary>Can I borrow any token against my Liquid Deposit?</summary>
 
-The short answer is no. When you deposit into an Alchemist contract in Liquid, you can only borrow the corresponding synthetic alAsset against your deposit (e.g., alETH for ETH). However, you can take your alAsset and swap it in the market for whatever tokens you want.
+The short answer is no. When you deposit into an Liquid contract in Liquid, you can only borrow the corresponding synthetic lAsset against your deposit (e.g., LETH for ETH). However, you can take your lAsset and swap it in the market for whatever tokens you want.
 
 </details>
 

@@ -2,12 +2,12 @@
 sidebar_position: 5
 ---
 
-# AlchemistAllocator
+# LiquidAllocator
 
 ## Description
 
-AlchemistCurator is the governance and configuration contract for MYT vaults. It allows admins and operators to register or remove strategy adapters for a given MYT and to adjust their absolute and relative caps. In short, it defines which strategies exist within the MYT and how much capital each can hold.<br/><br/>
-**Note:** AlchemistCurator inherits from PermissionedProxy, which provides it's access control system for operator roles, and the deny-list used to restrict certain calls. The admin role is set using the same pending/admin admin system as the Alchemist and is handled in this child contract. For details on the operator role and logic, see PermissionedProxy.
+LiquidCurator is the governance and configuration contract for MYT vaults. It allows admins and operators to register or remove strategy adapters for a given MYT and to adjust their absolute and relative caps. In short, it defines which strategies exist within the MYT and how much capital each can hold.<br/><br/>
+**Note:** LiquidCurator inherits from PermissionedProxy, which provides it's access control system for operator roles, and the deny-list used to restrict certain calls. The admin role is set using the same pending/admin admin system as the Liquid and is handled in this child contract. For details on the operator role and logic, see PermissionedProxy.
 
 ## Variables
 
@@ -17,8 +17,8 @@ AlchemistCurator is the governance and configuration contract for MYT vaults. It
   - **Description** - A mapping that associates each MYT strategy adapter address with the specific MYT vault address it is a part of. This is how the curator knows which vault to target when adding, removing, or adjusting caps for a given strategy.  
   - **Type** - `mapping(address => address)`  
   - **Used By**
-    - [`_vault(address adapter)`](/dev/myt/alchemist-curator-contract#InternalOperations_vault)
-    - [`_setStrategy(address adapter, address myt, bool remove)`](/dev/myt/alchemist-curator-contract#InternalOperations_setStrategy)
+    - [`_vault(address adapter)`](/dev/myt/liquid-curator-contract#InternalOperations_vault)
+    - [`_setStrategy(address adapter, address myt, bool remove)`](/dev/myt/liquid-curator-contract#InternalOperations_setStrategy)
   - **Updated By**
     - `setStrategy(address adapter, address myt, bool remove)` - cannot use the zero address for the adapter or myt
   - **Read By**
@@ -30,7 +30,7 @@ AlchemistCurator is the governance and configuration contract for MYT vaults. It
 - **Description** - The first step in a two-step process of setting a new administrator. The pendingAdmin is set by the current admin, then the pendingAdmin must accept the responsibility to lock in the change of admin.
 - **Type** - address
 - **Updated By**
-  - [`transferAdminOwnership(address _newAdmin)`](/dev/myt/alchemist-curator-contract#AdminActions_transferAdminOwnerShip)
+  - [`transferAdminOwnership(address _newAdmin)`](/dev/myt/liquid-curator-contract#AdminActions_transferAdminOwnerShip)
 - **Read By**
   - `pendingAdmin()`
 - **Notified By** - none
@@ -61,12 +61,12 @@ AlchemistCurator is the governance and configuration contract for MYT vaults. It
   - **Reverts**  
     - With `"PD"` if `msg.sender` is not the current admin.  
   - **Emits**  
-    - [`AdminChanged(address newAdmin)`](/dev/myt/alchemist-curator-contract#Events_AdminChanged)  
+    - [`AdminChanged(address newAdmin)`](/dev/myt/liquid-curator-contract#Events_AdminChanged)  
 </details>
 <details id="AdminActions_decreaseAbsoluteCap">
   <summary>decreaseAbsoluteCap(address adapter, uint256 amount)</summary>
 
-  - **Description** - Delegates to the internal [`_decreaseAbsoluteCap(adapter, id, amount)`](/dev/myt/alchemist-curator-contract#InternalOperations_decreaseAbosluteCap) to immediately lowers the absolute cap for a given strategy on its MYT vault. The absolute cap is the maximum quanitity of underlying assets that may be allocated to the strategy.
+  - **Description** - Delegates to the internal [`_decreaseAbsoluteCap(adapter, id, amount)`](/dev/myt/liquid-curator-contract#InternalOperations_decreaseAbosluteCap) to immediately lowers the absolute cap for a given strategy on its MYT vault. The absolute cap is the maximum quanitity of underlying assets that may be allocated to the strategy.
     - `@param adapter` - The strategy adapter address.
     - `@param amount` - The amount denominated in underlying assets to decrease the absolute cap by.
   - **Visibility Specifier** - external
@@ -74,7 +74,7 @@ AlchemistCurator is the governance and configuration contract for MYT vaults. It
   - **Reverts**
     - `AbsoluteCapNotDecreasing()` - if the new cap is higher than the previous. Propgated from the MorphoV2 vault call.
   - **Emits**
-    - [`DecreaseAbsoluteCap(address adapter, uint256 amount, bytes id)`](/dev/myt/alchemist-curator-contract#Events_DecreaseAbsoluteCap)
+    - [`DecreaseAbsoluteCap(address adapter, uint256 amount, bytes id)`](/dev/myt/liquid-curator-contract#Events_DecreaseAbsoluteCap)
 </details>
 <details id="AdminActions_submitDecreaseAbsoluteCap">
   <summary>submitDecreaseAbsoluteCap(address adapter, uint256 amount)</summary>
@@ -87,7 +87,7 @@ AlchemistCurator is the governance and configuration contract for MYT vaults. It
   -  **Reverts**
     - `AbsoluteCapNotDecreasing()` - if the new cap is higher than the previous. Propgated from the MorphoV2 vault call.
   - **Emits**
-    - [`SubmitDecreaseAbsoluteCap(address adapter, uint256 amount, bytes id)`](/dev/myt/alchemist-curator-contract#Events_SubmitDecreaseAbsoluteCap)
+    - [`SubmitDecreaseAbsoluteCap(address adapter, uint256 amount, bytes id)`](/dev/myt/liquid-curator-contract#Events_SubmitDecreaseAbsoluteCap)
 </details>
 <details id="AdminActions_decreaseRelativeCap">
   <summary>decreaseRelativeCap(address adapter, uint256 amount)</summary>
@@ -101,7 +101,7 @@ AlchemistCurator is the governance and configuration contract for MYT vaults. It
   - **Reverts**
     - `RelativeCapNotDecreasing()` - if the new cap is higher than the previous. Propgated from the MorphoV2 vault call.
   - **Emits**
-    - [`DecreaseRelativeCap(address adapter, uint256 amount, bytes id)`](/dev/myt/alchemist-curator-contract#Events_DecreaseRelativeCap)
+    - [`DecreaseRelativeCap(address adapter, uint256 amount, bytes id)`](/dev/myt/liquid-curator-contract#Events_DecreaseRelativeCap)
 </details>
 <details id="AdminActions_submitDecreaseRelativeCap">
   <summary>submitDecreaseRelativeCap(address adapter, uint256 amount)</summary>
@@ -115,12 +115,12 @@ AlchemistCurator is the governance and configuration contract for MYT vaults. It
   - **Reverts**
     - `RelativeCapNotDecreasing()` - if the new cap is higher than the previous. Propgated from the MorphoV2 vault call.
   - **Emits**
-    - [`SubmitDecreaseRelativeCap(address adapter, uint256 amount, bytes id)`](/dev/myt/alchemist-curator-contract#Events_SubmitDecreaseRelativeCap)
+    - [`SubmitDecreaseRelativeCap(address adapter, uint256 amount, bytes id)`](/dev/myt/liquid-curator-contract#Events_SubmitDecreaseRelativeCap)
 </details>
 <details id="AdminActions_increaseAbsoluteCap">
   <summary>increaseAbsoluteCap(address adapter, uint256 amount)</summary>
 
-  - **Description** - Delegates to the internal [`_increaseAbsoluteCap(adapter, id, amount)`](/dev/myt/alchemist-curator-contract#InternalOperations_increaseAbsoluteCap) to raise the absolute cap for a given strategy on its MYT vault.  
+  - **Description** - Delegates to the internal [`_increaseAbsoluteCap(adapter, id, amount)`](/dev/myt/liquid-curator-contract#InternalOperations_increaseAbsoluteCap) to raise the absolute cap for a given strategy on its MYT vault.  
     The absolute cap is the maximum quantity of underlying assets that may be allocated to the strategy.  
     - `@param adapter` - The strategy adapter address.  
     - `@param amount` - The amount denominated in underlying asset units to increase the absolute cap by.  
@@ -129,7 +129,7 @@ AlchemistCurator is the governance and configuration contract for MYT vaults. It
   - **Reverts**
     - `AbsoluteCapNotIncreasing()` - if the new cap is lower than the previous. Propagated from the MorphoV2 vault call.  
   - **Emits**
-    - [`IncreaseAbsoluteCap(address adapter, uint256 amount, bytes id)`](/dev/myt/alchemist-curator-contract#Events_IncreaseAbsoluteCap)
+    - [`IncreaseAbsoluteCap(address adapter, uint256 amount, bytes id)`](/dev/myt/liquid-curator-contract#Events_IncreaseAbsoluteCap)
 </details>
 <details id="AdminActions_increaseRelativeCap">
   <summary>increaseRelativeCap(address adapter, uint256 amount)</summary>
@@ -144,7 +144,7 @@ AlchemistCurator is the governance and configuration contract for MYT vaults. It
   - **Reverts**
     - `RelativeCapNotIncreasing()` - if the new cap is lower than the previous. Propagated from the MorphoV2 vault call.  
   - **Emits**
-    - [`IncreaseRelativeCap(address adapter, uint256 amount, bytes id)`](/dev/myt/alchemist-curator-contract#Events_IncreaseRelativeCap)
+    - [`IncreaseRelativeCap(address adapter, uint256 amount, bytes id)`](/dev/myt/liquid-curator-contract#Events_IncreaseRelativeCap)
 </details>
 <details id="AdminActions_submitIncreaseAbsoluteCap">
   <summary>submitIncreaseAbsoluteCap(address adapter, uint256 amount)</summary>
@@ -158,7 +158,7 @@ AlchemistCurator is the governance and configuration contract for MYT vaults. It
   - **Reverts**
     - `AbsoluteCapNotIncreasing()` - if the new cap is lower than the previous. Propagated from the MorphoV2 vault call.
   - **Emits**
-    - [`SubmitIncreaseAbsoluteCap(address adapter, uint256 amount, bytes id)`](/dev/myt/alchemist-curator-contract#Events_SubmitIncreaseAbsoluteCap)
+    - [`SubmitIncreaseAbsoluteCap(address adapter, uint256 amount, bytes id)`](/dev/myt/liquid-curator-contract#Events_SubmitIncreaseAbsoluteCap)
 </details>
 <details id="AdminActions_submitIncreaseRelativeCap">
   <summary>submitIncreaseRelativeCap(address adapter, uint256 amount)</summary>
@@ -172,7 +172,7 @@ AlchemistCurator is the governance and configuration contract for MYT vaults. It
   - **Reverts**
     - `RelativeCapNotIncreasing()` - if the new cap is lower than the previous. Propagated from the MorphoV2 vault call.
   - **Emits**
-    - [`SubmitIncreaseRelativeCap(address adapter, uint256 amount, bytes id)`](/dev/myt/alchemist-curator-contract#Events_SubmitIncreaseRelativeCap)
+    - [`SubmitIncreaseRelativeCap(address adapter, uint256 amount, bytes id)`](/dev/myt/liquid-curator-contract#Events_SubmitIncreaseRelativeCap)
 </details>
 
 ### Operator Actions
@@ -183,7 +183,7 @@ AlchemistCurator is the governance and configuration contract for MYT vaults. It
   <summary>setStrategy(address adapter, address myt)</summary>
 
   - **Description** - Registers a MYT strategy adapter with the specified MYT vault.<br/><br/>  
-    First runs address validity checks, then offloads to the internal [`_setStrategy(adapter, myt, false)`](/dev/myt/alchemist-curator-contract#InternalOperations_setStrategy) to register the MYT strategy with the vault as an active strategy.
+    First runs address validity checks, then offloads to the internal [`_setStrategy(adapter, myt, false)`](/dev/myt/liquid-curator-contract#InternalOperations_setStrategy) to register the MYT strategy with the vault as an active strategy.
     - `@param adapter` - The address of the MYT strategy adapter to register.  
     - `@param myt` - The address of the MYT vault that the adapter belongs to.  
   - **Visibility Specifier** - external  
@@ -191,13 +191,13 @@ AlchemistCurator is the governance and configuration contract for MYT vaults. It
   - **Reverts**
     - With `"INVALID_ADDRESS"` if either `adapter` or `myt` is the zero address.  
   - **Emits**  
-    - [`StrategySet(address adapter, address myt)`](/dev/myt/alchemist-curator-contract#Events_StrategySet) - emitted in the internal _setStrategy() call.
+    - [`StrategySet(address adapter, address myt)`](/dev/myt/liquid-curator-contract#Events_StrategySet) - emitted in the internal _setStrategy() call.
 </details>
 <details id="OperatorActions_removeStrategy">
   <summary>removeStrategy(address adapter, address myt)</summary>
 
   - **Description** - Deregisters a MYT strategy adapter from the specified MYT vault.<br/><br/>  
-    First runs address validity checkts, then offloads to the internal [`_setStrategy(adapter, myt, true)`](/dev/myt/alchemist-curator-contract#InternalOperations_setStrategy) to deregister the MYT strategy from the vault as an active strategy.
+    First runs address validity checkts, then offloads to the internal [`_setStrategy(adapter, myt, true)`](/dev/myt/liquid-curator-contract#InternalOperations_setStrategy) to deregister the MYT strategy from the vault as an active strategy.
     - `@param adapter` - The address of the MYT strategy adapter to remove.  
     - `@param myt` - The address of the MYT vault that the adapter is currently linked to.  
   - **Visibility Specifier** - external  
@@ -205,7 +205,7 @@ AlchemistCurator is the governance and configuration contract for MYT vaults. It
   - **Reverts**  
     - With `"INVALID_ADDRESS"` if either `adapter` or `myt` is the zero address.  
   - **Emits**  
-    - [`StrategySet(address adapter, address myt)`](/dev/myt/alchemist-curator-contract#Events_StrategySet) - emitted in the internal _setStrategy() call.
+    - [`StrategySet(address adapter, address myt)`](/dev/myt/liquid-curator-contract#Events_StrategySet) - emitted in the internal _setStrategy() call.
 </details>
 <details id="OperatorActions_submitSetStrategy">
   <summary>submitSetStrategy(address adapter, address myt)</summary>
@@ -219,7 +219,7 @@ AlchemistCurator is the governance and configuration contract for MYT vaults. It
   - **Reverts**
     - With `"INVALID_ADDRESS"` if `adapter == address(0)` or `myt == address(0)`.  
   - **Emits**
-    - [`SubmitSetStrategy(address adapter, address myt)`](/dev/myt/alchemist-curator-contract#Events_SubmitSetStrategy) - from the internal _submitSetStrategy call
+    - [`SubmitSetStrategy(address adapter, address myt)`](/dev/myt/liquid-curator-contract#Events_SubmitSetStrategy) - from the internal _submitSetStrategy call
 </details>
 
 ### Internal Operations
@@ -227,8 +227,8 @@ AlchemistCurator is the governance and configuration contract for MYT vaults. It
 <details id="InternalOperations_setStrategy">
   <summary>_setStrategy(address adapter, address myt, bool remove)</summary>
 
-  - **Description** - Internal helper function used to add or remove a MYT strategy adapter from the specified MYT vault. Called by both [`setStrategy(address, myt)`](/dev/myt/alchemist-curator-contract#OperatorActions_setStrategy) and [`removeStrategy(address, myt)`](/dev/myt/alchemist-curator-contract#OperatorActions_removeStrategy).<br/><br/>
-  	First updates the `adapterToMYT` mapping to associate the adapter with the provided MYT vault. Then retrieves the vault reference using the internal [`_vault(adapter)`](/dev/myt/alchemist-curator-contract#InternalActions_vault) function, and finally calls either `vault.removeAdapter(adapter)` to deregister the adapter, or `vault.addAdapter(adapter)` to register it. 
+  - **Description** - Internal helper function used to add or remove a MYT strategy adapter from the specified MYT vault. Called by both [`setStrategy(address, myt)`](/dev/myt/liquid-curator-contract#OperatorActions_setStrategy) and [`removeStrategy(address, myt)`](/dev/myt/liquid-curator-contract#OperatorActions_removeStrategy).<br/><br/>
+  	First updates the `adapterToMYT` mapping to associate the adapter with the provided MYT vault. Then retrieves the vault reference using the internal [`_vault(adapter)`](/dev/myt/liquid-curator-contract#InternalActions_vault) function, and finally calls either `vault.removeAdapter(adapter)` to deregister the adapter, or `vault.addAdapter(adapter)` to register it. 
     - `@param adapter` - The address of the MYT strategy adapter being added or removed.  
     - `@param myt` - The address of the MYT vault that the adapter is associated with.  
     - `@param remove` - True/false flag indicating whether to remove or add the adapter.  
@@ -236,7 +236,7 @@ AlchemistCurator is the governance and configuration contract for MYT vaults. It
   - **State Mutability Specifier** - nonpayable
   - **Reverts** - none
   - **Emits**  
-    - [`StrategySet(address adapter, address myt)`](/dev/myt/alchemist-curator-contract#Events_StrategySet)
+    - [`StrategySet(address adapter, address myt)`](/dev/myt/liquid-curator-contract#Events_StrategySet)
 </details>
 <details id="InternalOperations_submitSetStrategy">
   <summary>_submitSetStrategy(address adapter, address myt)</summary>
@@ -248,7 +248,7 @@ AlchemistCurator is the governance and configuration contract for MYT vaults. It
   - **State Mutability Specifier** - nonpayable
   - **Reverts** - none
   - **Emits**
-    - [`SubmitSetStrategy(address adapter, address myt)`](/dev/myt/alchemist-curator-contract#Events_SubmitSetStrategy) 
+    - [`SubmitSetStrategy(address adapter, address myt)`](/dev/myt/liquid-curator-contract#Events_SubmitSetStrategy) 
 </details>
 <details id="InternalOperations_decreaseAbsoluteCap">
   <summary>_decreaseAbsoluteCap(address adapter, bytes id, uint256 amount)</summary>
@@ -262,12 +262,12 @@ AlchemistCurator is the governance and configuration contract for MYT vaults. It
   - **Reverts**
     - `AbsoluteCapNotDecreasing()` - if the new cap is higher than the previous. Propgated from the MorphoV2 vault call.
   - **Emits**
-    - [`DecreaseAbsoluteCap(address adapter, uint256 amount, bytes id)`](/dev/myt/alchemist-curator-contract#Events_DecreaseAbsoluteCap)
+    - [`DecreaseAbsoluteCap(address adapter, uint256 amount, bytes id)`](/dev/myt/liquid-curator-contract#Events_DecreaseAbsoluteCap)
 </details>
 <details id="InternalOperations_submitDecreaseAbsoluteCap">
   <summary>_submitDecreaseAbsoluteCap(address adapter, bytes id, uint256 amount)</summary>
 
-  - **Description** - Internal helper that enqueues a cap decrease on the MYT vault by encoding `IVaultV2.decreaseAbsoluteCap(id, amount)` and delegating to the internal [`_vaultSubmit(data)`](/dev/myt/alchemist-curator-contract#InternalOperations_vaultSubmit).
+  - **Description** - Internal helper that enqueues a cap decrease on the MYT vault by encoding `IVaultV2.decreaseAbsoluteCap(id, amount)` and delegating to the internal [`_vaultSubmit(data)`](/dev/myt/liquid-curator-contract#InternalOperations_vaultSubmit).
     - `@param adapter` - The strategy adapter address (used to resolve its vault).
     - `@param id` - The encoded MYT strategy ID as bytes.
     - `@param amount` - The amount denominated in underlying units to decrease the absolute cap by.
@@ -276,7 +276,7 @@ AlchemistCurator is the governance and configuration contract for MYT vaults. It
   - **Reverts**
     - `AbsoluteCapNotDecreasing()` - if the new cap is higher than the previous. Propgated from the MorphoV2 vault call.
   - **Emits**
-    - [`SubmitDecreaseAbsoluteCap(address adapter, uint256 amount, bytes id)`](/dev/myt/alchemist-curator-contract#Events_SubmitDecreaseAbsoluteCap)
+    - [`SubmitDecreaseAbsoluteCap(address adapter, uint256 amount, bytes id)`](/dev/myt/liquid-curator-contract#Events_SubmitDecreaseAbsoluteCap)
 </details>
 <details id="InternalOperations_decreaseRelativeCap">
   <summary>_decreaseRelativeCap(address adapter, bytes id, uint256 amount)</summary>
@@ -290,12 +290,12 @@ AlchemistCurator is the governance and configuration contract for MYT vaults. It
   - **Reverts**
     - `RelativeCapNotDecreasing()` - if the new cap is higher than the previous. Propgated from the MorphoV2 vault call.
   - **Emits**
-    - [`DecreaseRelativeCap(address adapter, uint256 amount, bytes id)`](/dev/myt/alchemist-curator-contract#Events_DecreaseRelativeCap)
+    - [`DecreaseRelativeCap(address adapter, uint256 amount, bytes id)`](/dev/myt/liquid-curator-contract#Events_DecreaseRelativeCap)
 </details>
 <details id="Internal_submitDecreaseRelativeCap">
   <summary>_submitDecreaseRelativeCap(address adapter, bytes id, uint256 amount)</summary>
 
-  - **Description** - Internal helper that enqueues a cap decrease on the MYT vault by encoding `IVaultV2.decreaseRelativeCap(id, amount)` and delegating to the internal [`_vaultSubmit(data)`](/dev/myt/alchemist-curator-contract#InternalOperations_vaultSubmit).
+  - **Description** - Internal helper that enqueues a cap decrease on the MYT vault by encoding `IVaultV2.decreaseRelativeCap(id, amount)` and delegating to the internal [`_vaultSubmit(data)`](/dev/myt/liquid-curator-contract#InternalOperations_vaultSubmit).
     - `@param adapter` - Strategy adapter address (used to resolve its vault).  
     - `@param id` - Strategy ID blob (`IMYTStrategy.getIdData()`).  
     - `@param amount` - Amount (underlying or relative value basis) to decrease the relative cap by.  
@@ -304,7 +304,7 @@ AlchemistCurator is the governance and configuration contract for MYT vaults. It
   - **Reverts**
     - `RelativeCapNotDecreasing()` - if the new cap is higher than the previous. Propgated from the MorphoV2 vault call.
   - **Emits**
-    - [`SubmitDecreaseRelativeCap(address adapter, uint256 amount, bytes id)`](/dev/myt/alchemist-curator-contract#Events_SubmitDecreaseRelativeCap) 
+    - [`SubmitDecreaseRelativeCap(address adapter, uint256 amount, bytes id)`](/dev/myt/liquid-curator-contract#Events_SubmitDecreaseRelativeCap) 
 </details>
 <details id="InternalOperations_increaseAbsoluteCap">
   <summary>_increaseAbsoluteCap(address adapter, bytes id, uint256 amount)</summary>
@@ -318,7 +318,7 @@ AlchemistCurator is the governance and configuration contract for MYT vaults. It
   - **Reverts**
     - `AbsoluteCapNotIncreasing()` - if the new cap is lower than the previous. Propagated from the MorphoV2 vault call.  
   - **Emits**
-    - [`IncreaseAbsoluteCap(address adapter, uint256 amount, bytes id)`](/dev/myt/alchemist-curator-contract#Events_IncreaseAbsoluteCap)
+    - [`IncreaseAbsoluteCap(address adapter, uint256 amount, bytes id)`](/dev/myt/liquid-curator-contract#Events_IncreaseAbsoluteCap)
 </details>
 <details id="InternalOperations_increaseRelativeCap">
   <summary>_increaseRelativeCap(address adapter, bytes id, uint256 amount)</summary>
@@ -332,12 +332,12 @@ AlchemistCurator is the governance and configuration contract for MYT vaults. It
   - **Reverts**
     - `RelativeCapNotIncreasing()` - if the new cap is lower than the previous. Propagated from the MorphoV2 vault call.  
   - **Emits**
-    - [`IncreaseRelativeCap(address adapter, uint256 amount, bytes id)`](/dev/myt/alchemist-curator-contract#Events_IncreaseRelativeCap)
+    - [`IncreaseRelativeCap(address adapter, uint256 amount, bytes id)`](/dev/myt/liquid-curator-contract#Events_IncreaseRelativeCap)
 </details>
 <details id="InternalOperations_submitIncreaseAbsoluteCap">
   <summary>_submitIncreaseAbsoluteCap(address adapter, bytes id, uint256 amount)</summary>
 
-  - **Description** - Internal helper that enqueues a cap increase on the MYT vault by encoding `IVaultV2.increaseAbsoluteCap(id, amount)` and delegating to the internal [`_vaultSubmit(data)`](/dev/myt/alchemist-curator-contract#InternalOperations_vaultSubmit).
+  - **Description** - Internal helper that enqueues a cap increase on the MYT vault by encoding `IVaultV2.increaseAbsoluteCap(id, amount)` and delegating to the internal [`_vaultSubmit(data)`](/dev/myt/liquid-curator-contract#InternalOperations_vaultSubmit).
     - `@param adapter` - The strategy adapter address.
     - `@param id` - The encoded MYT strategy ID.
     - `@param amount` - The amount denominated in underlying asset units to increase the absolute cap by.
@@ -346,7 +346,7 @@ AlchemistCurator is the governance and configuration contract for MYT vaults. It
   - **Reverts**
     - `AbsoluteCapNotIncreasing()` - if the new cap is lower than the previous. Propagated from the MorphoV2 vault call.
   - **Emits**
-    - [`SubmitIncreaseAbsoluteCap(address adapter, uint256 amount, bytes id)`](/dev/myt/alchemist-curator-contract#Events_SubmitIncreaseAbsoluteCap)
+    - [`SubmitIncreaseAbsoluteCap(address adapter, uint256 amount, bytes id)`](/dev/myt/liquid-curator-contract#Events_SubmitIncreaseAbsoluteCap)
 </details>
 <details id="InternalOperations_vaultSubmit">
   <summary>_vaultSubmit(address adapter, bytes data)</summary>
