@@ -1,94 +1,98 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import {Ownable} from "@luxfi/oz/access/Ownable.sol";
+import {IIdentityRegistry} from "@luxfi/erc-3643/contracts/registry/interface/IIdentityRegistry.sol";
+import {IIdentity} from "@luxfi/onchain-id/contracts/interface/IIdentity.sol";
 
 /// @title  LiquidComplianceGate
-/// @author Lux Liquid
+/// @notice Per-vault compliance gate for Liquid redemptions on regulated
+///         collateral. **Pure delegation to ERC-3643 + ONCHAINID** — no
+///         whitelist tables, no KYC levels stored locally. The Identity
+///         Registry is the source of truth for "is verified", and ONCHAINID
+///         claim topics encode "what kind of investor".
 ///
-/// @notice Enforces KYC/whitelist checks before allowing redemption from
-/// Liquid vaults holding regulated securities.
-///
-/// Deposits into Liquid are open (the alToken is a standard ERC-20).
-/// Redemptions go through this gate which checks a whitelist and KYC level.
-///
-/// The whitelist is maintained by the regulated ATS/BD operator.
-///
-/// KYC levels:
-///   0 = none
-///   1 = basic KYC
-///   2 = accredited investor (Reg D)
-///   3 = qualified purchaser (Reg S / institutional)
+/// @dev    Per vault, configure:
+///           - the `IIdentityRegistry` to query (usually one shared registry,
+///             but multiple are allowed e.g. for jurisdiction-segmented vaults)
+///           - the set of claim topics that must be present on the redeemer's
+///             ONCHAINID (e.g. KYC, accreditation, qualified-purchaser)
+///           - blocked country codes (ISO 3166-1 numeric)
+///         A redeemer passes `canRedeem` iff:
+///           1. the registry says they are verified;
+///           2. their country is not blocked;
+///           3. every required claim topic resolves to a non-empty claim set
+///              on their bound ONCHAINID.
 contract LiquidComplianceGate is Ownable {
-    /// @notice Whether an address is whitelisted for redemptions.
-    mapping(address => bool) public whitelisted;
+    struct VaultPolicy {
+        IIdentityRegistry registry;
+        uint256[] requiredTopics;
+        mapping(uint16 => bool) blockedCountries;
+        bool configured;
+    }
 
-    /// @notice KYC level assigned to each address.
-    mapping(address => uint8) public kycLevel;
+    mapping(address => VaultPolicy) private _policy;
 
-    /// @notice Required KYC level per vault (vault address => level).
-    /// e.g., Reg D vault = level 2, Reg A+ vault = level 1.
-    mapping(address => uint8) public requiredLevel;
+    event VaultRegistrySet(address indexed vault, address indexed registry);
+    event RequiredTopicsSet(address indexed vault, uint256[] topics);
+    event CountryBlockSet(address indexed vault, uint16 indexed country, bool blocked);
 
-    /// @notice Combined authorization: vault => account => authorized.
-    /// Mirrors LiquidGate pattern for direct vault-level gating.
-    mapping(address => mapping(address => bool)) public authorized;
+    error VaultNotConfigured(address vault);
+    error ZeroAddress();
 
-    event Approved(address indexed account, uint8 level);
-    event Removed(address indexed account);
-    event LevelRequired(address indexed vault, uint8 level);
+    constructor(address owner_) Ownable(owner_) {}
 
-    constructor(address _owner) Ownable(_owner) {}
+    // ── Read path ───────────────────────────────────────────────────────────
 
-    /// @notice Check if an address can redeem from a specific vault.
-    /// @param account The address attempting redemption.
-    /// @param vault   The vault address holding the security.
-    /// @return True if the account meets whitelist and KYC requirements.
+    /// @notice Returns true iff `account` is allowed to redeem from `vault`
+    ///         under `vault`'s configured ERC-3643 / ONCHAINID policy.
     function canRedeem(address account, address vault) external view returns (bool) {
-        return whitelisted[account] && kycLevel[account] >= requiredLevel[vault];
-    }
+        VaultPolicy storage p = _policy[vault];
+        if (!p.configured) return false;
+        if (!p.registry.isVerified(account)) return false;
+        if (p.blockedCountries[p.registry.investorCountry(account)]) return false;
 
-    /// @notice Whitelist an address with a KYC level.
-    /// @param account The address to approve.
-    /// @param level   The KYC level (1=basic, 2=accredited, 3=qualified).
-    function approve(address account, uint8 level) external onlyOwner {
-        whitelisted[account] = true;
-        kycLevel[account] = level;
-        emit Approved(account, level);
-    }
+        uint256[] memory topics = p.requiredTopics;
+        if (topics.length == 0) return true;
 
-    /// @notice Batch approve multiple addresses at the same KYC level.
-    /// @param accounts Array of addresses to approve.
-    /// @param level    The KYC level to assign.
-    function approveBatch(address[] calldata accounts, uint8 level) external onlyOwner {
-        for (uint256 i = 0; i < accounts.length; i++) {
-            whitelisted[accounts[i]] = true;
-            kycLevel[accounts[i]] = level;
-            emit Approved(accounts[i], level);
+        IIdentity id = p.registry.identity(account);
+        if (address(id) == address(0)) return false;
+        for (uint256 i; i < topics.length; ++i) {
+            if (id.getClaimIdsByTopic(topics[i]).length == 0) return false;
         }
+        return true;
     }
 
-    /// @notice Remove an address from the whitelist.
-    /// @param account The address to remove.
-    function remove(address account) external onlyOwner {
-        whitelisted[account] = false;
-        kycLevel[account] = 0;
-        emit Removed(account);
+    function vaultRegistry(address vault) external view returns (IIdentityRegistry) {
+        return _policy[vault].registry;
     }
 
-    /// @notice Set the required KYC level for a vault.
-    /// @param vault The vault address.
-    /// @param level The minimum KYC level required for redemption.
-    function setRequiredLevel(address vault, uint8 level) external onlyOwner {
-        requiredLevel[vault] = level;
-        emit LevelRequired(vault, level);
+    function vaultRequiredTopics(address vault) external view returns (uint256[] memory) {
+        return _policy[vault].requiredTopics;
     }
 
-    /// @notice Set direct vault-level authorization (mirrors LiquidGate).
-    /// @param vault  The vault address.
-    /// @param to     The account to authorize/deauthorize.
-    /// @param value  True to authorize, false to deauthorize.
-    function setAuthorization(address vault, address to, bool value) external onlyOwner {
-        authorized[vault][to] = value;
+    function isCountryBlocked(address vault, uint16 country) external view returns (bool) {
+        return _policy[vault].blockedCountries[country];
+    }
+
+    // ── Admin ───────────────────────────────────────────────────────────────
+
+    function setVaultRegistry(address vault, IIdentityRegistry registry) external onlyOwner {
+        if (vault == address(0) || address(registry) == address(0)) revert ZeroAddress();
+        _policy[vault].registry = registry;
+        _policy[vault].configured = true;
+        emit VaultRegistrySet(vault, address(registry));
+    }
+
+    function setRequiredTopics(address vault, uint256[] calldata topics) external onlyOwner {
+        if (!_policy[vault].configured) revert VaultNotConfigured(vault);
+        _policy[vault].requiredTopics = topics;
+        emit RequiredTopicsSet(vault, topics);
+    }
+
+    function setCountryBlock(address vault, uint16 country, bool blocked) external onlyOwner {
+        if (!_policy[vault].configured) revert VaultNotConfigured(vault);
+        _policy[vault].blockedCountries[country] = blocked;
+        emit CountryBlockSet(vault, country, blocked);
     }
 }
