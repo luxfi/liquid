@@ -16,7 +16,7 @@ Liquid v3 keeps the cost structure transparent and predictable. Three parameters
 
 ## Borrower redemption fee
 
-When the Transmuter converts queued alAssets into vault value it credits that amount against outstanding loans. At the same moment, it routes a small fraction of the repaid debt to the protocol treasury. The figure is currently set at 0.50%.
+When the Transmuter converts queued lAssets into vault value it credits that amount against outstanding loans. At the same moment, it routes a small fraction of the repaid debt to the protocol treasury. The figure is currently set at 0.50%.
 
 Because the charge is event-based rather than time-based, the effective borrowing cost depends on two factors:
 

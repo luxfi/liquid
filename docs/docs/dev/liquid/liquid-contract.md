@@ -1,20 +1,20 @@
 ---
 sidebar_position: 1
 hide_title: true
-sidebar_label: AlchemistV3
+sidebar_label: Liquid
 ---
 
-import alchemist from '@site/static/img/alchemist-01.png';
+import liquid from '@site/static/img/liquid-01.png';
 
-<img src={alchemist} alt="AlchemistV3" class="banner-spacing" />
+<img src={liquid} alt="Liquid" class="banner-spacing" />
 
-The Alchemist is the vault contract responsible for accepting deposits and issuing debt. It stores and tracks user accounts, earmarking and redemptions, and allows users to deposit, withdraw, and repay against their positions. Every Alchemist is associated with one Transmuter, one debt asset, (alAsset) and one MYT (yield strategy).
+The Liquid is the vault contract responsible for accepting deposits and issuing debt. It stores and tracks user accounts, earmarking and redemptions, and allows users to deposit, withdraw, and repay against their positions. Every Liquid is associated with one Transmuter, one debt asset, (lAsset) and one MYT (yield strategy).
 
 ## Variables
 
 ### Initialization Parameters
 
-> Set on contract deployment, configuring basic params for the Alchemist.
+> Set on contract deployment, configuring basic params for the Liquid.
 
 #### Addresses
 
@@ -24,21 +24,21 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - The initial admin account. Can be used to perform any admin/guardian action.
 - **Type** - Address
 - **Used By**
-  - [Admin Actions](/dev/alchemist/alchemist-contract#admin-actions)
-  - [Guardian Actions](/dev/alchemist/alchemist-contract#guardian-actions)
+  - [Admin Actions](/dev/liquid/liquid-contract#admin-actions)
+  - [Guardian Actions](/dev/liquid/liquid-contract#guardian-actions)
 - **Updated By**
-  - [`acceptAdmin()`](/dev/alchemist/alchemist-contract#UserActions_acceptAdmin)
+  - [`acceptAdmin()`](/dev/liquid/liquid-contract#UserActions_acceptAdmin)
 - **Read By** - `admin()`
 </details>
 <details>
   <summary>debtToken</summary>
 
-- **Description** - the address of the ERC20 token used to represent debt. i.e. the alAsset.
+- **Description** - the address of the ERC20 token used to represent debt. i.e. the lAsset.
 - **Type** - Address
 - **Used By**
-  - [`underlyingConversionFactor`](/dev/alchemist/alchemist-contract#Variables_underlyingConversionFactor)
-  - [`burn(uint256 amount, uint256 recipientId)`](/dev/alchemist/alchemist-contract#UserActions_burn)
-  - [`_mint(uint256 tokenId, uint256 amount, address recipient)`](/dev/alchemist/alchemist-contract#InternalOperations_mint)
+  - [`underlyingConversionFactor`](/dev/liquid/liquid-contract#Variables_underlyingConversionFactor)
+  - [`burn(uint256 amount, uint256 recipientId)`](/dev/liquid/liquid-contract#UserActions_burn)
+  - [`_mint(uint256 tokenId, uint256 amount, address recipient)`](/dev/liquid/liquid-contract#InternalOperations_mint)
 - **Updated By**
   - NONE - immutable variable
 - **Read By** - `debtToken()`
@@ -49,8 +49,8 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - The address of the ERC20 base token/mirrored asset address; ie. USDC or WETH
 - **Type** - Address
 - **Used By**
-  - [`underlyingConversionFactor`](/dev/alchemist/alchemist-contract#Variables_underlyingConversionFactor)
-  - [`setAlchemistFeeVault(address value)`](/dev/alchemist/alchemist-contract#AdminActions_setAlchemistFeeVault)
+  - [`underlyingConversionFactor`](/dev/liquid/liquid-contract#Variables_underlyingConversionFactor)
+  - [`setLiquidFeeVault(address value)`](/dev/liquid/liquid-contract#AdminActions_setLiquidFeeVault)
 - **Updated By**
   - NONE - immutable variable
 - **Read By** - `underlyingToken()`
@@ -61,18 +61,18 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - the address of the yield token (MYT) being deposited into this contract. Actions against the contract (withdraw, deposit, etc.) operate on yield tokens.
 - **Type** - Address
 - **Used By**
-  - [`setDepositCap(uint256 value)`](/dev/alchemist/alchemist-contract#AdminActions_setDepositCap)
+  - [`setDepositCap(uint256 value)`](/dev/liquid/liquid-contract#AdminActions_setDepositCap)
   - `setTransmuter(address value)`
-  - [`getTotalDeposited()`](/dev/alchemist/alchemist-contract#ReadingState_getTotalDeposited)
-  - [`deposit(uint256 amount, address recipient, uint256 recipientId)`](/dev/alchemist/alchemist-contract#UserActions_deposit)
-  - [`withdraw(uint256 amount, address recipient, uint256 tokenId)`](/dev/alchemist/alchemist-contract#UserActions_withdraw)
-  - [`repay(uint256 amount, uint256 recipientTokenId)`](/dev/alchemist/alchemist-contract#UserActions_repay)
-  - [`redeem(uint256 amount)`](/dev/alchemist/alchemist-contract#TransmuterActions_redeem)
-  - [`convertYieldTokensToUnderlying(uint256 amount)`](/dev/alchemist/alchemist-contract#ReadingState_convertYieldTokensToUnderlying)
-  - [`convertUnderlyingTokensToYield(uint256 amount)`](/dev/alchemist/alchemist-contract#ReadingState_convertUnderlyingTokensToYield)
-  - [`_forceRepay(uint256 accountId, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_forceRepay)
-  - [`_liquidate(uint256 accountId)`](/dev/alchemist/alchemist-contract#InternalOperations_liquidate)
-  - [`_getTotalUnderlyingValue()`](/dev/alchemist/alchemist-contract#ReadingState_getTotalUnderlyingValue)
+  - [`getTotalDeposited()`](/dev/liquid/liquid-contract#ReadingState_getTotalDeposited)
+  - [`deposit(uint256 amount, address recipient, uint256 recipientId)`](/dev/liquid/liquid-contract#UserActions_deposit)
+  - [`withdraw(uint256 amount, address recipient, uint256 tokenId)`](/dev/liquid/liquid-contract#UserActions_withdraw)
+  - [`repay(uint256 amount, uint256 recipientTokenId)`](/dev/liquid/liquid-contract#UserActions_repay)
+  - [`redeem(uint256 amount)`](/dev/liquid/liquid-contract#TransmuterActions_redeem)
+  - [`convertYieldTokensToUnderlying(uint256 amount)`](/dev/liquid/liquid-contract#ReadingState_convertYieldTokensToUnderlying)
+  - [`convertUnderlyingTokensToYield(uint256 amount)`](/dev/liquid/liquid-contract#ReadingState_convertUnderlyingTokensToYield)
+  - [`_forceRepay(uint256 accountId, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_forceRepay)
+  - [`_liquidate(uint256 accountId)`](/dev/liquid/liquid-contract#InternalOperations_liquidate)
+  - [`_getTotalUnderlyingValue()`](/dev/liquid/liquid-contract#ReadingState_getTotalUnderlyingValue)
 - **Updated By**
   - NONE - immutable variable
 - **Read By** - `yieldToken()`
@@ -83,35 +83,35 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - token adapter used to get price for yield tokens.
 - **Type** - Address
 - **Used By**
-  - [`convertYieldTokensToUnderlying(uint256 amount)`](/dev/alchemist/alchemist-contract#ReadingState_convertYieldTokensToUnderlying)
-  - [`convertUnderlyingTokensToYield(uin256 amount)`](/dev/alchemist/alchemist-contract#ReadingState_convertUnderlyingTokensToYield)
+  - [`convertYieldTokensToUnderlying(uint256 amount)`](/dev/liquid/liquid-contract#ReadingState_convertYieldTokensToUnderlying)
+  - [`convertUnderlyingTokensToYield(uin256 amount)`](/dev/liquid/liquid-contract#ReadingState_convertUnderlyingTokensToYield)
 - **Updated By**
-  - [`setTokenAdapter(address value)`](/dev/alchemist/alchemist-contract#AdminActions_setTokenAdapter)
+  - [`setTokenAdapter(address value)`](/dev/liquid/liquid-contract#AdminActions_setTokenAdapter)
 - **Read By**
   - `tokenAdapter()`
-- **Notified By** - [`TokenAdapterUpdated(address value)`](/dev/alchemist/alchemist-contract#Events_TokenAdapterUpdated)
+- **Notified By** - [`TokenAdapterUpdated(address value)`](/dev/liquid/liquid-contract#Events_TokenAdapterUpdated)
 </details>
 <details>
   <summary>transmuter</summary>
 
-- **Description** - address of the transmuter linked to this alchemist. Transmuter seizes collateral (denominated in yieldTokens) from the Alchemist to cover term obligations
+- **Description** - address of the transmuter linked to this liquid. Transmuter seizes collateral (denominated in yieldTokens) from the Liquid to cover term obligations
 - **Type** - Address
 - **Used By**
-  - [`burn(uint256 amount, uint256 recipientId)`](/dev/alchemist/alchemist-contract#UserActions_burn)
-  - [`repay(uint256 amount, uint256 recipientTokenId)`](/dev/alchemist/alchemist-contract#UserActions_repay)
-  - [Transmuter Actions`](/dev/alchemist/alchemist-contract#transmuter-actions)
-  - [`deposit(uint256 amount, address recipient, uint256 recipientId)`](/dev/alchemist/alchemist-contract#UserActions_deposit)
-  - [`withdraw(uint256 amount, address recipient, uint256 tokenId)`](/dev/alchemist/alchemist-contract#UserActions_withdraw)
-  - [`repay(uint256 amount, uint256 recipientTokenId)`](/dev/alchemist/alchemist-contract#UserActions_repay)
-  - [`redeem(uint256 amount)`](/dev/alchemist/alchemist-contract#TransmuterActions_redeem)
-  - [`_liquidate(uint256 acountId)`](/dev/alchemist/alchemist-contract#InternalOperations_liquidate)
-  - [`_earmark()`](/dev/alchemist/alchemist-contract#InternalOperations_earmark)
-  - [`_calculateUnrealizedDebt(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_calculateUnrealizedDebt)
+  - [`burn(uint256 amount, uint256 recipientId)`](/dev/liquid/liquid-contract#UserActions_burn)
+  - [`repay(uint256 amount, uint256 recipientTokenId)`](/dev/liquid/liquid-contract#UserActions_repay)
+  - [Transmuter Actions`](/dev/liquid/liquid-contract#transmuter-actions)
+  - [`deposit(uint256 amount, address recipient, uint256 recipientId)`](/dev/liquid/liquid-contract#UserActions_deposit)
+  - [`withdraw(uint256 amount, address recipient, uint256 tokenId)`](/dev/liquid/liquid-contract#UserActions_withdraw)
+  - [`repay(uint256 amount, uint256 recipientTokenId)`](/dev/liquid/liquid-contract#UserActions_repay)
+  - [`redeem(uint256 amount)`](/dev/liquid/liquid-contract#TransmuterActions_redeem)
+  - [`_liquidate(uint256 acountId)`](/dev/liquid/liquid-contract#InternalOperations_liquidate)
+  - [`_earmark()`](/dev/liquid/liquid-contract#InternalOperations_earmark)
+  - [`_calculateUnrealizedDebt(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_calculateUnrealizedDebt)
 - **Updated By**
   - `setTransmuter(address value)`
 - **Read By**
   - `transmuter()`
-- **Notified By** - [`TransmuterUpdated(address value)`](/dev/alchemist/alchemist-contract#Events_TransmuterUpdated)
+- **Notified By** - [`TransmuterUpdated(address value)`](/dev/liquid/liquid-contract#Events_TransmuterUpdated)
 </details>
 <details>
   <summary>protocolFeeReceiver</summary>
@@ -119,13 +119,13 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - the address that receives protocol fees.
 - **Type** - Address
 - **Used By**
-  - [`repay(uint256 amount, uint256 recipientTokenId)`](/dev/alchemist/alchemist-contract#UserActions_repay)
-  - [`redeem(uint256 amount)`](/dev/alchemist/alchemist-contract#TransmuterActions_redeem)
+  - [`repay(uint256 amount, uint256 recipientTokenId)`](/dev/liquid/liquid-contract#UserActions_repay)
+  - [`redeem(uint256 amount)`](/dev/liquid/liquid-contract#TransmuterActions_redeem)
 - **Updated By**
-  - [`setProtocolFeeReceiver(address reciever)`](/dev/alchemist/alchemist-contract#AdminActions_setProtocolFeeReceiver)
+  - [`setProtocolFeeReceiver(address reciever)`](/dev/liquid/liquid-contract#AdminActions_setProtocolFeeReceiver)
 - **Read By**
   - `protocolFeeReceiver()`
-- **Notified By** - [`ProtocolFeeReceiverUpdated(address reciever)`](/dev/alchemist/alchemist-contract#Events_ProtocolFeeReceiverUpdated)
+- **Notified By** - [`ProtocolFeeReceiverUpdated(address reciever)`](/dev/liquid/liquid-contract#Events_ProtocolFeeReceiverUpdated)
 </details>
 
 #### Uint256
@@ -136,12 +136,12 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - the global maximum amount of deposited collateral. AKA the max amount of deposited tokens that can be held by the contract, denomimated in yieldToken
 - **Type** - uint256
 - **Used By**
-  - [`deposit(uint256 amount, address recipient, uint256 recipientId)`](/dev/alchemist/alchemist-contract#UserActions_deposit)
+  - [`deposit(uint256 amount, address recipient, uint256 recipientId)`](/dev/liquid/liquid-contract#UserActions_deposit)
 - **Updated By**
-  - [`setDepositCap(uint256 value)`](/dev/alchemist/alchemist-contract#AdminActions_setDepositCap)
+  - [`setDepositCap(uint256 value)`](/dev/liquid/liquid-contract#AdminActions_setDepositCap)
 - **Read By**
   - `depositCap()`
-- **Notified By** - [`DepositCapUpdated(uint256 value)`](/dev/alchemist/alchemist-contract#Events_DepositCapUpdated)
+- **Notified By** - [`DepositCapUpdated(uint256 value)`](/dev/liquid/liquid-contract#Events_DepositCapUpdated)
 </details>
 
 <details>
@@ -150,30 +150,30 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - the minimum collateralization ratio for a specific account, or how much collateral over debt is allowed before liquidation. Inverse of LTV. Value > 1.
 - **Type** - uint256
 - **Used By**
-  - [`setCollateralizationLowerBound(uint256 value)`](/dev/alchemist/alchemist-contract#AdminActions_setCollateralizationLowerBound)
-  - [`getMaxBorrowable(uint256 tokenId)`](/dev/alchemist/alchemist-contract#ReadingState_getMaxBorrowable)
-  - [`_liquidate(uint256 acountId)`](/dev/alchemist/alchemist-contract#InternalOperations_liquidate)
-  - [`_addDebt(uint256 tokenId, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_addDebt)
-  - [`_subDebt(uint256 tokenId, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_subDebt)
-  - [`_isUnderCollateralized(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_isUnderCollateralized)
+  - [`setCollateralizationLowerBound(uint256 value)`](/dev/liquid/liquid-contract#AdminActions_setCollateralizationLowerBound)
+  - [`getMaxBorrowable(uint256 tokenId)`](/dev/liquid/liquid-contract#ReadingState_getMaxBorrowable)
+  - [`_liquidate(uint256 acountId)`](/dev/liquid/liquid-contract#InternalOperations_liquidate)
+  - [`_addDebt(uint256 tokenId, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_addDebt)
+  - [`_subDebt(uint256 tokenId, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_subDebt)
+  - [`_isUnderCollateralized(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_isUnderCollateralized)
 - **Updated By**
-  - [`setMinimumCollateralization(uint256 value)`](/dev/alchemist/alchemist-contract#AdminActions_setMinimumCollateralization)
+  - [`setMinimumCollateralization(uint256 value)`](/dev/liquid/liquid-contract#AdminActions_setMinimumCollateralization)
 - **Read By**
   - `minimumCollateralization()`
-- **Notified By** - [`MinimumCollateralizationUpdated(uint256 value)`](/dev/alchemist/alchemist-contract#Events_MinimumCollateralizationUpdated)
+- **Notified By** - [`MinimumCollateralizationUpdated(uint256 value)`](/dev/liquid/liquid-contract#Events_MinimumCollateralizationUpdated)
 </details>
 <details>
   <summary>globalMinimumCollateralization</summary>
 
-- **Description** - represents the minimum allowed global collateralization ratio for the Alchemist. A threshold that if crossed will result in fully liquidating accounts to cover. Only accounts that are already eligible for standard (partial) liquidation can be fully liquidated as a result of the globalMinimumCollateralization.
+- **Description** - represents the minimum allowed global collateralization ratio for the Liquid. A threshold that if crossed will result in fully liquidating accounts to cover. Only accounts that are already eligible for standard (partial) liquidation can be fully liquidated as a result of the globalMinimumCollateralization.
 - **Type** - uint256
 - **Used By**
-  - [`_doLiquidation(uint256 accountId, uint256 collateralInUnderlying, uint256 repaidAmountInYield)`](/dev/alchemist/alchemist-contract#InternalOperations_doLiquidation)
+  - [`_doLiquidation(uint256 accountId, uint256 collateralInUnderlying, uint256 repaidAmountInYield)`](/dev/liquid/liquid-contract#InternalOperations_doLiquidation)
 - **Updated By**
-  - [`setGlobalMinimumCollateralization(uint256 value)`](/dev/alchemist/alchemist-contract#AdminActions_setGlobalMinimumCollateralization)
+  - [`setGlobalMinimumCollateralization(uint256 value)`](/dev/liquid/liquid-contract#AdminActions_setGlobalMinimumCollateralization)
 - **Read By**
   - `globalMinimumCollateralization()`
-- **Notified By** - [`GlobalMinimumCollateralizationUpdated(uint256 value)`](/dev/alchemist/alchemist-contract#Events_GlobalMinimumCollateralizationUpdated)
+- **Notified By** - [`GlobalMinimumCollateralizationUpdated(uint256 value)`](/dev/liquid/liquid-contract#Events_GlobalMinimumCollateralizationUpdated)
 </details>
 <details>
   <summary>collateralizationLowerBound</summary>
@@ -182,12 +182,12 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
   If `collateral / debt` falls below this value, the account becomes eligible for liquidation. In LTV terms: `liquidation LTV = 1 / collateralizationLowerBound`.
 - **Type** - uint256
 - **Used By**
-  - [`_liquidate(uint256 acountId)`](/dev/alchemist/alchemist-contract#InternalOperations_liquidate)
+  - [`_liquidate(uint256 acountId)`](/dev/liquid/liquid-contract#InternalOperations_liquidate)
 - **Updated By**
-  - [`setCollateralizationLowerBound(uint256 value)`](/dev/alchemist/alchemist-contract#AdminActions_setCollateralizationLowerBound)
+  - [`setCollateralizationLowerBound(uint256 value)`](/dev/liquid/liquid-contract#AdminActions_setCollateralizationLowerBound)
 - **Read By**
   - `collateralizationLowerBound()`
-- **Notified By** - [`CollateralizationLowerBoundUpdated(uint256 value)`](/dev/alchemist/alchemist-contract#Events_CollateralizationLowerBoundUpdated)
+- **Notified By** - [`CollateralizationLowerBoundUpdated(uint256 value)`](/dev/liquid/liquid-contract#Events_CollateralizationLowerBoundUpdated)
 </details>
 <details>
   <summary>protocolFee</summary>
@@ -195,14 +195,14 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - the fee percentage (expressed in BPS) on users paid to the protocol. The fee is taken from collateral during redepmtions, or from collateral when users pay down their non-earmarked debt
 - **Type** - uint256
 - **Used By**
-  - [`burn(uint256 acountId, uint256 recipientId)`](/dev/alchemist/alchemist-contract#UserActions_burn)
-  - [`repay(uint256 amount, uint256 recipientTokenId)`](/dev/alchemist/alchemist-contract#UserActions_repay)
-  - [`redeem(uint256 amount)`](/dev/alchemist/alchemist-contract#TransmuterActions_redeem)
+  - [`burn(uint256 acountId, uint256 recipientId)`](/dev/liquid/liquid-contract#UserActions_burn)
+  - [`repay(uint256 amount, uint256 recipientTokenId)`](/dev/liquid/liquid-contract#UserActions_repay)
+  - [`redeem(uint256 amount)`](/dev/liquid/liquid-contract#TransmuterActions_redeem)
 - **Updated By**
-  - [`setProtocolFee(uint256 fee)`](/dev/alchemist/alchemist-contract#AdminActions_setProtocolFee)
+  - [`setProtocolFee(uint256 fee)`](/dev/liquid/liquid-contract#AdminActions_setProtocolFee)
 - **Read By**
   - `protocolFee()`
-- **Notified By** - [`ProtocolFeeUpdated(uint256 fee)`](/dev/alchemist/alchemist-contract#Events_ProtocolFeeUpdated)
+- **Notified By** - [`ProtocolFeeUpdated(uint256 fee)`](/dev/liquid/liquid-contract#Events_ProtocolFeeUpdated)
 </details>
 <details>
   <summary>liquidatorFee</summary>
@@ -210,12 +210,12 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - fee percentage (expressed in BPS) paid to liquidators on liquidation. The fee amount (what this percentage is applied to) is denominated in debt token, which is then converted to yieldToken and taken from yieldToken. Also can be taken from underlying if feeBonus > 0.
 - **Type** - uint256
 - **Used By**
-  - [`_liquidate(uint256 accountId)`](/dev/alchemist/alchemist-contract#InternalOperations_liquidate)
+  - [`_liquidate(uint256 accountId)`](/dev/liquid/liquid-contract#InternalOperations_liquidate)
 - **Updated By**
-  - [`setLiquidatorFee(uint256 fee)`](/dev/alchemist/alchemist-contract#AdminActions_setLiquidatorFee)
+  - [`setLiquidatorFee(uint256 fee)`](/dev/liquid/liquid-contract#AdminActions_setLiquidatorFee)
 - **Read By**
   - `liquidatorFee()`
-- **Notified By** - [`LiquidatorFeeUpdated(uint256 fee)`](/dev/alchemist/alchemist-contract#Events_LiquidatorFeeUpdated)
+- **Notified By** - [`LiquidatorFeeUpdated(uint256 fee)`](/dev/liquid/liquid-contract#Events_LiquidatorFeeUpdated)
 </details>
 <details>
   <summary>repaymentFee</summary>
@@ -223,12 +223,12 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - fee percentage (expressed in BPS) paid to liquidators on repayment. The fee amount (which this percentage is applied to) is denominated in yieldToken.
 - **Type** - uint256
 - **Used By**
-  - [`_liquidate(uint256 accountId)`](/dev/alchemist/alchemist-contract#InternalOperations_liquidate)
+  - [`_liquidate(uint256 accountId)`](/dev/liquid/liquid-contract#InternalOperations_liquidate)
 - **Updated By**
-  - [`setRepaymentFee(uint256 fee)`](/dev/alchemist/alchemist-contract#AdminActions_setRepaymentFee)
+  - [`setRepaymentFee(uint256 fee)`](/dev/liquid/liquid-contract#AdminActions_setRepaymentFee)
 - **Read By**
   - `repaymentFee()`
-- **Notified By** - [`RepaymentFeeUpdated(uint256 fee)`](/dev/alchemist/alchemist-contract#Events_RepaymentFeeUpdated)
+- **Notified By** - [`RepaymentFeeUpdated(uint256 fee)`](/dev/liquid/liquid-contract#Events_RepaymentFeeUpdated)
 </details>
 
 ### Constants
@@ -241,14 +241,14 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - Constant equaling 10_000. Used for any explicit decimal representation. Treats 100% as 10,000; meaning 10% would be expressed as 1000 BPS.
 - **Type** - uint256
 - **Updated By**
-  - [`setProtocolFee(uint256 fee)`](/dev/alchemist/alchemist-contract#AdminActions_setProtocolFee)
-  - [`setLiquidatorFee(uint256 fee)`](/dev/alchemist/alchemist-contract#AdminActions_setLiquidatorFee)
-  - [`setRepaymentFee(uint256 fee)`](/dev/alchemist/alchemist-contract#AdminActions_setRepaymentFee)
-  - [`burn(uint256 amount, uint256 recipientId)`](/dev/alchemist/alchemist-contract#UserActions_burn)
-  - [`repay(uint256 amount, uint256 recipientTokenId)`](/dev/alchemist/alchemist-contract#UserActions_repay)
-  - [`redeem(uint256 amount)`](/dev/alchemist/alchemist-contract#TransmuterActions_redeem)
-  - [`calculateLiquidation(uint256 collateral, uint256 debt, uint256 targetCollateralization, uint256 alchemistCurrentCollateralization, uint256 alchemistMinimumCollateralization, uint256 feeBps)`](/dev/alchemist/alchemist-contract#ReadingState_calculateLiquidation)
-  - [`_liquidate(uint256 accountId)`](/dev/alchemist/alchemist-contract#InternalOperations_liquidate)
+  - [`setProtocolFee(uint256 fee)`](/dev/liquid/liquid-contract#AdminActions_setProtocolFee)
+  - [`setLiquidatorFee(uint256 fee)`](/dev/liquid/liquid-contract#AdminActions_setLiquidatorFee)
+  - [`setRepaymentFee(uint256 fee)`](/dev/liquid/liquid-contract#AdminActions_setRepaymentFee)
+  - [`burn(uint256 amount, uint256 recipientId)`](/dev/liquid/liquid-contract#UserActions_burn)
+  - [`repay(uint256 amount, uint256 recipientTokenId)`](/dev/liquid/liquid-contract#UserActions_repay)
+  - [`redeem(uint256 amount)`](/dev/liquid/liquid-contract#TransmuterActions_redeem)
+  - [`calculateLiquidation(uint256 collateral, uint256 debt, uint256 targetCollateralization, uint256 liquidCurrentCollateralization, uint256 liquidMinimumCollateralization, uint256 feeBps)`](/dev/liquid/liquid-contract#ReadingState_calculateLiquidation)
+  - [`_liquidate(uint256 accountId)`](/dev/liquid/liquid-contract#InternalOperations_liquidate)
 - **Updated By** - NONE - immutable variable
 </details>
 <details>
@@ -258,17 +258,17 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Type** - uint256
 - **Updated By**
   - `setMinimumCollateralization(uint256 value)`
-  - [`setCollateralizationLowerBound(uint256 value)`](/dev/alchemist/alchemist-contract#AdminActions_setCollateralizationLowerBound)
-  - [`getMaxBorrowable(uint256 tokenId)`](/dev/alchemist/alchemist-contract#ReadingState_getMaxBorrowable)
-  - [`withdraw(uint256 amount, address recipient, uint256 tokenId)`](/dev/alchemist/alchemist-contract#UserActions_withdraw)
-  - [`calculateLiquidation(uint256 collateral, uint256 debt, uint256 targetCollateralization, uint256 alchemistCurrentCollateralization, uint256 alchemistMinimumCollateralization, uint256 feeBps)`](/dev/alchemist/alchemist-contract#ReadingState_calculateLiquidation)
-  - [`_liquidate(uint256 accountId)`](/dev/alchemist/alchemist-contract#InternalOperations_liquidate)
-  - [`_addDebt(uint256 tokenId, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_addDebt)
-  - [`_subDebt(uint256 tokenId, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_subDebt)
-  - [`_isUnderCollateralized(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_isUnderCollateralized)
-  - [`_doLiquidation(uint256 accountId, uint256 collateralInUnderlying, uint256 repaidAmountInYield)`](/dev/alchemist/alchemist-contract#InternalOperations_doLiquidation)
-  - [`_sync()`](/dev/alchemist/alchemist-contract#InternalOperations_sync)
-  - [`_calculateUnrealizedDebt(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_calculateUnrealizedDebt)
+  - [`setCollateralizationLowerBound(uint256 value)`](/dev/liquid/liquid-contract#AdminActions_setCollateralizationLowerBound)
+  - [`getMaxBorrowable(uint256 tokenId)`](/dev/liquid/liquid-contract#ReadingState_getMaxBorrowable)
+  - [`withdraw(uint256 amount, address recipient, uint256 tokenId)`](/dev/liquid/liquid-contract#UserActions_withdraw)
+  - [`calculateLiquidation(uint256 collateral, uint256 debt, uint256 targetCollateralization, uint256 liquidCurrentCollateralization, uint256 liquidMinimumCollateralization, uint256 feeBps)`](/dev/liquid/liquid-contract#ReadingState_calculateLiquidation)
+  - [`_liquidate(uint256 accountId)`](/dev/liquid/liquid-contract#InternalOperations_liquidate)
+  - [`_addDebt(uint256 tokenId, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_addDebt)
+  - [`_subDebt(uint256 tokenId, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_subDebt)
+  - [`_isUnderCollateralized(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_isUnderCollateralized)
+  - [`_doLiquidation(uint256 accountId, uint256 collateralInUnderlying, uint256 repaidAmountInYield)`](/dev/liquid/liquid-contract#InternalOperations_doLiquidation)
+  - [`_sync()`](/dev/liquid/liquid-contract#InternalOperations_sync)
+  - [`_calculateUnrealizedDebt(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_calculateUnrealizedDebt)
 - **Updated By** - NONE - immutable variable
 </details>
 <details>
@@ -291,39 +291,39 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - user deposits denominated in yieldTokens.
 - **Type** - uint256
 - **Used By**
-  - [`\_calculateUnrealizedDebt(uint256 tokenId)](/dev/alchemist/alchemist-contract#InternalOperations_calculateUnrealizedDebt)
-- **Updated By** - [`deposit(uint256 amount, address recipient, uint256 recipientId)`](/dev/alchemist/alchemist-contract#UserActions_deposit) - [`withdraw(uint256 amount, address recipient, uint256 recipientId)`](/dev/alchemist/alchemist-contract#UserActions_withdraw) - [`burn(uint256 amount, uint256 recipientId)`](/dev/alchemist/alchemist-contract#UserActions_burn) - [`repay(uint256 amount, uint256 recipientTokenId)`](/dev/alchemist/alchemist-contract#UserActions_repay) - [`_forceRepay(uint256 accountId, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_forceRepay) - [`_liquidate(uint256 accountId)`](/dev/alchemist/alchemist-contract#InternalOperations_liquidate) - [`_sync(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_sync)
+  - [`\_calculateUnrealizedDebt(uint256 tokenId)](/dev/liquid/liquid-contract#InternalOperations_calculateUnrealizedDebt)
+- **Updated By** - [`deposit(uint256 amount, address recipient, uint256 recipientId)`](/dev/liquid/liquid-contract#UserActions_deposit) - [`withdraw(uint256 amount, address recipient, uint256 recipientId)`](/dev/liquid/liquid-contract#UserActions_withdraw) - [`burn(uint256 amount, uint256 recipientId)`](/dev/liquid/liquid-contract#UserActions_burn) - [`repay(uint256 amount, uint256 recipientTokenId)`](/dev/liquid/liquid-contract#UserActions_repay) - [`_forceRepay(uint256 accountId, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_forceRepay) - [`_liquidate(uint256 accountId)`](/dev/liquid/liquid-contract#InternalOperations_liquidate) - [`_sync(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_sync)
 </details>
 <details>
   <summary>debt</summary>
 
-- **Description** - denominated in alAsset
+- **Description** - denominated in lAsset
 - **Type** - uint256
 - **Used By**
-  - [`burn(uint256 amount, uint256 recipientId)`](/dev/alchemist/alchemist-contract#UserActions_burn)
-  - [`repay(uint256 amount, uint256 recipientTokenId)`](/dev/alchemist/alchemist-contract#UserActions_repay)
-  - [`_forceRepay(uint256 accountId, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_forceRepay)
-  - [`_liquidate(uint256 accountId)`](/dev/alchemist/alchemist-contract#InternalOperations_liquidate)
-  - [`calculateLiquidation(uint256 collateral, uint256 debt, uint256 targetCollateralization, uint256 alchemistCurrentCollateralization, uint256 alchemistMinimumCollateralization, uint256 feeBps)`](/dev/alchemist/alchemist-contract#ReadingState_calculateLiquidation)
-  - [`_sync(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_sync)
-  - [`_calculateUnrealizedDebt(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_calculateUnrealizedDebt)
-  - [`_isUnderCollateralized(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_isUnderCollateralized)
-- **Updated By** - [`_addDebt(uint256 tokenId, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_addDebt) - [`_subDebt(uint256 tokenId, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_subDebt) - [`_sync(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_sync)
+  - [`burn(uint256 amount, uint256 recipientId)`](/dev/liquid/liquid-contract#UserActions_burn)
+  - [`repay(uint256 amount, uint256 recipientTokenId)`](/dev/liquid/liquid-contract#UserActions_repay)
+  - [`_forceRepay(uint256 accountId, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_forceRepay)
+  - [`_liquidate(uint256 accountId)`](/dev/liquid/liquid-contract#InternalOperations_liquidate)
+  - [`calculateLiquidation(uint256 collateral, uint256 debt, uint256 targetCollateralization, uint256 liquidCurrentCollateralization, uint256 liquidMinimumCollateralization, uint256 feeBps)`](/dev/liquid/liquid-contract#ReadingState_calculateLiquidation)
+  - [`_sync(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_sync)
+  - [`_calculateUnrealizedDebt(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_calculateUnrealizedDebt)
+  - [`_isUnderCollateralized(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_isUnderCollateralized)
+- **Updated By** - [`_addDebt(uint256 tokenId, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_addDebt) - [`_subDebt(uint256 tokenId, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_subDebt) - [`_sync(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_sync)
 
 </details>
 <details>
   <summary>earmarked</summary>
 
-- **Description** - denominated in alAsset. Earmarked funds refer to debt that is reserved to later be redeemed for collateral. Earmarked debt can only be repaid using yieldToken.
+- **Description** - denominated in lAsset. Earmarked funds refer to debt that is reserved to later be redeemed for collateral. Earmarked debt can only be repaid using yieldToken.
 - **Type** - uint256
 - **Used By**
-  - [`burn(uint256 amount, uint256 recipientId)`](/dev/alchemist/alchemist-contract#UserActions_burn)
-  - [`repay(uint256 amount, uint256 recipientTokenId)`](/dev/alchemist/alchemist-contract#UserActions_repay)
-  - [`_forceRepay(uint256 accountId, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_forceRepay)
-  - [`_liquidate(uint256 accountId)`](/dev/alchemist/alchemist-contract#InternalOperations_liquidate)
-  - [`_sync(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_sync)
-  - [`_calculateUnrealizedDebt(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_calculateUnrealizedDebt)
-- **Updated By** - [`_addDebt(uint256 tokenId, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_addDebt) - [`repay(uint256 amount, uint256 recipientTokenId)`](/dev/alchemist/alchemist-contract#UserActions_repay) - [`_forceRepay(uint256 accountId, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_forceRepay) - [`\_sync(uint256 tokenId)](/dev/alchemist/alchemist-contract#InternalOperations_sync)
+  - [`burn(uint256 amount, uint256 recipientId)`](/dev/liquid/liquid-contract#UserActions_burn)
+  - [`repay(uint256 amount, uint256 recipientTokenId)`](/dev/liquid/liquid-contract#UserActions_repay)
+  - [`_forceRepay(uint256 accountId, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_forceRepay)
+  - [`_liquidate(uint256 accountId)`](/dev/liquid/liquid-contract#InternalOperations_liquidate)
+  - [`_sync(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_sync)
+  - [`_calculateUnrealizedDebt(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_calculateUnrealizedDebt)
+- **Updated By** - [`_addDebt(uint256 tokenId, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_addDebt) - [`repay(uint256 amount, uint256 recipientTokenId)`](/dev/liquid/liquid-contract#UserActions_repay) - [`_forceRepay(uint256 accountId, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_forceRepay) - [`\_sync(uint256 tokenId)](/dev/liquid/liquid-contract#InternalOperations_sync)
 
 </details>
 <details>
@@ -332,9 +332,9 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - the portion of an accounts collateralBalance which can currently be used to take out new debt. Denominated in yieldToken
 - **Type** - uint256
 - **Used By**
-  - [`withdraw(uint256 amount, address recipient, uint256 tokenId)`](/dev/alchemist/alchemist-contract#UserActions_withdraw)
-  - [`_addDebt(uint256 tokenId, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_addDebt)
-- **Updated By** - [`deposit(uint256 amount, uint256 recipient, uint256 recipientId)`](/dev/alchemist/alchemist-contract#UserActions_deposit) - [`withdraw(uint256 amount, address recipient, uint256 tokenId)`](/dev/alchemist/alchemist-contract#UserActions_withdraw) - [`_addDebt(uint256 tokenId, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_addDebt) - [`_subDebt(uint256 tokenId, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_subDebt)
+  - [`withdraw(uint256 amount, address recipient, uint256 tokenId)`](/dev/liquid/liquid-contract#UserActions_withdraw)
+  - [`_addDebt(uint256 tokenId, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_addDebt)
+- **Updated By** - [`deposit(uint256 amount, uint256 recipient, uint256 recipientId)`](/dev/liquid/liquid-contract#UserActions_deposit) - [`withdraw(uint256 amount, address recipient, uint256 tokenId)`](/dev/liquid/liquid-contract#UserActions_withdraw) - [`_addDebt(uint256 tokenId, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_addDebt) - [`_subDebt(uint256 tokenId, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_subDebt)
 </details>
 <details>
   <summary>lastAccruedEarmarkWeight</summary>
@@ -342,9 +342,9 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - Last weight of debt from the most recent account sync. This is a stored index used as a checkpoint of the last time a position had earmarking applied. The global earmark weight advances as new debt is added and as time in blocks passes (to model earmark progress). The difference between these weightings determines how much additional debt in the position needs to be earmarked.
 - **Type** - uint256
 - **Used By**
-  - [`_sync(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_sync)
-  - [`_calculateUnrealizedDebt(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_calculateUnrealizedDebt)
-- **Updated By** - [`_sync(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_sync)
+  - [`_sync(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_sync)
+  - [`_calculateUnrealizedDebt(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_calculateUnrealizedDebt)
+- **Updated By** - [`_sync(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_sync)
 </details>
 <details>
   <summary>lastAccruedRedemptionWeight</summary>
@@ -352,9 +352,9 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - Last weight of redemption from most recent account sync. This is a stored index used as a checkpoint of the last time a position had redemptions applied. The global redemption weight advances as system-wide redemptions occur and as time in blocks passes (to model redemption progress). The difference between these weightings determines how much of the account’s earmarked debt should actually be redeemed.
 - **Type** - uint256
 - **Used By**
-  - [`_sync(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_sync)
-  - [`_calculateUnrealizedDebt(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_calculateUnrealizedDebt)
-- **Updated By** - [`_sync(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_sync)
+  - [`_sync(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_sync)
+  - [`_calculateUnrealizedDebt(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_calculateUnrealizedDebt)
+- **Updated By** - [`_sync(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_sync)
 </details>
 <details>
   <summary>lastCollateralWeight</summary>
@@ -362,9 +362,9 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - Last weight of collateral from most recent account sync. This is a stored index used as a checkpoint of the last time a position had its locked collateral adjusted. The global collateral weight advances as system-wide redemptions are processed. The difference between these weightings determines how much of the account’s locked collateral should be reduced.
 - **Type** - uint256
 - **Used By**
-  - [`_sync(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_sync)
-  - [`_calculateUnrealizedDebt(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_calculateUnrealizedDebt)
-- **Updated By** - [`_sync(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_sync)
+  - [`_sync(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_sync)
+  - [`_calculateUnrealizedDebt(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_calculateUnrealizedDebt)
+- **Updated By** - [`_sync(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_sync)
 </details>
 <details>
   <summary>lastMintBlock</summary>
@@ -372,9 +372,9 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - Block of the most recent mint.
 - **Type** - uint256
 - **Used By**
-  - [`burn(uint256 amount, uint256 recipientId)`](/dev/alchemist/alchemist-contract#UserActions_burn)
-  - [`repay(uint256 amount, uint256 recipientId)`](/dev/alchemist/alchemist-contract#UserActions_repay)
-- **Updated By** - [`calculateLiquidation(uint256 collateral, uint256 debt, uint256 targetCollateralization, uint256 alchemistCurretnCollateralization, uint256 alchemistMinimumCollateralization, uint256 feeBps)`](/dev/alchemist/alchemist-contract#ReadingState_calculateLiquidation)
+  - [`burn(uint256 amount, uint256 recipientId)`](/dev/liquid/liquid-contract#UserActions_burn)
+  - [`repay(uint256 amount, uint256 recipientId)`](/dev/liquid/liquid-contract#UserActions_repay)
+- **Updated By** - [`calculateLiquidation(uint256 collateral, uint256 debt, uint256 targetCollateralization, uint256 liquidCurretnCollateralization, uint256 liquidMinimumCollateralization, uint256 feeBps)`](/dev/liquid/liquid-contract#ReadingState_calculateLiquidation)
 </details>
 <details>
   <summary>lastRedemptionSync</summary>
@@ -382,8 +382,8 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - Block the last redemption was synced to the account.
 - **Type** - uint256
 - **Used By**
-  - [`_sync(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_sync)
-- **Updated By** - [`_sync(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_sync)
+  - [`_sync(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_sync)
+- **Updated By** - [`_sync(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_sync)
 </details>
 <details>
   <summary>rawLocked</summary>
@@ -391,21 +391,21 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - the portion of an accounts collateral balance that's already pledged to collateralize existing debt and can't be used for new borrows until debt is repaid or a position get's room. Denominated in yieldTokens
 - **Type** - uint256
 - **Used By**
-  - [`_sync(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_sync)
-  - [`_calculateUnrealizedDebt(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_calculateUnrealizedDebt)
-- **Updated By** - [`_addDebt(uint256 tokenId, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_addDebt) - [`_subDebt(uint256 tokenId, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_subDebt) - [`_sync(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_sync)
+  - [`_sync(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_sync)
+  - [`_calculateUnrealizedDebt(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_calculateUnrealizedDebt)
+- **Updated By** - [`_addDebt(uint256 tokenId, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_addDebt) - [`_subDebt(uint256 tokenId, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_subDebt) - [`_sync(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_sync)
 </details>
 <details>
   <summary>mintAllowances</summary>
 
-- **Description** - allowances for minting alAssets, per version. Indexing by allowances version allows for easy efficient clearing of the entire map if needed.
+- **Description** - allowances for minting lAssets, per version. Indexing by allowances version allows for easy efficient clearing of the entire map if needed.
 - **Type** - mapping(uint256 => mapping(address => uint256))
 - **Updated By**
-  - [`_approveMint(uint256 ownerTokenId, address spener, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_approveMint)
-  - [`_decreaseMintAllowance(uint256 ownerTokenId, address spener, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_decreaseMintAllowance)
+  - [`_approveMint(uint256 ownerTokenId, address spener, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_approveMint)
+  - [`_decreaseMintAllowance(uint256 ownerTokenId, address spener, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_decreaseMintAllowance)
 - **Read By**
-  - [`mintAllowance(uint256 ownerTokenId, address spender)`](/dev/alchemist/alchemist-contract#ReadingState_mintAllowance)
-- **Notified By** - [`MintAllowancesReset(uint256 tokenId)`](/dev/alchemist/alchemist-contract#Events_MintAllowancesReset)
+  - [`mintAllowance(uint256 ownerTokenId, address spender)`](/dev/liquid/liquid-contract#ReadingState_mintAllowance)
+- **Notified By** - [`MintAllowancesReset(uint256 tokenId)`](/dev/liquid/liquid-contract#Events_MintAllowancesReset)
 </details>
 <details>
   <summary>allowancesVersion</summary>
@@ -413,10 +413,10 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - id used in the mintAllowances map which is incremented on reset.
 - **Type** - uint256
 - **Used By**
-  - [`mintAllowance(uint256 ownerTokenId, address spender)`](/dev/alchemist/alchemist-contract#ReadingState_mintAllowance)
-  - [`_approveMint(uint256 ownerTokenId, address spener, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_approveMint)
-  - [`_decreaseMintAllowance(uint256 ownerTokenId, address spener, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_decreaseMintAllowance)
-- **Updated By** - [`resetMintAllowances(uint256 tokenId)`](/dev/alchemist/alchemist-contract#UserActions_resetMintAllowances)
+  - [`mintAllowance(uint256 ownerTokenId, address spender)`](/dev/liquid/liquid-contract#ReadingState_mintAllowance)
+  - [`_approveMint(uint256 ownerTokenId, address spener, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_approveMint)
+  - [`_decreaseMintAllowance(uint256 ownerTokenId, address spener, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_decreaseMintAllowance)
+- **Updated By** - [`resetMintAllowances(uint256 tokenId)`](/dev/liquid/liquid-contract#UserActions_resetMintAllowances)
 </details>
 
 ### RedemptionInfo
@@ -429,9 +429,9 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - the snapshot of the global earmark index at the last redemption block. It’s used to rewind an account’s earmarked debt back to what it was when that redemption occurred, so the system can correctly apply the redemption against the right state.
 - **Type** - uint256
 - **Used By**
-  - [`_sync(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_sync)
-  - [`_calculateUnrealizedDebt(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_calculateUnrealizedDebt)
-- **Updated By** - [`redeem(uint256 amount)`](/dev/alchemist/alchemist-contract#TransmuterActions_redeem)
+  - [`_sync(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_sync)
+  - [`_calculateUnrealizedDebt(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_calculateUnrealizedDebt)
+- **Updated By** - [`redeem(uint256 amount)`](/dev/liquid/liquid-contract#TransmuterActions_redeem)
 </details>
 
 ### Public State
@@ -446,40 +446,40 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - The first step in a two-step process of setting a new administrator. The pendingAdmin is set by the current admin, then the pendingAdmin must accept the responsibility to lock in the change of admin.
 - **Type** - address
 - **Updated By**
-  - [`setPendingAdmin(address value)`](/dev/alchemist/alchemist-contract#AdminActions_setPendingAdmin)
+  - [`setPendingAdmin(address value)`](/dev/liquid/liquid-contract#AdminActions_setPendingAdmin)
 - **Read By**
   - `pendingAdmin()`
-- **Notified By** - [`PendingAdminUpdated(address value)`](/dev/alchemist/alchemist-contract#Events_PendingAdminUpdated)
+- **Notified By** - [`PendingAdminUpdated(address value)`](/dev/liquid/liquid-contract#Events_PendingAdminUpdated)
 </details>
 <details>
-  <summary>alchemistFeeVault</summary>
+  <summary>liquidFeeVault</summary>
 
-- **Description** - An external vault used to hold funds that can be used to pay liquidators in the event that Alchemist funds cannot cover the costs of liquidation. This would occur if (1) the account does not have enough funds to cover the liquidation, or (2) the entire Alchemist is undercollateralized.
+- **Description** - An external vault used to hold funds that can be used to pay liquidators in the event that Liquid funds cannot cover the costs of liquidation. This would occur if (1) the account does not have enough funds to cover the liquidation, or (2) the entire Liquid is undercollateralized.
 - **Type** - address
 - **Used By**
-  - [`_`doliquidation(uint256 accountId, uint256 collateralInUnderlying, uint256 repaidAmountInYield)`](/dev/alchemist/alchemist-contract#InternalOperations_doLiquidation)
+  - [`_`doliquidation(uint256 accountId, uint256 collateralInUnderlying, uint256 repaidAmountInYield)`](/dev/liquid/liquid-contract#InternalOperations_doLiquidation)
 - **Updated By**
-  - [`setAlchemistFeeVault(address value)`](/dev/alchemist/alchemist-contract#AdminActions_setAlchemistFeeVault)
+  - [`setLiquidFeeVault(address value)`](/dev/liquid/liquid-contract#AdminActions_setLiquidFeeVault)
 - **Read By**
-  - `alchemistFeeVault()`
-- **Notified By** - [`AlchemistFeeVaultUpdated(address value)`](/dev/alchemist/alchemist-contract#Events_AlchemistFeeVaultUpdated)
+  - `liquidFeeVault()`
+- **Notified By** - [`LiquidFeeVaultUpdated(address value)`](/dev/liquid/liquid-contract#Events_LiquidFeeVaultUpdated)
 </details>
 <details>
-  <summary>alchemistPositionNFT</summary>
+  <summary>liquidPositionNFT</summary>
 
-- **Description** - the address of the NFT contract for this alchemist. Each position in the alchemist is tied to an NFT.
+- **Description** - the address of the NFT contract for this liquid. Each position in the liquid is tied to an NFT.
 - **Type** - address
 - **Used By**
-  - [`deposit(uint256 amount, address recipient, uint256 tokenId)`](/dev/alchemist/alchemist-contract#UserActions_deposit)
-  - [`withdraw(uint256 amount, address recipient, uint256 tokenId)`](/dev/alchemist/alchemist-contract#UserActions_withdraw)
-  - [`mint(uint256 tokenId, uint256 amount, address recipient)`](/dev/alchemist/alchemist-contract#UserActions_mint)
-  - [`batchLiquidate(uint256[] memory accountIds)`](/dev/alchemist/alchemist-contract#UserActions_batchLiquidate)
-  - [`approveMint(uint256 tokenId, address spender, uint256 amount)`](/dev/alchemist/alchemist-contract#UserActions_approveMint)
-  - [`resetMintAllowances(uint256 tokenId)`](/dev/alchemist/alchemist-contract#UserActions_resetMintAllowances)
-  - [`_checkForValidAccountId(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_checkForValidAccountId)
+  - [`deposit(uint256 amount, address recipient, uint256 tokenId)`](/dev/liquid/liquid-contract#UserActions_deposit)
+  - [`withdraw(uint256 amount, address recipient, uint256 tokenId)`](/dev/liquid/liquid-contract#UserActions_withdraw)
+  - [`mint(uint256 tokenId, uint256 amount, address recipient)`](/dev/liquid/liquid-contract#UserActions_mint)
+  - [`batchLiquidate(uint256[] memory accountIds)`](/dev/liquid/liquid-contract#UserActions_batchLiquidate)
+  - [`approveMint(uint256 tokenId, address spender, uint256 amount)`](/dev/liquid/liquid-contract#UserActions_approveMint)
+  - [`resetMintAllowances(uint256 tokenId)`](/dev/liquid/liquid-contract#UserActions_resetMintAllowances)
+  - [`_checkForValidAccountId(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_checkForValidAccountId)
 - **Updated By**
-  - [`setAlchemistPositionNFT(address nft)`](/dev/alchemist/alchemist-contract#AdminActions_setAlchemistPositionNFT)
-- **Read By** - `alchemistPositionNFT()`
+  - [`setLiquidPositionNFT(address nft)`](/dev/liquid/liquid-contract#AdminActions_setLiquidPositionNFT)
+- **Read By** - `liquidPositionNFT()`
 </details>
 
 #### Uint256
@@ -487,11 +487,11 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 <details id="Variables_underlyingConversionFactor">
   <summary>underlyingConversionFactor</summary>
 
-- **Description** - Set once on initialization, dependent on initialization params, then never again. Determines what you can multiply the underlying token decimals by in order to denominate similarly to alAsset; For example if USDC is 6 decimals and alUSD is 18, then the conversion factor is 10^12 to be able to denominate USDC the same way as alUSD. Used for mathematical operations
+- **Description** - Set once on initialization, dependent on initialization params, then never again. Determines what you can multiply the underlying token decimals by in order to denominate similarly to lAsset; For example if USDC is 6 decimals and LUSD is 18, then the conversion factor is 10^12 to be able to denominate USDC the same way as LUSD. Used for mathematical operations
 - **Type** - uint256
 - **Used By**
-  - [`normalizeUnderlyingTokensToDebt(uint256 amount)`](/dev/alchemist/alchemist-contract#ReadingState_normalizeUnderlyingTokensToDebt)
-  - [`normalizeDebtTokensToUnderlying(uint256 amount)`](/dev/alchemist/alchemist-contract#ReadingState_normalizeDebtTokensToUnderlying)
+  - [`normalizeUnderlyingTokensToDebt(uint256 amount)`](/dev/liquid/liquid-contract#ReadingState_normalizeUnderlyingTokensToDebt)
+  - [`normalizeDebtTokensToUnderlying(uint256 amount)`](/dev/liquid/liquid-contract#ReadingState_normalizeDebtTokensToUnderlying)
 - **Updated By**
   - `initialize(LiquidInitializationParams memory params)`
 - **Read By** - `underlyingConversionFactor()`
@@ -502,14 +502,14 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - Global running total of system debt currently earmarked for redemption. Can be any amount 0 up to the amount of total system debt. Unearmarked debt = totalDebt - cumulativeEarmarked.
 - **Type** - uint256
 - **Used By**
-  - [`repay(uint256 amount, uint256 recipientTokenId)`](/dev/alchemist/alchemist-contract#UserActions_repay)
-  - [`redeem(uint256 amount)`](/dev/alchemist/alchemist-contract#TransmuterActions_redeem)
-  - [`_earmark()`](/dev/alchemist/alchemist-contract#InternalOperations_earmark)
-  - [`_calculateUnrealizedDebt(int256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_calculateUnrealizedDebt)
+  - [`repay(uint256 amount, uint256 recipientTokenId)`](/dev/liquid/liquid-contract#UserActions_repay)
+  - [`redeem(uint256 amount)`](/dev/liquid/liquid-contract#TransmuterActions_redeem)
+  - [`_earmark()`](/dev/liquid/liquid-contract#InternalOperations_earmark)
+  - [`_calculateUnrealizedDebt(int256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_calculateUnrealizedDebt)
 - **Updated By**
-  - [repay(uint256 amount, uint256 recipientTokenId)`](/dev/alchemist/alchemist-contract#UserActions_repay)
-  - [`redeem(uint256 amount)`](/dev/alchemist/alchemist-contract#TransmuterActions_redeem)
-  - [`_earmark()`](/dev/alchemist/alchemist-contract#InternalOperations_earmark)
+  - [repay(uint256 amount, uint256 recipientTokenId)`](/dev/liquid/liquid-contract#UserActions_repay)
+  - [`redeem(uint256 amount)`](/dev/liquid/liquid-contract#TransmuterActions_redeem)
+  - [`_earmark()`](/dev/liquid/liquid-contract#InternalOperations_earmark)
 - **Read By** - `cumulativeEarmarked()`
 </details>
 <details>
@@ -518,10 +518,10 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - the block number when \_earmark() last updated global earmarking. Used to compute how much to earmark from the last time earmarking occured.
 - **Type** - uint256
 - **Used By**
-  - [`_earmark()`](/dev/alchemist/alchemist-contract#InternalOperations_earmark)
-  - [`_calculateUnrealizedDebt(int256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_calculateUnrealizedDebt)
+  - [`_earmark()`](/dev/liquid/liquid-contract#InternalOperations_earmark)
+  - [`_calculateUnrealizedDebt(int256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_calculateUnrealizedDebt)
 - **Updated By**
-  - [`_earmark()`](/dev/alchemist/alchemist-contract#InternalOperations_earmark)
+  - [`_earmark()`](/dev/liquid/liquid-contract#InternalOperations_earmark)
 - **Read By** - `lastEarmarkBlock()`
 </details>
 <details>
@@ -530,21 +530,21 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - the block number of the most recent redemption that advanced global redemption state. Used to reference the snapshot of earmark and debt state at that block, so accounts can be updated consistently by applying the redemption against that state.
 - **Type** - uint256
 - **Used By**
-  - [`_sync(uint256 tokenId)`]`(/dev/alchemist/alchemist-contract#InternalOperations_sync)
-  - [`_calculateUnrealizedDebt(int256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_calculateUnrealizedDebt)
+  - [`_sync(uint256 tokenId)`]`(/dev/liquid/liquid-contract#InternalOperations_sync)
+  - [`_calculateUnrealizedDebt(int256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_calculateUnrealizedDebt)
 - **Updated By**
-  - [`redeem(uint256 amount)`](/dev/alchemist/alchemist-contract#TransmuterActions_redeem)
+  - [`redeem(uint256 amount)`](/dev/liquid/liquid-contract#TransmuterActions_redeem)
 - **Read By** - `lastEarmarkBlock()`
 </details>
 <details>
   <summary>lastTransmuterTokenBalance</summary>
 
-- **Description** - the last recorded balance of yieldTokens in the Transmuter. It is periodically updated by a Transmuter call, and is used to help the Alchemist determine how much it needs to earmark.
+- **Description** - the last recorded balance of yieldTokens in the Transmuter. It is periodically updated by a Transmuter call, and is used to help the Liquid determine how much it needs to earmark.
 - **Type** - uint256
 - **Used By**
-  - [`_earmark()`](/dev/alchemist/alchemist-contract#InternalOperations_earmark)
+  - [`_earmark()`](/dev/liquid/liquid-contract#InternalOperations_earmark)
 - **Updated By**
-  - [`setLastTransmuterTokenBalance(uint256 amount)`](/dev/alchemist/alchemist-contract#TransmuterActions_setLastTransmuterTokenBalance)
+  - [`setLastTransmuterTokenBalance(uint256 amount)`](/dev/liquid/liquid-contract#TransmuterActions_setLastTransmuterTokenBalance)
 - **Read By** - `lastTransmuterTokenBalance()`
 </details>
 <details>
@@ -553,14 +553,14 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - The total system-wide debt.
 - **Type** - uint256
 - **Used By**
-  - [`redeem(uint256 amount)`](/dev/alchemist/alchemist-contract#TransmuterActions_redeem)
-  - [`_doLiquidation(uint256 accountId, uint256 collateralInUnderlying, uint256 repaidAmountInYield)`](/dev/alchemist/alchemist-contract#InternalOperations_doLiquidation)
-  - [`_earmark()`](/dev/alchemist/alchemist-contract#InternalOperations_earmark)
-  - [`_calculateUnrealizedDebt(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_calculateUnrealizedDebt)
+  - [`redeem(uint256 amount)`](/dev/liquid/liquid-contract#TransmuterActions_redeem)
+  - [`_doLiquidation(uint256 accountId, uint256 collateralInUnderlying, uint256 repaidAmountInYield)`](/dev/liquid/liquid-contract#InternalOperations_doLiquidation)
+  - [`_earmark()`](/dev/liquid/liquid-contract#InternalOperations_earmark)
+  - [`_calculateUnrealizedDebt(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_calculateUnrealizedDebt)
 - **Updated By**
-  - [`redeem(uint256 amount)`](/dev/alchemist/alchemist-contract#TransmuterActions_redeem)
-  - [`_addDebt(uint256 tokenUd, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_addDebt)
-  - [`_subDebt(uint256 tokenUd, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_subDebt)
+  - [`redeem(uint256 amount)`](/dev/liquid/liquid-contract#TransmuterActions_redeem)
+  - [`_addDebt(uint256 tokenUd, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_addDebt)
+  - [`_subDebt(uint256 tokenUd, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_subDebt)
 - **Read By** - `totalDebt()`
 </details>
 <details>
@@ -569,11 +569,11 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - The total system-wide debt tokens issued and circulating.
 - **Type** - uint256
 - **Used By**
-  - [`burn(uint256 amount, uint256 recipientId)`](/dev/alchemist/alchemist-contract#UserActions_burn)
+  - [`burn(uint256 amount, uint256 recipientId)`](/dev/liquid/liquid-contract#UserActions_burn)
 - **Updated By**
-  - [`burn(uint256 amount, uint256 recipientId)`](/dev/alchemist/alchemist-contract#UserActions_burn)
-  - [`reduceSyntheticsIssued(uint256 amount)`](/dev/alchemist/alchemist-contract#TransmuterActions_reduceSyntheticsIssued)
-  - [`_mint(uint256 tokenId, uint256 amount, address recipient)`](/dev/alchemist/alchemist-contract#InternalOperations_mint)
+  - [`burn(uint256 amount, uint256 recipientId)`](/dev/liquid/liquid-contract#UserActions_burn)
+  - [`reduceSyntheticsIssued(uint256 amount)`](/dev/liquid/liquid-contract#TransmuterActions_reduceSyntheticsIssued)
+  - [`_mint(uint256 tokenId, uint256 amount, address recipient)`](/dev/liquid/liquid-contract#InternalOperations_mint)
 - **Read By** - `totalSyntheticsIssued()`
 </details>
 
@@ -585,12 +585,12 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - A flag that prevents depositing by users when set to true. Can be toggled by an Admin or Guardian.
 - **Type** - boolean
 - **Used By**
-  - [`deposit(uint256 amount, uint256 recipient, uint256 tokenId)`](/dev/alchemist/alchemist-contract#UserActions_deposit)
+  - [`deposit(uint256 amount, uint256 recipient, uint256 tokenId)`](/dev/liquid/liquid-contract#UserActions_deposit)
 - **Updated By**
-  - [`pauseDeposits(bool isPaused)`](/dev/alchemist/alchemist-contract#GuardianActions_pauseDeposits)
+  - [`pauseDeposits(bool isPaused)`](/dev/liquid/liquid-contract#GuardianActions_pauseDeposits)
 - **Read By**
   - `depositsPaused()`
-- **Notified By** - [`DepositsPaused(bool isPaused)`](/dev/alchemist/alchemist-contract#Events_DepositsPaused)
+- **Notified By** - [`DepositsPaused(bool isPaused)`](/dev/liquid/liquid-contract#Events_DepositsPaused)
 </details>
 <details>
   <summary>loansPaused</summary>
@@ -598,13 +598,13 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - A flag that prevents taking loans by users when set to true. Can be toggled by an Admin or Guardian.
 - **Type** - boolean
 - **Used By**
-  - [`mint(uint256 tokenId, uint256 amount, uint256 recipient)`](/dev/alchemist/alchemist-contract#UserActions_mint)
-  - [`mintFrom(uint256 tokenId, uint256 amount, uint256 recipient)`](/dev/alchemist/alchemist-contract#UserActions_mintFrom)
+  - [`mint(uint256 tokenId, uint256 amount, uint256 recipient)`](/dev/liquid/liquid-contract#UserActions_mint)
+  - [`mintFrom(uint256 tokenId, uint256 amount, uint256 recipient)`](/dev/liquid/liquid-contract#UserActions_mintFrom)
 - **Updated By**
-  - [`pauseLoans(bool isPaused)`](/dev/alchemist/alchemist-contract#GuardianActions_pauseLoans)
+  - [`pauseLoans(bool isPaused)`](/dev/liquid/liquid-contract#GuardianActions_pauseLoans)
 - **Read By**
   - `loansPaused()`
-- **Notified By** - [`LoansPaused(bool isPaused)`](/dev/alchemist/alchemist-contract#Events_LoansPaused)
+- **Notified By** - [`LoansPaused(bool isPaused)`](/dev/liquid/liquid-contract#Events_LoansPaused)
 </details>
 
 #### Mappings
@@ -615,12 +615,12 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - A mapping of addresses to true or false values, where true indicates that the address is enabled as having the guardian role (able to execute functions guarded by the `OnlyAdminOrGuardian` modifier), and false marks the address as not having the guardian role.
 - **Type** - mapping(address => bool)
 - **Used By**
-  - [`Guardian Actions`](/dev/alchemist/alchemist-contract#guardian-actions)
+  - [`Guardian Actions`](/dev/liquid/liquid-contract#guardian-actions)
 - **Updated By**
-  - [`setGuardian(address guardian, bool isActive)`](/dev/alchemist/alchemist-contract#AdminActions_setGuardian)
+  - [`setGuardian(address guardian, bool isActive)`](/dev/liquid/liquid-contract#AdminActions_setGuardian)
 - **Read By**
   - `guardians(address guardian)`
-- **Notified By** - [`GuardianSet(address guardian, bool state)`](/dev/alchemist/alchemist-contract#Events_GuardianSet)
+- **Notified By** - [`GuardianSet(address guardian, bool state)`](/dev/liquid/liquid-contract#Events_GuardianSet)
 </details>
 
 ### Private State
@@ -635,10 +635,10 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - A global cumulative scaling factor that increases whenever new debt is earmarked. Accounts use the difference between this value and their account-specific lastAccruedEarmarkWeight to determine how much of their outstanding debt should now be considered earmarked.
 - **Type** - uint256
 - **Used By**
-  - [`redeem(uint256 amount)`](/dev/alchemist/alchemist-contract#TransmuterActions_redeem)
-  - [`_sync(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_sync)
-  - [`_calculateUnrealizedDebt(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_calculateUnrealizedDebt)
-- **Updated By** - [`_earmark()`](/dev/alchemist/alchemist-contract#InternalOperations_earmark)
+  - [`redeem(uint256 amount)`](/dev/liquid/liquid-contract#TransmuterActions_redeem)
+  - [`_sync(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_sync)
+  - [`_calculateUnrealizedDebt(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_calculateUnrealizedDebt)
+- **Updated By** - [`_earmark()`](/dev/liquid/liquid-contract#InternalOperations_earmark)
 </details>
 <details>
   <summary>_redemptionWeight</summary>
@@ -646,10 +646,10 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - A global cumulative scaling factor that increases whenever earmarked debt is redeemed. Accounts use the difference between this value and their account-specific lastAccruedRedemptionWeight to determine how much of their earmarked debt has been reconciled by redemptions.
 - **Type** - uint256
 - **Used By**
-  - [`_validate(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_validate)
-  - [`_sync(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_sync)
-  - [`_calculateUnrealizedDebt(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_calculateUnrealizedDebt)
-- **Updated By** - [`redeem(uint256 amount)`](/dev/alchemist/alchemist-contract#TransmuterActions_redeem)
+  - [`_validate(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_validate)
+  - [`_sync(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_sync)
+  - [`_calculateUnrealizedDebt(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_calculateUnrealizedDebt)
+- **Updated By** - [`redeem(uint256 amount)`](/dev/liquid/liquid-contract#TransmuterActions_redeem)
 </details>
 <details>
   <summary>_collateralWeight</summary>
@@ -657,9 +657,9 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - A global cumulative scaling factor that increases whenever collateral is redeemed or fees are taken. Accounts use the difference between this value and their account-specific lastCollateralWeight to determine how much of their locked collateral should be seized in proportion to global redemptions.
 - **Type** - uint256
 - **Used By**
-  - [`_sync(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_sync)
-  - [`_calculateUnrealizedDebt(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_calculateUnrealizedDebt)
-- **Updated By** - [`redeem(uint256 amount)`](/dev/alchemist/alchemist-contract#TransmuterActions_redeem)
+  - [`_sync(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_sync)
+  - [`_calculateUnrealizedDebt(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_calculateUnrealizedDebt)
+- **Updated By** - [`redeem(uint256 amount)`](/dev/liquid/liquid-contract#TransmuterActions_redeem)
 </details>
 <details>
   <summary>_totalLocked</summary>
@@ -667,8 +667,8 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - total locked collateral; aka collateral that can't be withdrawn due to LTV constraints.
 - **Type** - uint256
 - **Used By**
-  - [`_subDebt(uint256 tokenId, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_subDebt)
-- **Updated By** - [`redeem(uint256 amount)`](/dev/alchemist/alchemist-contract#TransmuterActions_redeem) - [`_resolveRepaymentFee(uint256 accountId, uint256 repaidAmountInYield)`](/dev/alchemist/alchemist-contract#InternalActions_resolveRepaymentFee) - [`_addDebt(uint256 tokenId, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_addDebt) - [`_subDebt(uint256 tokenId, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_subDebt)
+  - [`_subDebt(uint256 tokenId, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_subDebt)
+- **Updated By** - [`redeem(uint256 amount)`](/dev/liquid/liquid-contract#TransmuterActions_redeem) - [`_resolveRepaymentFee(uint256 accountId, uint256 repaidAmountInYield)`](/dev/liquid/liquid-contract#InternalActions_resolveRepaymentFee) - [`_addDebt(uint256 tokenId, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_addDebt) - [`_subDebt(uint256 tokenId, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_subDebt)
 </details>
 
 #### Mappings
@@ -679,35 +679,35 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - tracks user accounts and balances.
 - **Type** - mapping(uint256 => Account)
 - **Used By**
-  - [`mintAllowance(uint256 ownerTokenId, account spender)`](/dev/alchemist/alchemist-contract#ReadingState_mintAllowance)
-  - [`deposit(uint256 amount, uint256 recipient, uint256 tokenId)`](/dev/alchemist/alchemist-contract#UserActions_deposit)
-  - [`burn(uint256 amount, uint256 recipient)`](/dev/alchemist/alchemist-contract#UserActions_burn)
-  - [`repay(uint256 amount, uint256 recipientTokenId)`](/dev/alchemist/alchemist-contract#UserActions_repay)
-  - [`_forceRepay(uint256 accountId, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_forceRepay)
-  - [`_liquidate(uint256 accountId)`](/dev/alchemist/alchemist-contract#InternalOperations_liquidate)
-  - [`_doLiquidation(uint256 accountId, uint256 collateralInUnderlying, uint256 repaidAmountInYield)`](/dev/alchemist/alchemist-contract#InternalOperations_doLiquidation)
-  - [`_resolveRepaymentFee(uint256 accountId, uint256 repaidAmountInYield)`](/dev/alchemist/alchemist-contract#InternalOperations_resolveRepaymentFee)
-  - [`_addDebt(uint256 tokenId, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_addDebt)
-  - [`_subDebt(uint256 tokenId, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_subDebt)
-  - [`_approveMint(uint256 ownerTokenId, address spender, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_approveMint)
-  - [`_decreaseMintAllowance(uint256 ownerTokenId, address spender, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_decreaseMintAllowance)
-  - [`_sync(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_sync)
-  - [`_calculateUnrealizedDebt(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_calculateUnrealizedDebt)
-  - [`_isUnderCollateralized(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_isUndercollateralized)
+  - [`mintAllowance(uint256 ownerTokenId, account spender)`](/dev/liquid/liquid-contract#ReadingState_mintAllowance)
+  - [`deposit(uint256 amount, uint256 recipient, uint256 tokenId)`](/dev/liquid/liquid-contract#UserActions_deposit)
+  - [`burn(uint256 amount, uint256 recipient)`](/dev/liquid/liquid-contract#UserActions_burn)
+  - [`repay(uint256 amount, uint256 recipientTokenId)`](/dev/liquid/liquid-contract#UserActions_repay)
+  - [`_forceRepay(uint256 accountId, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_forceRepay)
+  - [`_liquidate(uint256 accountId)`](/dev/liquid/liquid-contract#InternalOperations_liquidate)
+  - [`_doLiquidation(uint256 accountId, uint256 collateralInUnderlying, uint256 repaidAmountInYield)`](/dev/liquid/liquid-contract#InternalOperations_doLiquidation)
+  - [`_resolveRepaymentFee(uint256 accountId, uint256 repaidAmountInYield)`](/dev/liquid/liquid-contract#InternalOperations_resolveRepaymentFee)
+  - [`_addDebt(uint256 tokenId, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_addDebt)
+  - [`_subDebt(uint256 tokenId, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_subDebt)
+  - [`_approveMint(uint256 ownerTokenId, address spender, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_approveMint)
+  - [`_decreaseMintAllowance(uint256 ownerTokenId, address spender, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_decreaseMintAllowance)
+  - [`_sync(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_sync)
+  - [`_calculateUnrealizedDebt(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_calculateUnrealizedDebt)
+  - [`_isUnderCollateralized(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_isUndercollateralized)
 - **Updated By**
-  - [`deposit(uint256 amount, uint256 recipient, uint256 tokenId)`](/dev/alchemist/alchemist-contract#UserActions_deposit)
-  - [`withdraw(uint256 amount, uint256 recipient, uint256 tokenId)`](/dev/alchemist/alchemist-contract#UserActions_withdraw)
-  - [`burn(uint256 amount, uint256 recipient)`](/dev/alchemist/alchemist-contract#UserActions_burn)
-  - [`resetMintAllowances(uint256 tokenId)`](/dev/alchemist/alchemist-contract#UserActions_resetMintAllowances)
-  - [`mint(uint256 tokenId, uint256 amount, uint256 recipient)`](/dev/alchemist/alchemist-contract#UserActions_mint)
-  - [`_doLiquidation(uint256 accountId, uint256 collateralInUnderlying, uint256 repaidAmountInYield)`](/dev/alchemist/alchemist-contract#InternalOperations_doLiquidation)
-  - [`_resolveRepaymentFee(uint256 accountId, uint256 repaidAmountInYield)`](/dev/alchemist/alchemist-contract#InternalActions_resolveRepaymentFee)
-  - [`_addDebt(uint256 tokenId, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_addDebt)
-  - [`_subDebt(uint256 tokenId, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_subDebt)
-  - [`_approveMint(uint256 ownerTokenId, address spender, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_approveMint)
-  - [`_decreaseMintAllowance(uint256 ownerTokenId, address spender, uint256 amount)`](/dev/alchemist/alchemist-contract#InternalOperations_decreaseMintAllowance)
-  - [`_sync(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_sync)
-- **Read By** - [`getCDP(uint256 tokenId)`](/dev/alchemist/alchemist-contract#ReadingState_getCDP)
+  - [`deposit(uint256 amount, uint256 recipient, uint256 tokenId)`](/dev/liquid/liquid-contract#UserActions_deposit)
+  - [`withdraw(uint256 amount, uint256 recipient, uint256 tokenId)`](/dev/liquid/liquid-contract#UserActions_withdraw)
+  - [`burn(uint256 amount, uint256 recipient)`](/dev/liquid/liquid-contract#UserActions_burn)
+  - [`resetMintAllowances(uint256 tokenId)`](/dev/liquid/liquid-contract#UserActions_resetMintAllowances)
+  - [`mint(uint256 tokenId, uint256 amount, uint256 recipient)`](/dev/liquid/liquid-contract#UserActions_mint)
+  - [`_doLiquidation(uint256 accountId, uint256 collateralInUnderlying, uint256 repaidAmountInYield)`](/dev/liquid/liquid-contract#InternalOperations_doLiquidation)
+  - [`_resolveRepaymentFee(uint256 accountId, uint256 repaidAmountInYield)`](/dev/liquid/liquid-contract#InternalActions_resolveRepaymentFee)
+  - [`_addDebt(uint256 tokenId, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_addDebt)
+  - [`_subDebt(uint256 tokenId, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_subDebt)
+  - [`_approveMint(uint256 ownerTokenId, address spender, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_approveMint)
+  - [`_decreaseMintAllowance(uint256 ownerTokenId, address spender, uint256 amount)`](/dev/liquid/liquid-contract#InternalOperations_decreaseMintAllowance)
+  - [`_sync(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_sync)
+- **Read By** - [`getCDP(uint256 tokenId)`](/dev/liquid/liquid-contract#ReadingState_getCDP)
 </details>
 <details>
   <summary>_redemptions</summary>
@@ -715,31 +715,31 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - tracks historic redemptions
 - **Type** - mapping(uint256 => RedemptionInfo)
 - **Used By**
-  - [`_sync(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_sync)
-  - [`_calculateUnrealizedDebt(uint256 tokenId)`](/dev/alchemist/alchemist-contract#InternalOperations_calculateUnrealizedDebt)
-- **Updated By** - [`redeem(uint256 amount)`](/dev/alchemist/alchemist-contract#TransmuterActions_redeem)
+  - [`_sync(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_sync)
+  - [`_calculateUnrealizedDebt(uint256 tokenId)`](/dev/liquid/liquid-contract#InternalOperations_calculateUnrealizedDebt)
+- **Updated By** - [`redeem(uint256 amount)`](/dev/liquid/liquid-contract#TransmuterActions_redeem)
 </details>
 
 ## Functions
 
 ### User Actions
 
-> Functions that can be called by external accounts which influence the state of the Alchemist.
+> Functions that can be called by external accounts which influence the state of the Liquid.
 
 <details id="UserActions_deposit">
   <summary>deposit(uint256 amount, address recipient, uint256 tokenId)</summary>
 
-- **Description** - Allows a user to deposit yieldTokens into the Alchemist.<br/><br/> The passed uint256 for tokenId should be 0 for any new position, or the tokenId of the AlchemistV3PositionNFT if depositing into an existing position.
+- **Description** - Allows a user to deposit yieldTokens into the Liquid.<br/><br/> The passed uint256 for tokenId should be 0 for any new position, or the tokenId of the LiquidPositionNFT if depositing into an existing position.
   - `@param recipient` - used to specify an address that will recieve the NFT position if minting a brand new position, which also requires tokenId == 0. Otherwise it won't be used
   - `@param tokenId` - 0 for a new position, or a valid id for an existing position
 - **Visibility Specifier** - external
 - **State Mutability Specifier** - nonpayable
 - **Returns** - uint256 amountDepositedDenominatedInDebtTokens
 - **Emits**
-  - [`AlchemistV3PositionNFTMinted(address recipient, uint256 tokenId)`](/dev/alchemist/alchemist-contract#Events_AlchemistV3PositionNFTMinted)
-  - [`Deposit(uint256 amount, uint256 tokenId)`](/dev/alchemist/alchemist-contract#Events_Deposit)
+  - [`LiquidPositionNFTMinted(address recipient, uint256 tokenId)`](/dev/liquid/liquid-contract#Events_LiquidPositionNFTMinted)
+  - [`Deposit(uint256 amount, uint256 tokenId)`](/dev/liquid/liquid-contract#Events_Deposit)
 - **Reverts** - recipient == zero address - amount == 0 - depositsPaused - deposit would result in a total deposit that exceeeds the deposit cap\
-- [`UnknownAccountOwnerIdError()`](/dev/alchemist/alchemist-contract#Error_UnknownAccountOwnerIDError) - passed tokenId does not correspond to an existing NFT and is not 0
+- [`UnknownAccountOwnerIdError()`](/dev/liquid/liquid-contract#Error_UnknownAccountOwnerIDError) - passed tokenId does not correspond to an existing NFT and is not 0
 </details>
 <details id="UserActions_withdraw">
   <summary>withdraw(uint256 amount, address recipient, uint256 tokenId)</summary>
@@ -747,46 +747,46 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Description** - Allows the owner of an account to withdraw funds to a specfied recipient address. <br/><br/>First applies all earmarking, redemptions, and locked collateral adjustments to the account so it is up-to-date; then transfers funds if valid.
   - `@param amount` - the amount of yieldToken to withdraw
   - `@param recipient` - the address which will recieve the withdrawn assets
-  - `@param tokenId` - the ID of the owner's account, assigned on creation of the AlchemistV3PositionNFT
+  - `@param tokenId` - the ID of the owner's account, assigned on creation of the LiquidPositionNFT
 - **Visibility Specifier** - external
 - **State Mutability Specifier** - nonpayable
 - **Returns** - uint256 amountOfYieldTokensWithdrawn
 - **Emits**
-  - [`Withdraw(uint256 amount, uint256 tokenId)`](/dev/alchemist/alchemist-contract#Events_Withdraw)
-- **Reverts** - recipient == zero address - amount == 0 - attempted collateral withdrawn > user's unlocked collateral (collateral that isn't pledged to collateralize existing debt) - [`UnauthorizedAccountAccessError()`](/dev/alchemist/alchemist-contract#Error_UnauthorizedAccountAccessError) - msg.sender is not the owner of the account identified by the passed tokenId - [`UnknownAccountOwnerIdError()`](/dev/alchemist/alchemist-contract#Error_UnknownAccountOwnerIDError) - passed tokenId does not correspond to an existing NFT and is not 0 - [`Undercollateralized()`](/dev/alchemist/alchemist-contract#Error_Undercollateralized) - if the account is undercollateralized don't allow a withdraw
+  - [`Withdraw(uint256 amount, uint256 tokenId)`](/dev/liquid/liquid-contract#Events_Withdraw)
+- **Reverts** - recipient == zero address - amount == 0 - attempted collateral withdrawn > user's unlocked collateral (collateral that isn't pledged to collateralize existing debt) - [`UnauthorizedAccountAccessError()`](/dev/liquid/liquid-contract#Error_UnauthorizedAccountAccessError) - msg.sender is not the owner of the account identified by the passed tokenId - [`UnknownAccountOwnerIdError()`](/dev/liquid/liquid-contract#Error_UnknownAccountOwnerIDError) - passed tokenId does not correspond to an existing NFT and is not 0 - [`Undercollateralized()`](/dev/liquid/liquid-contract#Error_Undercollateralized) - if the account is undercollateralized don't allow a withdraw
 </details>
 <details id="UserActions_mint">
   <summary>mint(uint256 tokenId, uint256 amount, address recipient)</summary>
 
 - **Description** - Allows the owner of the account with the passed tokenId to mint debt. <br/><br/>First syncs global and account state, increases the account’s debt by amount, then mints amount of the debt token to the recipient address.
-  - `@param tokenId` - the ID of the owner's account, assigned on creation of the AlchemistV3PositionNFT
-  - `@param amount` - the amount of alAssets to mint
+  - `@param tokenId` - the ID of the owner's account, assigned on creation of the LiquidPositionNFT
+  - `@param amount` - the amount of lAssets to mint
   - `@param recipient` - the address which will recieve the minted assets
 - **Visibility Specifier** - external
 - **State Mutability Specifier** - nonpayable
 - **Returns** - uint256 totalTokenTVLInUnderlying
 - **Emits**
-  - [`Mint(uint256 tokenId, uint256 amount, address recipient)`](/dev/alchemist/alchemist-contract#Events_Mint)
-- **Reverts** - recipient == zero address - amount == 0 - loansPaused - [`UnauthorizedAccountAccessError()`](/dev/alchemist/alchemist-contract#Error_UnauthorizedAccountAccessError) - msg.sender is not the owner of the account identified by the passed tokenId - [`UnknownAccountOwnerIdError()`](/dev/alchemist/alchemist-contract#Error_UnknownAccountOwnerIDError) - passed tokenId does not correspond to an existing NFT and is not 0 - [`Undercollateralized()`](/dev/alchemist/alchemist-contract#Error_Undercollateralized) - if the account would be undercollateralized don't allow minting more debt
+  - [`Mint(uint256 tokenId, uint256 amount, address recipient)`](/dev/liquid/liquid-contract#Events_Mint)
+- **Reverts** - recipient == zero address - amount == 0 - loansPaused - [`UnauthorizedAccountAccessError()`](/dev/liquid/liquid-contract#Error_UnauthorizedAccountAccessError) - msg.sender is not the owner of the account identified by the passed tokenId - [`UnknownAccountOwnerIdError()`](/dev/liquid/liquid-contract#Error_UnknownAccountOwnerIDError) - passed tokenId does not correspond to an existing NFT and is not 0 - [`Undercollateralized()`](/dev/liquid/liquid-contract#Error_Undercollateralized) - if the account would be undercollateralized don't allow minting more debt
 </details>
 <details id="UserActions_mintFrom">
   <summary>mintFrom(uint256 tokenId, uint256 amount, address recipient)</summary>
 
 - **Description** - Borrow on behalf of tokenId using a mint allowance instead of ownership.<br/><br/> It first decreases msg.sender’s allowance for that account by amount, then performs the same actions as mint, minting debt tokens to the recipient address.
-  - `@param tokenId` - the ID of the owner's account, assigned on creation of the AlchemistV3PositionNFT
-  - `@param amount` - the amount of alAssets to mint
+  - `@param tokenId` - the ID of the owner's account, assigned on creation of the LiquidPositionNFT
+  - `@param amount` - the amount of lAssets to mint
   - `@param recipient` - the address which will recieve the minted assets
 - **Visibility Specifier** - external
 - **State Mutability Specifier** - nonpayable
 - **Returns** - uint256 totalTokenTVLInUnderlying
 - **Emits**
-  - [`Mint(uint256 tokenId, uint256 amount, address recipient)`](/dev/alchemist/alchemist-contract#Events_Mint)
-- **Reverts** - recipient == zero address - amount == 0 - loansPaused - [`UnknownAccountOwnerIdError()`](/dev/alchemist/alchemist-contract#Error_UnknownAccountOwnerIDError) - passed tokenId does not correspond to an existing NFT and is not 0 - [`Undercollateralized()`](/dev/alchemist/alchemist-contract#Error_Undercollateralized) - if the account would be undercollateralized don't allow minting more debt
+  - [`Mint(uint256 tokenId, uint256 amount, address recipient)`](/dev/liquid/liquid-contract#Events_Mint)
+- **Reverts** - recipient == zero address - amount == 0 - loansPaused - [`UnknownAccountOwnerIdError()`](/dev/liquid/liquid-contract#Error_UnknownAccountOwnerIDError) - passed tokenId does not correspond to an existing NFT and is not 0 - [`Undercollateralized()`](/dev/liquid/liquid-contract#Error_Undercollateralized) - if the account would be undercollateralized don't allow minting more debt
 </details>
 <details id="UserActions_burn">
   <summary>burn(uint256 amount, uint256 recipientId)</summary>
 
-- **Description** - Burn debt tokens (alAssets) from the caller to repay the unearmarked portion of the position’s debt.<br/><br/>
+- **Description** - Burn debt tokens (lAssets) from the caller to repay the unearmarked portion of the position’s debt.<br/><br/>
   First syncs global/account state and makes sure it would not be burning debt that is locked for the transmuter, then burns the caller’s tokens. Charges a protocol fee in yield tokens against the account’s collateral.<br/><br/>
   Difference between `repay()` and `burn()`:<br/>
   `repay()` takes an amount of yieldTokens and can reconcile earmarked debt in addition to unearmarked debt. It does not actually reduce debtToken supply, it only reconciles accounts and collects funds that will be alter used to burn debt.<br/>
@@ -796,8 +796,8 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **State Mutability Specifier** - nonpayable
 - **Returns** - uint256 debtUnitsRepaid
 - **Emits**
-  - [`Burn(address indexed sender, uint256 amount, uint256 indexed recipientId)`](/dev/alchemist/alchemist-contract#Events_Burn)
-- **Reverts** - amount == 0 - No unearmarked debt to repay - insufficient balance/allowance - [`UnknownAccountOwnerIdError()`](/dev/alchemist/alchemist-contract#Error_UnknownAccountOwnerIDError) - passed tokenId does not correspond to an existing NFT and is not 0 - [`CannotRepayOnMintBlock()`](/dev/alchemist/alchemist-contract#Error_CannotRepayOnMintBlock) - same-block mint repay is disallowed - [`BurnLimitExceeded(uint256 amount, uint256 available)`](/dev/alchemist/alchemist-contract#Error_BurnLimitExceeded) - requested burn exceeds `totalSyntheticsIssued - transmuter.totalLocked()`
+  - [`Burn(address indexed sender, uint256 amount, uint256 indexed recipientId)`](/dev/liquid/liquid-contract#Events_Burn)
+- **Reverts** - amount == 0 - No unearmarked debt to repay - insufficient balance/allowance - [`UnknownAccountOwnerIdError()`](/dev/liquid/liquid-contract#Error_UnknownAccountOwnerIDError) - passed tokenId does not correspond to an existing NFT and is not 0 - [`CannotRepayOnMintBlock()`](/dev/liquid/liquid-contract#Error_CannotRepayOnMintBlock) - same-block mint repay is disallowed - [`BurnLimitExceeded(uint256 amount, uint256 available)`](/dev/liquid/liquid-contract#Error_BurnLimitExceeded) - requested burn exceeds `totalSyntheticsIssued - transmuter.totalLocked()`
 </details>
 <details id="UserActions_repay">
   <summary>repay(uint256 amount, uint256 recipientTokenId)</summary>
@@ -813,25 +813,25 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **State Mutability Specifier** - nonpayable
 - **Returns** - uint256 yieldTokensUsedToRepay
 - **Emits**
-  - [`Repay(address indexed sender, uint256 amount, uint256 indexed recipientId, uint256 credit)`](/dev/alchemist/alchemist-contract#Events_Repay)
-- **Reverts** - amount == 0 - account lacks collateral to cover the protocol fee - No outstanding debt for the account of the passed recipientId - [`UnknownAccountOwnerIDError()`](/dev/alchemist/alchemist-contract#Error_UnknownAccountOwnerIDError) - passed tokenId does not correspond to an existing NFT - [`CannotRepayOnMintBlock()`](/dev/alchemist/alchemist-contract#Error_CannotRepayOnMintBlock) - same-block mint repay is disallowed. For flash loan protection.
+  - [`Repay(address indexed sender, uint256 amount, uint256 indexed recipientId, uint256 credit)`](/dev/liquid/liquid-contract#Events_Repay)
+- **Reverts** - amount == 0 - account lacks collateral to cover the protocol fee - No outstanding debt for the account of the passed recipientId - [`UnknownAccountOwnerIDError()`](/dev/liquid/liquid-contract#Error_UnknownAccountOwnerIDError) - passed tokenId does not correspond to an existing NFT - [`CannotRepayOnMintBlock()`](/dev/liquid/liquid-contract#Error_CannotRepayOnMintBlock) - same-block mint repay is disallowed. For flash loan protection.
 
 </details>
 <details id="UserActions_liquidate">
   <summary>liquidate(uint256 accountId)</summary>
 
 - **Description** - Attempts to `_liquidate()` an undercollateralized position of the account identified by the passed accountId.<br/><br/>
-  First syncs state and applys earmarking so the account is up to date, then repays earmarked debt if present. If that restores the position above the collateralization lower bound, a repayment fee denominated in yield is paid to the caller and no liquidation is performed. If the position remains below the lower bound, proceeds to liquidate, seizing yieldToken-denominated collateral and paying the liquidator fees. If the account does not have enough to cover liquidation fees, or the entire Alchemist is undercollateralized, then the liquidator will be paid using the funds from this Alchemist's `alchemistFeeVault`.
+  First syncs state and applys earmarking so the account is up to date, then repays earmarked debt if present. If that restores the position above the collateralization lower bound, a repayment fee denominated in yield is paid to the caller and no liquidation is performed. If the position remains below the lower bound, proceeds to liquidate, seizing yieldToken-denominated collateral and paying the liquidator fees. If the account does not have enough to cover liquidation fees, or the entire Liquid is undercollateralized, then the liquidator will be paid using the funds from this Liquid's `liquidFeeVault`.
   - `@param accountId` - the tokenId of the account to liquidate
 - **Visibility Specifier** - external
 - **State Mutability Specifier** - nonpayable
 - **Returns**
   - `yieldAmount` — if liquidation happened: collateral in yield seized; if only repayment happened: the repaid amount in yield
   - `feeInYield` — liquidator/repayment fee paid in yield tokens
-  - `feeInUnderlying` — additional liquidator fee paid in underlying from this Alchemist's `alchemistFeeVault` (if needed)
+  - `feeInUnderlying` — additional liquidator fee paid in underlying from this Liquid's `liquidFeeVault` (if needed)
 - **Emits**
-  - [`Liquidated(uint256 indexed accountId, address liquidator, uint256 amount, uint256 feeInYield, uint256 feeInUnderlying)`](/dev/alchemist/alchemist-contract#Events_Liquidated)
-- **Reverts** - [UnknownAccountOwnerIDError()](/dev/alchemist/alchemist-contract#Error_UnknownAccountOwnerIDError) — passed accountId does not correspond to an existing NFT - [LiquidationError()](/dev/alchemist/alchemist-contract#Error_LiquidationError) — no liquidation/repayment occurred, either because the account is healthy, the tokenAdapter has trouble pricing the yieldToken (price == 0), etc.
+  - [`Liquidated(uint256 indexed accountId, address liquidator, uint256 amount, uint256 feeInYield, uint256 feeInUnderlying)`](/dev/liquid/liquid-contract#Events_Liquidated)
+- **Reverts** - [UnknownAccountOwnerIDError()](/dev/liquid/liquid-contract#Error_UnknownAccountOwnerIDError) — passed accountId does not correspond to an existing NFT - [LiquidationError()](/dev/liquid/liquid-contract#Error_LiquidationError) — no liquidation/repayment occurred, either because the account is healthy, the tokenAdapter has trouble pricing the yieldToken (price == 0), etc.
 </details>
 
 <details id="UserActions_batchLiquidate">
@@ -845,9 +845,9 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Returns**
   - `totalAmountLiquidated` — sum of per-account `yieldAmount` returned by `_liquidate` (i.e., total yield moved)
   - `totalFeesInYield` — sum of yield-denominated liquidator/repayment fees
-  - `totalFeesInUnderlying` — sum of underlying-denominated liquidator fees paid from this Alchemist's `alchemistFeeVault` (see `_liquidate()` for when this would occur)
+  - `totalFeesInUnderlying` — sum of underlying-denominated liquidator fees paid from this Liquid's `liquidFeeVault` (see `_liquidate()` for when this would occur)
 - **Emits** - none
-- **Reverts** - [`MissingInputData()`](/dev/alchemist/alchemist-contract#Error_MissingInputData) — `accountIds` is empty - [`LiquidationError()`](/dev/alchemist/alchemist-contract#Error_LiquidationError) — no liquidation/repayment occurred for any account. See `liquidate()` under **User Actions** for why this might occur.
+- **Reverts** - [`MissingInputData()`](/dev/liquid/liquid-contract#Error_MissingInputData) — `accountIds` is empty - [`LiquidationError()`](/dev/liquid/liquid-contract#Error_LiquidationError) — no liquidation/repayment occurred for any account. See `liquidate()` under **User Actions** for why this might occur.
 
 </details>
 <details id="UserActions_poke">
@@ -860,7 +860,7 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **State Mutability Specifier** - nonpayable
 - **Returns** - none
 - **Emits** - none
-- **Reverts** - [`UnknownAccountOwnerIDError()`](/dev/alchemist/alchemist-contract#Error_UnknownAccountOwnerIDError) — passed tokenId does not correspond to an existing NFT
+- **Reverts** - [`UnknownAccountOwnerIDError()`](/dev/liquid/liquid-contract#Error_UnknownAccountOwnerIDError) — passed tokenId does not correspond to an existing NFT
 </details>
 <details id="UserActions_approveMint">
   <summary>approveMint(uint256 tokenId, address spender, uint256 amount)</summary>
@@ -874,8 +874,8 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **State Mutability Specifier** - nonpayable
 - **Returns** - none
 - **Emits**
-  - [`ApproveMint(uint256 indexed ownerTokenId, address indexed spender, uint256 amount)`](/dev/alchemist/alchemist-contract#Events_ApproveMint) _(emitted by `_approveMint`)_
-- **Reverts** - [`UnauthorizedAccountAccessError()`](/dev/alchemist/alchemist-contract#Error_UnauthorizedAccountAccessError) — caller is not the owner of the position identified by `tokenId`
+  - [`ApproveMint(uint256 indexed ownerTokenId, address indexed spender, uint256 amount)`](/dev/liquid/liquid-contract#Events_ApproveMint) _(emitted by `_approveMint`)_
+- **Reverts** - [`UnauthorizedAccountAccessError()`](/dev/liquid/liquid-contract#Error_UnauthorizedAccountAccessError) — caller is not the owner of the position identified by `tokenId`
 </details>
 <details id="UserActions_resetMintAllowances">
   <summary>resetMintAllowances(uint256 tokenId)</summary>
@@ -886,8 +886,8 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **State Mutability Specifier** - nonpayable
 - **Returns** - none
 - **Emits**
-  - [`MintAllowancesReset(uint256 indexed tokenId)`](/dev/alchemist/alchemist-contract#Events_MintAllowancesReset)
-- **Reverts** - [`Unauthorized()`](/dev/alchemist/alchemist-contract#Error_Unauthorized) — caller is neither the NFT contract nor the position’s current owner
+  - [`MintAllowancesReset(uint256 indexed tokenId)`](/dev/liquid/liquid-contract#Events_MintAllowancesReset)
+- **Reverts** - [`Unauthorized()`](/dev/liquid/liquid-contract#Error_Unauthorized) — caller is neither the NFT contract nor the position’s current owner
 </details>
 <details id="UserActions_acceptAdmin">
   <summary>acceptAdmin()</summary>
@@ -897,8 +897,8 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **State Mutability Specifier** - nonpayable
 - **Returns** - none
 - **Emits**
-  - [`PendingAdminUpdated(address(0))`](/dev/alchemist/alchemist-contract#Events_PendingAdminUpdated)
-  - [`AdminUpdated(address value)`](/dev/alchemist/alchemist-contract#Events_AdminUpdated)
+  - [`PendingAdminUpdated(address(0))`](/dev/liquid/liquid-contract#Events_PendingAdminUpdated)
+  - [`AdminUpdated(address value)`](/dev/liquid/liquid-contract#Events_AdminUpdated)
 - **Reverts** - **Unauthorized()**
 </details>
 
@@ -915,7 +915,7 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **State Mutability Specifier** - nonpayable
 - **Returns** - none
 - **Emits**
-  - [`DepositsPaused(bool isPaused)`](/dev/alchemist/alchemist-contract#Events_DepositsPaused)
+  - [`DepositsPaused(bool isPaused)`](/dev/liquid/liquid-contract#Events_DepositsPaused)
 - **Reverts** - none
 </details>
 <details id="GuardianActions_pauseLoans">
@@ -927,7 +927,7 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **State Mutability Specifier** - nonpayable
 - **Returns** - none
 - **Emits**
-  - [`LoansPaused(bool isPaused)`](/dev/alchemist/alchemist-contract#Events_LoansPaused)
+  - [`LoansPaused(bool isPaused)`](/dev/liquid/liquid-contract#Events_LoansPaused)
 - **Reverts** - none
 </details>
 
@@ -935,28 +935,28 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 
 > Functions guarded by the onlyAdmin modifier.
 
-<details id="AdminActions_setAlchemistPositionNFT">
-  <summary>setAlchemistPositionNFT(address NFT)</summary>
+<details id="AdminActions_setLiquidPositionNFT">
+  <summary>setLiquidPositionNFT(address NFT)</summary>
 
 - **Description** - Sets the NFT contract that will be used to represent NFT positions. Can only be set once.
-  - `@param NFT` - the addressof the alchemistPositionNft contract.
+  - `@param NFT` - the addressof the liquidPositionNft contract.
 - **Visibility Specifier** - external
 - **State Mutability Specifier** - nonpayable
 - **Returns** - none
 - **Emits** - none
-- **Reverts** - [`AlchemistV3NFTZeroAddressError`](/dev/alchemist/alchemist-contract#Errors_AlchemistV3NFTZeroAddressError) - if the NFT is set to the zero address - [`AlchemistV3NFTAlreadySetError`](/dev/alchemist/alchemist-contract#AlchemistV3NFTAlreadySetError) - if the NFT is set to the zero address
+- **Reverts** - [`LiquidNFTZeroAddressError`](/dev/liquid/liquid-contract#Errors_LiquidNFTZeroAddressError) - if the NFT is set to the zero address - [`LiquidNFTAlreadySetError`](/dev/liquid/liquid-contract#LiquidNFTAlreadySetError) - if the NFT is set to the zero address
 </details>
-<details id="AdminActions_setAlchemistFeeVault">
-  <summary>setAlchemistFeeVault(address value)</summary>
+<details id="AdminActions_setLiquidFeeVault">
+  <summary>setLiquidFeeVault(address value)</summary>
 
-- **Description** - Sets the fee vault used for liquidations in the event of (1) an account not being able to cover, (2) the Alchemist itself being globally undercollateralized.
-  - `@param value` - the address of the AlchemistFeeVault contract to use.
+- **Description** - Sets the fee vault used for liquidations in the event of (1) an account not being able to cover, (2) the Liquid itself being globally undercollateralized.
+  - `@param value` - the address of the LiquidFeeVault contract to use.
 - **Visibility Specifier** - external
 - **State Mutability Specifier** - nonpayable
 - **Returns** - none
 - **Emits**
-  - [`AlchemistFeeVaultUpdated`](/dev/alchemist/alchemist-contract#Events_AlchemistFeeVaultUpdated)
-- **Reverts** - [`AlchemistVaultTokenMismatchError`](/dev/alchemist/alchemist-contract#Errors_AlchemistVaultTokenMismatchError) - if the token of the fee vault doesn't match the underlying
+  - [`LiquidFeeVaultUpdated`](/dev/liquid/liquid-contract#Events_LiquidFeeVaultUpdated)
+- **Reverts** - [`LiquidVaultTokenMismatchError`](/dev/liquid/liquid-contract#Errors_LiquidVaultTokenMismatchError) - if the token of the fee vault doesn't match the underlying
 </details>
 <details id="AdminActions_setPendingAdmin">
   <summary>setPendingAdmin(address value)</summary>
@@ -967,7 +967,7 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **State Mutability Specifier** - nonpayable
 - **Returns** - none
 - **Emits**
-  - [`PendingAdminUpdated(address value)`](/dev/alchemist/alchemist-contract#Events_PendingAdminUpdated)
+  - [`PendingAdminUpdated(address value)`](/dev/liquid/liquid-contract#Events_PendingAdminUpdated)
 - **Reverts** - none
 </details>
 <details id="AdminActions_setDepositCap">
@@ -979,7 +979,7 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **State Mutability Specifier** - nonpayable
 - **Returns** - none
 - **Emits**
-  - [`DepositCapUpdated(uint256 value)`](/dev/alchemist/alchemist-contract#Events_)
+  - [`DepositCapUpdated(uint256 value)`](/dev/liquid/liquid-contract#Events_)
 - **Reverts** - none
 </details>
 <details id="AdminActions_setProtocolFeeReceiver">
@@ -991,7 +991,7 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **State Mutability Specifier** - nonpayable
 - **Returns** - none
 - **Emits**
-  - [`ProtocolFeeReceiverUpdated(uint256 value)`](/dev/alchemist/alchemist-contract#Events_ProtocolFeeReceiverUpdated)
+  - [`ProtocolFeeReceiverUpdated(uint256 value)`](/dev/liquid/liquid-contract#Events_ProtocolFeeReceiverUpdated)
 - **Reverts** - none
 </details>
 <details id="AdminActions_setProtocolFee">
@@ -1003,7 +1003,7 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **State Mutability Specifier** - nonpayable
 - **Returns** - none
 - **Emits**
-  - [`ProtocolFeeUpdated(uint256 value)`](/dev/alchemist/alchemist-contract#Events_ProtocolFeeUpdated)
+  - [`ProtocolFeeUpdated(uint256 value)`](/dev/liquid/liquid-contract#Events_ProtocolFeeUpdated)
 - **Reverts** - none
 </details>
 <details id="AdminActions_setLiquidatorFee">
@@ -1015,7 +1015,7 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **State Mutability Specifier** - nonpayable
 - **Returns** - none
 - **Emits**
-  - [`LiquidatorFeeUpdated(uint256 fee)`](/dev/alchemist/alchemist-contract#Events_LiquidatorFeeUpdated)
+  - [`LiquidatorFeeUpdated(uint256 fee)`](/dev/liquid/liquid-contract#Events_LiquidatorFeeUpdated)
 - **Reverts** - none
 </details>
 <details id="AdminActions_setRepaymentFee">
@@ -1027,7 +1027,7 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **State Mutability Specifier** - nonpayable
 - **Returns** - none
 - **Emits**
-  - [`RepaymentFeeUpdated(uint256 fee)`](/dev/alchemist/alchemist-contract#Events_RepaymentFeeUpdated)
+  - [`RepaymentFeeUpdated(uint256 fee)`](/dev/liquid/liquid-contract#Events_RepaymentFeeUpdated)
 - **Reverts** - none
 </details>
 <details id="AdminActions_setTokenAdapter">
@@ -1039,7 +1039,7 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **State Mutability Specifier** - nonpayable
 - **Returns** - none
 - **Emits**
-  - [`TokenAdapterUpdated(address value)`](/dev/alchemist/alchemist-contract#Events_TokenAdapterUpdated)
+  - [`TokenAdapterUpdated(address value)`](/dev/liquid/liquid-contract#Events_TokenAdapterUpdated)
 - **Reverts** - none
 </details>
 <details id="AdminActions_setGuardian">
@@ -1052,7 +1052,7 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **State Mutability Specifier** - nonpayable
 - **Returns** - none
 - **Emits**
-  - [`GuardianSet(address guardian, bool isActive)`](/dev/alchemist/alchemist-contract#Events_GuardianSet)
+  - [`GuardianSet(address guardian, bool isActive)`](/dev/liquid/liquid-contract#Events_GuardianSet)
 - **Reverts** - none
 </details>
 <details id="AdminActions_setMinimumCollateralization">
@@ -1064,7 +1064,7 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **State Mutability Specifier** - nonpayable
 - **Returns** - none
 - **Emits**
-  - [`MinimumCollateralizationUpdated(uint256 value)`](/dev/alchemist/alchemist-contract#Events_MinimumCollateralizationUpdated)
+  - [`MinimumCollateralizationUpdated(uint256 value)`](/dev/liquid/liquid-contract#Events_MinimumCollateralizationUpdated)
 - **Reverts** - none
 </details>
 <details id="AdminActions_setGlobalMinimumCollateralization">
@@ -1076,7 +1076,7 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **State Mutability Specifier** - nonpayable
 - **Returns** - none
 - **Emits**
-  - [`GlobalMinimumCollateralizationUpdated(uint256 value)`](/dev/alchemist/alchemist-contract#Events_GlobalMinimumCollateralizationUpdated)
+  - [`GlobalMinimumCollateralizationUpdated(uint256 value)`](/dev/liquid/liquid-contract#Events_GlobalMinimumCollateralizationUpdated)
 - **Reverts** - none
 </details>
 <details id="AdminActions_setCollateralizationLowerBound">
@@ -1088,7 +1088,7 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **State Mutability Specifier** - nonpayable
 - **Returns** - none
 - **Emits**
-  - [`CollateralizationLowerBoundUpdated(uint256 value)`](/dev/alchemist/alchemist-contract#Events_CollateralizationLowerBoundUpdated)
+  - [`CollateralizationLowerBoundUpdated(uint256 value)`](/dev/liquid/liquid-contract#Events_CollateralizationLowerBoundUpdated)
 - **Reverts** - none
 </details>
 
@@ -1106,7 +1106,7 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **State Mutability Specifier** - nonpayable
 - **Returns** - none
 - **Emits**
-  - [`Redemption(uint256 amount)`](/dev/alchemist/alchemist-contract#Events_Redemption)
+  - [`Redemption(uint256 amount)`](/dev/liquid/liquid-contract#Events_Redemption)
 - **Reverts** - none
 </details>
 <details id="TransmuterActions_reduceSyntheticsIssued">
@@ -1123,7 +1123,7 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 <details id="TransmuterActions_setTransmuterTokenBalance">
   <summary>setTransmuterTokenBalance(uint256 amount)</summary>
 
-- **Description** - sets the `lastTransmuterTokenBalance` variable, which tells the Alchemist how many yieldTokens are in the Transmuter.
+- **Description** - sets the `lastTransmuterTokenBalance` variable, which tells the Liquid how many yieldTokens are in the Transmuter.
   - `@param amount` - amount denominated in yieldToken
 - **Visibility Specifier** - external
 - **State Mutability Specifier** - nonpayable
@@ -1179,14 +1179,14 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
   <summary>_liquidate(uint256 accountId)</summary>
 
 - **Description** - Internal helper that performs the liquidation logic for an undercollateralized account.<br/><br/>
-  First syncs state and applies earmarking so the account is up to date, then repays earmarked debt if present. If that restores the position above the collateralization lower bound, a repayment fee denominated in yield is paid to the caller and no liquidation is performed. If the position remains below the lower bound, proceeds to liquidate, seizing yieldToken-denominated collateral and paying the liquidator fees. If the account does not have enough to cover liquidation fees, or the entire Alchemist is undercollateralized, then the liquidator will be paid using the funds from this Alchemist's `alchemistFeeVault`.
+  First syncs state and applies earmarking so the account is up to date, then repays earmarked debt if present. If that restores the position above the collateralization lower bound, a repayment fee denominated in yield is paid to the caller and no liquidation is performed. If the position remains below the lower bound, proceeds to liquidate, seizing yieldToken-denominated collateral and paying the liquidator fees. If the account does not have enough to cover liquidation fees, or the entire Liquid is undercollateralized, then the liquidator will be paid using the funds from this Liquid's `liquidFeeVault`.
   - `@param accountId` - the tokenId of the account to liquidate
 - **Visibility Specifier** - internal
 - **State Mutability Specifier** - nonpayable
 - **Returns**
   - `amountLiquidated` - if liquidation happened: collateral in yield seized; if only repayment happened: the repaid amount in yield; If the tokenAdapter prices the yieldToken at 0, returns 0
   - `feeInYield` - liquidator/repayment fee paid in yield tokens
-  - `feeInUnderlying` - additional liquidator fee paid in underlying from this Alchemist's `alchemistFeeVault` (if needed)
+  - `feeInUnderlying` - additional liquidator fee paid in underlying from this Liquid's `liquidFeeVault` (if needed)
 - **Emits** - none
 - **Reverts** - none
 </details>
@@ -1195,7 +1195,7 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
   <summary>_doLiquidation(uint256 accountId, uint256 collateralInUnderlying, uint256 repaidAmountInYield)</summary>
 
 - **Description** - Performs isolated liquidation logic. Occurring after `_liquidate()` handles syncing/earmarking, and once an account is already determined to be below the collateralization lower bound.<br/><br/>
-  Calculates liquidation terms using account and global ratios, converts debt-denominated amounts to tokens, reduces account debt, and seizes collateral in yield tokens. It then transfers amount seized minus fees to the Transmuter, and pays the liquidator fees using user collateral, or from this Alchemist’s `alchemistFeeVault`.
+  Calculates liquidation terms using account and global ratios, converts debt-denominated amounts to tokens, reduces account debt, and seizes collateral in yield tokens. It then transfers amount seized minus fees to the Transmuter, and pays the liquidator fees using user collateral, or from this Liquid’s `liquidFeeVault`.
   - `@param accountId` - the tokenId of the account being liquidated
   - `@param collateralInUnderlying` - the account’s collateral value expressed in underlying units (used for liquidation math)
   - `@param repaidAmountInYield` - the amount of debt paid off in yield token during earmarking settlement prior to this liquidation
@@ -1220,7 +1220,7 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **State Mutability Specifier** - nonpayable
 - **Returns** - none
 - **Emits**
-  - [`ApproveMint(uint256 indexed ownerTokenId, address indexed spender, uint256 amount)`](/dev/alchemist/alchemist-contract#Events_ApproveMint)
+  - [`ApproveMint(uint256 indexed ownerTokenId, address indexed spender, uint256 amount)`](/dev/liquid/liquid-contract#Events_ApproveMint)
 - **Reverts** - none
 </details>
 <details id="InternalOperations_mint">
@@ -1235,8 +1235,8 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **State Mutability Specifier** - nonpayable
 - **Returns** - none
 - **Emits**
-  - [`Mint(uint256 indexed tokenId, uint256 amount, address recipient)`](/dev/alchemist/alchemist-contract#Events_Mint)
-- **Reverts** - [`Undercollateralized()`](/dev/alchemist/alchemist-contract#Error_Undercollateralized) — if minting would violate the minimum collateralization
+  - [`Mint(uint256 indexed tokenId, uint256 amount, address recipient)`](/dev/liquid/liquid-contract#Events_Mint)
+- **Reverts** - [`Undercollateralized()`](/dev/liquid/liquid-contract#Error_Undercollateralized) — if minting would violate the minimum collateralization
 
 </details>
 <details id="InternalOperations_forceRepay">
@@ -1253,7 +1253,7 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **State Mutability Specifier** - nonpayable
 - **Returns** - `uint256 creditToYield` - amount of yield tokens that were repaid and sent to the Transmuter
 - **Emits** - none
-- **Reverts** - No outstanding debt in the account to repay - [`UnknownAccountOwnerIDError()`](/dev/alchemist/alchemist-contract#Error_UnknownAccountOwnerIDError) — invalid `accountId`
+- **Reverts** - No outstanding debt in the account to repay - [`UnknownAccountOwnerIDError()`](/dev/liquid/liquid-contract#Error_UnknownAccountOwnerIDError) — invalid `accountId`
 
 </details>
 <details id="InternalOperations_addDebt">
@@ -1267,7 +1267,7 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **State Mutability Specifier** - nonpayable
 - **Returns** - none
 - **Emits** - none
-- **Reverts** - [`Undercollateralized()`](/dev/alchemist/alchemist-contract#Error_Undercollateralized) - not enough free collateral to lock for the additional debt
+- **Reverts** - [`Undercollateralized()`](/dev/liquid/liquid-contract#Error_Undercollateralized) - not enough free collateral to lock for the additional debt
 
 </details>
 <details id="InternalOperations_subDebt">
@@ -1293,7 +1293,7 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **State Mutability Specifier** - pure
 - **Returns** - none
 - **Emits** - none
-- **Reverts** - [`UnauthorizedAccountAccessError()`](/dev/alchemist/alchemist-contract#Error_UnauthorizedAccountAccessError) - owner and user are not the same
+- **Reverts** - [`UnauthorizedAccountAccessError()`](/dev/liquid/liquid-contract#Error_UnauthorizedAccountAccessError) - owner and user are not the same
 </details>
 <details id="InternalOperations_checkForValidAccountId">
   <summary>_checkForValidAccountId(uint256 tokenId)</summary>
@@ -1304,13 +1304,13 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **State Mutability Specifier** - view
 - **Returns** - none
 - **Emits** - none
-- **Reverts** - [`UnknownAccountOwnerIDError()`](/dev/alchemist/alchemist-contract#Error_UnknownAccountOwnerIDError) — tokenId not linked to a valid NFT
+- **Reverts** - [`UnknownAccountOwnerIDError()`](/dev/liquid/liquid-contract#Error_UnknownAccountOwnerIDError) — tokenId not linked to a valid NFT
 </details>
 <details id="InternalOperations_tokenExists">
   <summary>_tokenExists(address nft, uint256 tokenId)</summary>
 
-- **Description** - Utility to check if an alchemist NFT position exists for a given tokenId.
-  - `@param nft` - the address of the AlchemistV3NFTPosition contract
+- **Description** - Utility to check if an liquid NFT position exists for a given tokenId.
+  - `@param nft` - the address of the LiquidNFTPosition contract
   - `@param tokenId` - the tokenId to check for
 - **Visibility Specifier** - internal
 - **State Mutability Specifier** - view
@@ -1327,7 +1327,7 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **State Mutability Specifier** - pure
 - **Returns** - none
 - **Emits** - none
-- **Reverts** - [`IllegalState()`](/dev/alchemist/alchemist-contract#Error_IllegalState) — assertion failed
+- **Reverts** - [`IllegalState()`](/dev/liquid/liquid-contract#Error_IllegalState) — assertion failed
 </details>
 <details id="InternalOperations_validate">
   <summary>_validate(uint256 tokenId)</summary>
@@ -1338,7 +1338,7 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **State Mutability Specifier** - view
 - **Returns** - none
 - **Emits** - none
-- **Reverts** - [`Undercollateralized()`](/dev/alchemist/alchemist-contract#Error_Undercollateralized) — account not sufficiently collateralized
+- **Reverts** - [`Undercollateralized()`](/dev/liquid/liquid-contract#Error_Undercollateralized) — account not sufficiently collateralized
 </details>
 <details id="InternalOperations_isUnderCollateralized">
   <summary>_isUnderCollateralized(uint256 tokenId)</summary>
@@ -1354,7 +1354,7 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 <details id="InternalOperations_getTotalUnderlyingValue">
   <summary>_getTotalUnderlyingValue()</summary>
 
-- **Description** - Calculates the total value of this Alchemist in underlying tokens by converting the yield tokens deposited into their equivalent underlying-denominated amount.
+- **Description** - Calculates the total value of this Liquid in underlying tokens by converting the yield tokens deposited into their equivalent underlying-denominated amount.
 - **Visibility Specifier** - internal
 - **State Mutability Specifier** - view
 - **Returns** - `uint256 totalUnderlyingValue`
@@ -1409,7 +1409,7 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 <details id="ReadingState_getTotalDeposited">
   <summary>getTotalDeposited()</summary>
 
-- **Description** - Gets the Alchemist's balance of yieldTokens.
+- **Description** - Gets the Liquid's balance of yieldTokens.
 - **Visibility Specifier** - external
 - **State Mutability Specifier** - view
 - **Returns** - uint256 balance
@@ -1445,7 +1445,7 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 <details id="ReadingState_getTotalUnderlyingValue">
   <summary>getTotalUnderlyingValue()</summary>
 
-- **Description** - Calculates the total value of the alchemist in the underlying token
+- **Description** - Calculates the total value of the liquid in the underlying token
 - **Visibility Specifier** - external
 - **State Mutability Specifier** - view
 - **Returns** - uint256 totalTokenTVLInUnderlying
@@ -1535,14 +1535,14 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - **Reverts** - none
 </details>
 <details id="ReadingState_calculateLiquidation">
-  <summary>calculateLiquidation(uint256 collateral, uint256 debt, uint256 targetCollateralization, uint256 alchemistCurrentCollateralization, uint256 alchemistMinimumCollateralization, uint256 feeBps)</summary>
+  <summary>calculateLiquidation(uint256 collateral, uint256 debt, uint256 targetCollateralization, uint256 liquidCurrentCollateralization, uint256 liquidMinimumCollateralization, uint256 feeBps)</summary>
 
 - **Description** - Calculate how much debt to burn and collateral to seize to restore a position to `targetCollateralization`, including a fee on surplus collateral. (collateral - debt) Fully liquidates if position’s debt ≥ collateral, or the protocol’s global collateralization is below its minimum. Otherwise, charges a fee from surplus, checks if the target is already met, and if not, computes the minimal partial liquidation needed to reach the target.
   - `@param collateral` - position collateral denominated in underlying units
   - `@param debt` - position debt denonimated in debt units
   - `@param targetCollateralization` - per-position target collateral ratio
-  - `@param alchemistCurrentCollateralization` - global current ratio
-  - `@param alchemistMinimumCollateralization` - global minimum ratio
+  - `@param liquidCurrentCollateralization` - global current ratio
+  - `@param liquidMinimumCollateralization` - global minimum ratio
   - `@param feeBps` - fee in basis points taken from surplus
 - **Visibility Specifier** - public
 - **State Mutability Specifier** - pure
@@ -1562,25 +1562,25 @@ The Alchemist is the vault contract responsible for accepting deposits and issui
 - <span id="Error_UnauthorizedAccountAccessError"><strong><code>UnauthorizedAccountAccessError()</code></strong> - An error which is used to indicate that a user is performing an action on an account that requires account ownership</span>
 - <span id="Error_BurnLimitExceeded"><strong><code>BurnLimitExceeded(uint256 amount, uint256 available)</code></strong> - An error which is used to indicate that a burn operation failed because the transmuter requires more debt in the system.</span>
 - <span id="Error_UnknownAccountOwnerIDError"><strong><code>UnknownAccountOwnerIDError()</code></strong> - An error which is used to indicate that the account id used is not linked to any owner</span>
-- <span id="Error_AlchemistV3NFTZeroAddressError"><strong><code>AlchemistV3NFTZeroAddressError();</code></strong> - An error which is used to indicate that the NFT address being set is the zero address</span>
-- <span id="Error_AlchemistV3NFTAlreadySetError"><strong><code>AlchemistV3NFTAlreadySetError()</code></strong> - An error which is used to indicate that the NFT address for the Alchemist has already been set</span>
-- <span id="Error_AlchemistVaultTokenMismatchError"><strong><code>AlchemistVaultTokenMismatchError();</code></strong> - An error which is used to indicate that the token address for the AlchemistTokenVault does not match the underlyingToken</span>
+- <span id="Error_LiquidNFTZeroAddressError"><strong><code>LiquidNFTZeroAddressError();</code></strong> - An error which is used to indicate that the NFT address being set is the zero address</span>
+- <span id="Error_LiquidNFTAlreadySetError"><strong><code>LiquidNFTAlreadySetError()</code></strong> - An error which is used to indicate that the NFT address for the Liquid has already been set</span>
+- <span id="Error_LiquidVaultTokenMismatchError"><strong><code>LiquidVaultTokenMismatchError();</code></strong> - An error which is used to indicate that the token address for the LiquidTokenVault does not match the underlyingToken</span>
 - <span id="Error_CannotRepayOnMintBlock"><strong><code>CannotRepayOnMintBlock()</code></strong> - An error which is used to indicate that a user is trying to repay on the same block they are minting</span>
 
 ## Events
 
 - <span id="Events_PendingAdminUpdated"><strong><code>PendingAdminUpdated(address pendingAdmin)</code></strong> - Emitted when the pending admin is updated.</span>
-- <span id="Events_AlchemistFeeVaultUpdated"><strong><code>AlchemistFeeVaultUpdated(address alchemistFeeVault)</code></strong> - Emitted when the alchemist Fee vault is updated.</span>
+- <span id="Events_LiquidFeeVaultUpdated"><strong><code>LiquidFeeVaultUpdated(address liquidFeeVault)</code></strong> - Emitted when the liquid Fee vault is updated.</span>
 - <span id="Events_AdminUpdated"><strong><code>AdminUpdated(address admin)</code></strong> - Emitted when the administrator is updated.</span>
 - <span id="Events_DepositCapUpdated"><strong><code>DepositCapUpdated(uint256 value)</code></strong> - Emitted when the deposit cap is updated.</span>
-- <span id="Events_GuardianSet"><strong><code>GuardianSet(address guardian, bool state)</code></strong> - Emitted when a guardian is added or removed from the alchemist.</span>
-- <span id="Events_TokenAdapterUpdated"><strong><code>TokenAdapterUpdated(address adapter)</code></strong> - Emitted when a new token adapter is set in the alchemist.</span>
+- <span id="Events_GuardianSet"><strong><code>GuardianSet(address guardian, bool state)</code></strong> - Emitted when a guardian is added or removed from the liquid.</span>
+- <span id="Events_TokenAdapterUpdated"><strong><code>TokenAdapterUpdated(address adapter)</code></strong> - Emitted when a new token adapter is set in the liquid.</span>
 - <span id="Events_TransmuterUpdated"><strong><code>TransmuterUpdated(address transmuter)</code></strong> - Emitted when the transmuter is updated.</span>
 - <span id="Events_MinimumCollateralizationUpdated"><strong><code>MinimumCollateralizationUpdated(uint256 minimumCollateralization)</code></strong> - Emitted when the minimum collateralization is updated.</span>
 - <span id="Events_GlobalMinimumCollateralizationUpdated"><strong><code>GlobalMinimumCollateralizationUpdated(uint256 globalMinimumCollateralization)</code></strong> - Emitted when the global minimum collateralization is updated.</span>
 - <span id="Events_CollateralizationLowerBoundUpdated"><strong><code>CollateralizationLowerBoundUpdated(uint256 collateralizationLowerBound)</code></strong> - Emitted when the collateralization lower bound (for a liquidation) is updated.</span>
-- <span id="Events_DepositsPaused"><strong><code>DepositsPaused(bool isPaused)</code></strong> - Emitted when deposits are paused or unpaused in the alchemist.</span>
-- <span id="Events_LoansPaused"><strong><code>LoansPaused(bool isPaused)</code></strong> - Emitted when loans are paused or unpaused in the alchemist.</span>
+- <span id="Events_DepositsPaused"><strong><code>DepositsPaused(bool isPaused)</code></strong> - Emitted when deposits are paused or unpaused in the liquid.</span>
+- <span id="Events_LoansPaused"><strong><code>LoansPaused(bool isPaused)</code></strong> - Emitted when loans are paused or unpaused in the liquid.</span>
 - <span id="Events_ApproveMint"><strong><code>ApproveMint(uint256 indexed ownerTokenId, address indexed spender, uint256 amount)</code></strong> - Emitted when `owner` grants `spender` the ability to mint debt tokens on its behalf.</span>
 - <span id="Events_Deposit"><strong><code>Deposit(uint256 amount, uint256 indexed recipientId)</code></strong> - Emitted when a user deposits `amount` of yieldToken to `recipient`.</span>
 - <span id="Events_Withdraw"><strong><code>Withdraw(uint256 amount, uint256 indexed tokenId, address recipient)</code></strong> - Emitted when yieldToken is withdrawn from the account owned by `owner` to `recipient`.</span>

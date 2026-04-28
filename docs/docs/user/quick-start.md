@@ -12,7 +12,7 @@ This page gives you a low-risk way to see Liquid at work. It will walk through a
 ## What you will do
 
 - Deposit ETH or USDC to mint MYT and start earning yield.
-- Borrow at about 20% LTV to mint alAssets, then swap them to USDC if you want working capital.
+- Borrow at about 20% LTV to mint lAssets, then swap them to USDC if you want working capital.
 - Watch scheduled redemptions reduce your debt while your full collateral keeps earning until maturity.
 
 ### Prerequisites
@@ -29,9 +29,9 @@ Open Vaults, select Mix-ETH or Mix-USDC on your chain, and deposit. The vault wi
 
 ![](/img/quick-start-02.png)
 
-On the same vault page stay on Deposit / Borrow. Enter a small borrow near 20% LTV, then mint alETH or alUSD, respectively.
+On the same vault page stay on Deposit / Borrow. Enter a small borrow near 20% LTV, then mint LETH or LUSD, respectively.
 
-If you need spendable funds, swap the alAsset to USDC. Ensure you check the alAsset market price first. If it is below 1.00, the gap is your up-front cost. The borrower fee shown in the UI will apply when redemptions occur.
+If you need spendable funds, swap the lAsset to USDC. Ensure you check the lAsset market price first. If it is below 1.00, the gap is your up-front cost. The borrower fee shown in the UI will apply when redemptions occur.
 
 ## What happens next
 
@@ -40,12 +40,12 @@ Redemptions run on fixed terms set by the DAO. When a batch matures, the system 
 ### Example
 
 **Deposit**: 1,000 USDC  
-**Borrow**: 200 alUSD (20% LTV)  
-**alUSD market price**: 0.99 USDC  
-**Up-front cost from the price gap**: about 2 USDC on a full sale of the 200 alUSD  
+**Borrow**: 200 LUSD (20% LTV)  
+**LUSD market price**: 0.99 USDC  
+**Up-front cost from the price gap**: about 2 USDC on a full sale of the 200 LUSD  
 **Borrower fee**: shown in dapp. Applies only when redemptions settle.
 
-You now hold MYT that keeps earning, plus 200 alUSD you can swap or deploy. As redemptions arrive, your debt steps down until it nears zero. Collateral remains in place and continues compounding, provided the yield rate remains above the redemption rate divided by 5. (Only the 20% LTV borrowed will be redeemed at the specified rate).
+You now hold MYT that keeps earning, plus 200 LUSD you can swap or deploy. As redemptions arrive, your debt steps down until it nears zero. Collateral remains in place and continues compounding, provided the yield rate remains above the redemption rate divided by 5. (Only the 20% LTV borrowed will be redeemed at the specified rate).
 
 ## Safety checks
 
@@ -54,7 +54,7 @@ You now hold MYT that keeps earning, plus 200 alUSD you can swap or deploy. As r
 
 ## How to unwind
 
-Repay any remaining alAssets, then withdraw your collateral from the vault. If you swapped your alAssets to USDC, you can swap back to alAssets to repay and withdraw.
+Repay any remaining lAssets, then withdraw your collateral from the vault. If you swapped your lAssets to USDC, you can swap back to lAssets to repay and withdraw.
 
 ## Next steps
 
