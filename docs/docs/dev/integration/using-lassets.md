@@ -2,4 +2,4 @@
 sidebar_position: 1
 ---
 
-# Using alAssets
+# Using lAssets

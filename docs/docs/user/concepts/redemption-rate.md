@@ -72,7 +72,7 @@ The redemption rate formula calculates how much of the total system debt can be 
 
 #### Example
 
-If 1000 alETH sit in the Transmuter, the transmutation term is three months (0.25 years), and the Alchemist reports 1500 alETH of debt:
+If 1000 LETH sit in the Transmuter, the transmutation term is three months (0.25 years), and the Liquid reports 1500 LETH of debt:
 
 ```mermaid
 %%{init: {
@@ -85,11 +85,11 @@ If 1000 alETH sit in the Transmuter, the transmutation term is three months (0.2
 }}%%
 flowchart LR
     %% Nodes
-    A(Transmuter Balance<br/><b>1,000 <span style='color:#aaa'>alETH</span></b>)
+    A(Transmuter Balance<br/><b>1,000 <span style='color:#aaa'>LETH</span></b>)
     B(Transmutation Time<br/><b>0.25 <span style='color:#aaa'>Years</span></b>)
-    C(Total System Debt<br/><b>1,500 <span style='color:#aaa'>alETH</span></b>)
-    D(<b>Annualized Redemptions</b><br/>1,000 alETH/year / 0.25 Years<br/>= <b>4,000 <span style='color:#aaa'>alETH</span></b>)
-    E{{<b>Redemption Rate</b><br/>4,000 alETH / 1,500 alETH<br/>= <b>~267%</b>}}
+    C(Total System Debt<br/><b>1,500 <span style='color:#aaa'>LETH</span></b>)
+    D(<b>Annualized Redemptions</b><br/>1,000 LETH/year / 0.25 Years<br/>= <b>4,000 <span style='color:#aaa'>LETH</span></b>)
+    E{{<b>Redemption Rate</b><br/>4,000 LETH / 1,500 LETH<br/>= <b>~267%</b>}}
 
     %% Logic
     A e1@--> D
@@ -112,9 +112,9 @@ At that rate, the scheduled redemptions would repay roughly 2.67 times the curre
 
 | On-chain variable  | Effect on the rate           | Rationale                                                                                                                                          |
 | ------------------ | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Queued alAssets    | ↑ Larger queue → higher rate | More alUSD or alETH waiting in the Transmuter funds more repayments. Arbitrage deposits enlarge this queue when the market price drifts below peg. |
+| Queued lAssets    | ↑ Larger queue → higher rate | More LUSD or LETH waiting in the Transmuter funds more repayments. Arbitrage deposits enlarge this queue when the market price drifts below peg. |
 | Total system debt  | ↓ More debt → lower rate     | A bigger denominator dilutes the impact of a fixed queue.                                                                                          |
-| Transmutation time | ↑ Shorter term → higher rate | Each unit of queued alAsset cycles more often over a year.                                                                                         |
+| Transmutation time | ↑ Shorter term → higher rate | Each unit of queued lAsset cycles more often over a year.                                                                                         |
 
 ## Temporal Advantage
 

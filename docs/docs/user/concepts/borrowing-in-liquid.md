@@ -11,7 +11,7 @@ import borrowingScreen01 from '@site/static/img/borrowing-in-liquid-01.png';
 
 <img src={borrowing} alt="Borrowing" class="banner-spacing" />
 
-After converting ETH or USDC into the Mix-Yield Token, the next step is borrowing. The vault keeps your collateral and lets you mint synthetic assets—alETH or alUSD respectively—worth up to ninety percent of the collateral’s face value.
+After converting ETH or USDC into the Mix-Yield Token, the next step is borrowing. The vault keeps your collateral and lets you mint synthetic assets—LETH or LUSD respectively—worth up to ninety percent of the collateral’s face value.
 
 :::tip You are in control
 While Liquid loans repay themselves over time via yield, you are never locked in. You can manually repay part or all of your debt at any time to unlock your collateral immediately.
@@ -23,15 +23,15 @@ While Liquid loans repay themselves over time via yield, you are never locked in
 
 <b>1.</b> Navigate to the Borrow panel in your vault.
 
-<b>2.</b> Choose an amount of alAsset to mint. The “max” function will give the maximum value allowable within the bound of 90% LTV.
+<b>2.</b> Choose an amount of lAsset to mint. The “max” function will give the maximum value allowable within the bound of 90% LTV.
 
 :::danger Liquidation Risk
 If a yield strategy loses money, you could be liquidated. The LTV at which a liquidation will occur is 95% LTV. Choose your LTV with this in mind. <br/><br/>[Learn more about Liquidations →](./liquidations.md)
 :::
 
-<b>3.</b> Sign the transaction. Liquid will mint the requested alAsset directly to your wallet.
+<b>3.</b> Sign the transaction. Liquid will mint the requested lAsset directly to your wallet.
 
-<b>4.</b> Use the alAsset in any way you like—swap it for stablecoins, provide liquidity, or loop it back into the vault for further leverage.
+<b>4.</b> Use the lAsset in any way you like—swap it for stablecoins, provide liquidity, or loop it back into the vault for further leverage.
 
 ## What repays the debt
 
@@ -46,7 +46,7 @@ Your collateral continues to earn yield in your vault. The DAO sets a period len
 | Maximum LTV             | 90% of collateral value.                                                                                                                     |
 | Interest Rate           | Zero. Debt balance only declines; it never accrues new interest.                                                                             |
 | Repayment sources       | Vault yield, transmuter redemptions, manual repayments.                                                                                      |
-| Early repayment options | Use alAssets to repay the debt at any time.                                                                                                  |
+| Early repayment options | Use lAssets to repay the debt at any time.                                                                                                  |
 | Position NFT            | Your position is represented by an NFT available in your wallet after the transaction confirms.                                              |
 | Liquidation             | Liquidations are extremely unlikely, but redemptions are applied to your share of the debt, thus affecting high LTV users more. Learn more → |
 
@@ -58,6 +58,6 @@ Your collateral continues to earn yield in your vault. The DAO sets a period len
 
 - **IL Protection** – Combine borrowing with like-for-like liquidity pools to generate fees without impermanent loss.
 
-- **Leverage** – Loop alAssets back into the vault to amplify yield while the repayment mechanism remains self-managed.
+- **Leverage** – Loop lAssets back into the vault to amplify yield while the repayment mechanism remains self-managed.
 
 Borrowing in Liquid turns yield-bearing collateral into an immediate source of flexible liquidity, without sacrificing future upside or introducing unpredictable financing costs.

@@ -15,11 +15,11 @@ This section of the docs will contain contract descriptions and architecture des
 
 1. **Deposit to Earn & Borrow**
 
-   Deposit your collateral into your preferred yield strategy to start earning interest, and be able to take out a loan. Use your deposit to borrow and receive alAssets while your deposit earns interest.
+   Deposit your collateral into your preferred yield strategy to start earning interest, and be able to take out a loan. Use your deposit to borrow and receive lAssets while your deposit earns interest.
 
-2. **Swap alAsset**
+2. **Swap lAsset**
 
-   Swap the alAsset to any other token via a DEX or DEX Aggregator to access the value of your loan. alAssets can also be used directly on some DeFi protocols.
+   Swap the lAsset to any other token via a DEX or DEX Aggregator to access the value of your loan. lAssets can also be used directly on some DeFi protocols.
 
 3. **Wait, Withdraw, Borrow, Repay, or Self-Liquidate**
 

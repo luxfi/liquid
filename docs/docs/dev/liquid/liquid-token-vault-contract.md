@@ -2,11 +2,11 @@
 sidebar_position: 5
 ---
 
-# AlchemistTokenVault
+# LiquidTokenVault
 
 ## Description
 
-A minimal ERC-20 holding contract. Anyone can deposit, but only authorized callers can withdraw. It is used to escrow extra funds that may be used to cover obligations to liquidators and redeemers on the Alchemist. 
+A minimal ERC-20 holding contract. Anyone can deposit, but only authorized callers can withdraw. It is used to escrow extra funds that may be used to cover obligations to liquidators and redeemers on the Liquid. 
 Inherits from `AbstractFeeVault` for authorization and helpers.
 
 ## Functions
@@ -26,7 +26,7 @@ Inherits from `AbstractFeeVault` for authorization and helpers.
     - If `amount == 0`.
     - If the caller has insufficient allowance/balance.
   - **Emits**
-    - [`Deposited(address indexed from, uint256 amount)`](/dev/alchemist/alchemist-token-vault-contract#Events_Deposited)
+    - [`Deposited(address indexed from, uint256 amount)`](/dev/liquid/liquid-token-vault-contract#Events_Deposited)
 </details>
 
 ### Authorized Actions
@@ -46,7 +46,7 @@ Inherits from `AbstractFeeVault` for authorization and helpers.
     - If `amount == 0`.
     - If the contract has insufficient balance.
   - **Emits**
-    - [`Withdrawn(address indexed recipient, uint256 amount)`](/dev/alchemist/alchemist-token-vault-contract#Events_Withdrawn)
+    - [`Withdrawn(address indexed recipient, uint256 amount)`](/dev/liquid/liquid-token-vault-contract#Events_Withdrawn)
 </details>
 
 ### Reading State

@@ -8,7 +8,7 @@ import transmuter from '@site/static/img/transmuter-01.png';
 
 <img src={transmuter} alt="Transmuter" class="banner-spacing" />
 
-The Transmuter is a contract that allows redemption of synthetic debt assets created by associated AlchemistV3 contracts for the underlying assets that back them at a 1 to 1 ratio. Deposits of synthetic debt assets into the Transmuter create demand for underlying assets from AlchemistV3 instances, which are obligated to service that demand across a pre-set time period. This creates fixed-duration fixed-rate terms. Each Transmuter takes one synthetic debt asset (alAsset) and can be associated with multiple AlchemistV3 instances, however only one AlchemistV3 instance is used for redemptions.
+The Transmuter is a contract that allows redemption of synthetic debt assets created by associated Liquid contracts for the underlying assets that back them at a 1 to 1 ratio. Deposits of synthetic debt assets into the Transmuter create demand for underlying assets from Liquid instances, which are obligated to service that demand across a pre-set time period. This creates fixed-duration fixed-rate terms. Each Transmuter takes one synthetic debt asset (lAsset) and can be associated with multiple Liquid instances, however only one Liquid instance is used for redemptions.
 
 ## Variables
 
@@ -220,29 +220,29 @@ The Transmuter is a contract that allows redemption of synthetic debt assets cre
 - **Notified By** - [`PendingAdminUpdated(address value)`](/dev/transmuter/transmuter-contract#Events_PendingAdminUpdated)
 </details>
 <details>
-  <summary>alchemist</summary>
+  <summary>liquid</summary>
 
-- **Description** - The address of the alchemist instance used for redemptions.
+- **Description** - The address of the liquid instance used for redemptions.
 - **Type** - address
 - **Used By**
   - [`createRedemption(uint256 syntheticDepositAmount)`](/dev/transmuter/transmuter-contract#UserActions_createRedemption)
   - [`claimRedemption(uint256 id)`](/dev/transmuter/transmuter-contract#UserActions_claimRedemption)
 - **Updated By**
-  - [`setAlchemist(uint256 cap)`](/dev/transmuter/transmuter-contract#AdminActions_setAlchemist)
+  - [`setLiquid(uint256 cap)`](/dev/transmuter/transmuter-contract#AdminActions_setLiquid)
 - **Read By**
-  - `alchemist()`
-- **Notified By** - [`AlchemistUpdated(uint256 cap)`](/dev/transmuter/transmuter-contract#Events_DepositCapUpdated)
+  - `liquid()`
+- **Notified By** - [`LiquidUpdated(uint256 cap)`](/dev/transmuter/transmuter-contract#Events_DepositCapUpdated)
 </details>
 <details>
-  <summary>alchemists</summary>
+  <summary>liquids</summary>
 
-- **Description** - An array of alchemists associated with this Transmuter.
+- **Description** - An array of liquids associated with this Transmuter.
 - **Type** - address[]
 - **Used By**
   - TODO - not used anywhere?
 - **Updated By**
   - TODO - not updated anywhere
-- **Read By** - `alchemists()`
+- **Read By** - `liquids()`
 </details>
 
 ### Private State
@@ -302,20 +302,20 @@ The Transmuter is a contract that allows redemption of synthetic debt assets cre
   <summary>createRedemption(uint256 syntheticDepositAmount)</summary>
 
 - **Description** - Creates a time-locked redemption staked position that linearly vests over `timeToTransmute` blocks.<br/><br/>
-  Validates the deposit amount and capacity against both `depositCap` and `alchemist.totalSyntheticsIssued()`. Transfers the `syntheticDepositAmount` of alAsset from the function caller. Records a new `StakingPosition` to Transmuter from `block.number` to `block.number + timeToTransmute`. Updates the staking graph with the per-block redemption rate contributed by this position, adding it to the existing global rate so that redemptions for all positions can be served correctly. Mints a new position token and updates `totalLocked`.<br/><br/>
+  Validates the deposit amount and capacity against both `depositCap` and `liquid.totalSyntheticsIssued()`. Transfers the `syntheticDepositAmount` of lAsset from the function caller. Records a new `StakingPosition` to Transmuter from `block.number` to `block.number + timeToTransmute`. Updates the staking graph with the per-block redemption rate contributed by this position, adding it to the existing global rate so that redemptions for all positions can be served correctly. Mints a new position token and updates `totalLocked`.<br/><br/>
   - `@param syntheticDepositAmount` - amount of `syntheticToken` deposited in this staking position, to be locked until transmutation is finished or early exit is executed.
 - **Visibility Specifier** - external
 - **State Mutability Specifier** - nonpayable
 - **Returns** - none
 - **Emits**
   - `PositionCreated(address owner, uint256 amount, uint256 tokenId)`
-- **Reverts** - `DepositZeroAmount()` - if `syntheticDepositAmount == 0` - `DepositCapReached()` - if `totalLocked + syntheticDepositAmount` exceeds `depositCap` or `alchemist.totalSyntheticsIssued()`. In the latter case there must be enough debt in the system to be able to service redemptions, and this check ensures that more deposits are not accepted than there is debt for service them.
+- **Reverts** - `DepositZeroAmount()` - if `syntheticDepositAmount == 0` - `DepositCapReached()` - if `totalLocked + syntheticDepositAmount` exceeds `depositCap` or `liquid.totalSyntheticsIssued()`. In the latter case there must be enough debt in the system to be able to service redemptions, and this check ensures that more deposits are not accepted than there is debt for service them.
 </details>
 <details id="UserActions_claimRedemption">
   <summary>claimRedemption(uint256 id)</summary>
 
 - **Description** - Settles and closes the redemption for the staked position identified by id, paying out the vested portion in yield tokens and returning any unvested synthetics minus fees applied.<br/><br/>
-  Validates the position exists and is not being claimed in its creation block. Computes the vested vs. unvested split using block-based linear vesting. Verifies ownership and burns the position token. Calculates bad debt from Alchemist state and scales down vested payout if necessary. First uses yield from prior repayments to reduce redemptions, then redeems the rest from the Alchemist. (calls `alchemist.redeem()`) Applies the transmutation fee to "transmuted" or vested debt, and an exit fee to synthetics returned (unvested debt). If the staked position was not fully transmuted (vested) then the staking graph is updated to to remove the remaining per block rate. Transfers yield and synthetic payouts/fees, burns the transmuted synthetics, reduces `totalSyntheticsIssued`, (calls `alchemist.reduceSyntheticsIssued()`) decrements `totalLocked`, and deletes the position. Informs the alchemist of it's yieldToken quantity. (calls `alchemist.setTrasnmuterTokenBalance()`)<br/><br/>
+  Validates the position exists and is not being claimed in its creation block. Computes the vested vs. unvested split using block-based linear vesting. Verifies ownership and burns the position token. Calculates bad debt from Liquid state and scales down vested payout if necessary. First uses yield from prior repayments to reduce redemptions, then redeems the rest from the Liquid. (calls `liquid.redeem()`) Applies the transmutation fee to "transmuted" or vested debt, and an exit fee to synthetics returned (unvested debt). If the staked position was not fully transmuted (vested) then the staking graph is updated to to remove the remaining per block rate. Transfers yield and synthetic payouts/fees, burns the transmuted synthetics, reduces `totalSyntheticsIssued`, (calls `liquid.reduceSyntheticsIssued()`) decrements `totalLocked`, and deletes the position. Informs the liquid of it's yieldToken quantity. (calls `liquid.setTrasnmuterTokenBalance()`)<br/><br/>
   - `@param id` - the id of the staked position to claim and close
 - **Visibility Specifier** - external
 - **State Mutability Specifier** - nonpayable
@@ -352,15 +352,15 @@ The Transmuter is a contract that allows redemption of synthetic debt assets cre
   - [`PendingAdminUpdated(address value)`](/dev/transmuter/transmuter-contract#Events_PendingAdminUpdated)
 - **Reverts** - none
 </details>
-<details id="AdminActions_setAlchemist">
-  <summary>setAlchemist(address value)</summary>
+<details id="AdminActions_setLiquid">
+  <summary>setLiquid(address value)</summary>
 
-- **Description** - Sets the address of the AlchemistV3 contract that will be used to redeem against for this Transmuter.
+- **Description** - Sets the address of the Liquid contract that will be used to redeem against for this Transmuter.
 - **Visibility Specifier** - external
 - **State Mutability Specifier** - nonpayable
 - **Returns** - none
 - **Emits**
-  - [`AlchemistUpdated(address value)`](/dev/transmuter/transmuter-contract#Events_AlchemistUpdated)
+  - [`LiquidUpdated(address value)`](/dev/transmuter/transmuter-contract#Events_LiquidUpdated)
 - **Reverts** - none
 </details>
 <details id="AdminActions_setDepositCap">
@@ -501,7 +501,7 @@ The Transmuter is a contract that allows redemption of synthetic debt assets cre
 
 - <span id="Events_AdminUpdated"><strong><code>AdminUpdated(address admin)</code></strong> - Emitted when the admin address is updated.</span>
 - <span id="Events_PendingAdminUpdated"><strong><code>PendingAdminUpdated(address pendingAdmin)</code></strong> - Emitted when the pending admin is updated.</span>
-- <span id="Events_AlchemistUpdated"><strong><code>AlchemistUpdated(address alchemist)</code></strong> - Emitted when the associated alchemist is updated.</span>
+- <span id="Events_LiquidUpdated"><strong><code>LiquidUpdated(address liquid)</code></strong> - Emitted when the associated liquid is updated.</span>
 - <span id="Events_PositionCreated"><strong><code>PositionCreated(address indexed creator, uint256 amountStaked, uint256 nftId)</code></strong> - Emitted when a position is created.</span>
 - <span id="Events_PositionClaimed"><strong><code>PositionClaimed(address indexed claimer, uint256 amountClaimed, uint256 amountUnclaimed)</code></strong> - Emitted when a position is claimed.</span>
 - <span id="Events_GraphSizeUpdated"><strong><code>GraphSizeUpdated(uint256 size)</code></strong> - Emitted when the graph size is extended.</span>

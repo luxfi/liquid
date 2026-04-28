@@ -10,7 +10,7 @@ Liquid V3 is published under a Business Source License (BUSL) such that while th
 
 Friendly forks catering for blockchain ecosystems that are not served by current Liquid V3 deployments, or offer a significantly differentiated and novel version of V3 can apply for a BUSL license to fork Liquid V3.
 
-This framework enables teams to create a custom version of Liquid V3, with yield strats and Alchemists that suit their blockchain ecosystem.
+This framework enables teams to create a custom version of Liquid V3, with yield strats and Liquids that suit their blockchain ecosystem.
 
 ## What teams get from the friendly fork initiative:
 

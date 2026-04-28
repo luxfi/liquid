@@ -22,20 +22,20 @@ Making even a small repayment secures more control over how and when you use you
 
 ![](/img/repay-loan-01.png)
 
-The Repay tab accepts three asset types: alAssets, MYT, or the underlying token. You can use whichever is most convenient or cheapest at the moment.
+The Repay tab accepts three asset types: lAssets, MYT, or the underlying token. You can use whichever is most convenient or cheapest at the moment.
 
 ## Step 1 – Choose what to repay with
 
 | Option                   | When to use                          | Notes                                                                   |
 | ------------------------ | ------------------------------------ | ----------------------------------------------------------------------- |
-| alAsset (alUSD or alETH) | Standard debt                        | Repays non-earmarked debt only.                                         |
+| lAsset (LUSD or LETH) | Standard debt                        | Repays non-earmarked debt only.                                         |
 | MYT (Mix-Yield Token)    | Earmarked debt and/oor standard debt | Required for any debt already earmarked for a redemption cycle.         |
 | Underlying (ETH or USDC) | Convenience                          | Interface swaps to MYT behind the scenes before applying the repayment. |
 
 The asset-selector dropdown (left side of the entry box) will only list what is valid for the current vault state.
 
-:::tip Pro Tip: Repaying with alAssets
-You can often buy alUSD or alETH on secondary markets (like Curve) for slightly less than $1.00. Using these discounted tokens to repay your loan allows you to clear your debt cheaper than 1:1!
+:::tip Pro Tip: Repaying with lAssets
+You can often buy LUSD or LETH on secondary markets (like Curve) for slightly less than $1.00. Using these discounted tokens to repay your loan allows you to clear your debt cheaper than 1:1!
 :::
 
 ## Step 2 – Enter the amount
@@ -56,7 +56,7 @@ Lil section (table?) on how earmarked and regular debt is paid. Maybe this? Redu
 
 | Debt type     | How to identify                   | Repayment asset | Effect                                     |
 | ------------- | --------------------------------- | --------------- | ------------------------------------------ |
-| Non-earmarked | “Earmarked” counter = 0 in the UI | alAsset         | Reduces debt immediately.                  |
+| Non-earmarked | “Earmarked” counter = 0 in the UI | lAsset         | Reduces debt immediately.                  |
 | Earmarked     | “Earmarked” shows a token amount  | MYT             | Repays the reserved slice. The MYT you use |
 
 Repaying earmarked debt before maturity can keep your health factor higher.
