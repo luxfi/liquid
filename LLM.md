@@ -1,7 +1,10 @@
-# LLM.md - Hanzo Liquid (AlchemistV3)
+# LLM.md - Lux Liquid
 
 ## Overview
-Self-repaying lending protocol (Alchemix V3 fork). Users deposit yield-bearing collateral, borrow synthetic debt tokens (e.g. LETH), and debt is automatically repaid via yield. Includes a Transmuter for converting synthetics back to yield tokens over time.
+Self-repaying lending protocol on Lux. Users deposit yield-bearing collateral,
+borrow synthetic debt tokens (e.g. LETH), and debt is automatically repaid via
+yield. Includes a Transmuter for converting synthetics back to yield tokens
+over time.
 
 ## Tech Stack
 - **Language**: Solidity 0.8.28
@@ -12,40 +15,41 @@ Self-repaying lending protocol (Alchemix V3 fork). Users deposit yield-bearing c
 ## Build & Run
 ```bash
 forge build           # Compile all contracts
-forge test -v         # Run tests (247 pass, 9 fail without mainnet fork)
-forge test --match-path "src/test/AlchemistV3.t.sol" -v  # Run specific test
+forge test -v         # Run tests
+forge test --match-path "src/test/Liquid.t.sol" -v  # Run specific test
 ```
 
 ## Key Contracts
-- `AlchemistV3.sol` -- Core lending engine (Initializable proxy pattern, empty constructor + initialize)
-- `AlchemistV3Position.sol` -- ERC721 NFT representing user positions (constructor takes alchemist address)
-- `Transmuter.sol` -- Converts synthetic tokens to yield tokens over time (Fenwick tree / StakingGraph)
-- `AlchemistETHVault.sol` -- ETH/WETH fee vault (constructor: weth, alchemist, owner)
-- `AlchemistTokenVault.sol` -- ERC20 fee vault
-- `AlchemistCurator.sol` -- Strategy cap management (constructor: admin, operator)
-- `AlchemistAllocator.sol` -- Capital allocation to strategies (constructor: vault-v2, admin, operator)
-- `AlchemistStrategyClassifier.sol` -- Risk class management (constructor: admin)
-- `MYTStrategy.sol` -- Base strategy for MYT (multi-yield token) adapters
-- `PerpetualGauge.sol` -- Governance gauge for strategy weight voting
+- `Liquid.sol` -- Core lending engine (Initializable proxy pattern, empty constructor + initialize)
+- `LiquidPosition.sol` -- ERC721 NFT representing user positions (constructor takes liquid address)
+- `LiquidTransmuter.sol` -- Converts synthetic tokens to yield tokens over time (Fenwick tree / StakingGraph)
+- `LiquidETHVault.sol` -- ETH/WETH fee vault (constructor: weth, liquid, owner)
+- `LiquidTokenVault.sol` -- ERC20 fee vault
+- `LiquidCurator.sol` -- Strategy cap management (constructor: admin, operator)
+- `LiquidAllocator.sol` -- Capital allocation to strategies (constructor: vault-v2, admin, operator)
+- `LiquidStrategyClassifier.sol` -- Risk class management (constructor: admin)
+- `LiquidStrategy.sol` -- Base strategy adapter for VaultV2 flows
+- `LiquidGauge.sol` -- Governance gauge for strategy weight voting
+- `LiquidGate.sol` / `LiquidComplianceGate.sol` -- Auth + KYC gating for redemptions
 
 ## Constructor Signatures (critical for deployment)
-- `AlchemistV3()` -- empty, then call `initialize(AlchemistInitializationParams)`
-- `AlchemistV3Position(address alchemist_)`
-- `Transmuter(ITransmuter.TransmuterInitializationParams memory params)`
-- `AlchemistETHVault(address _weth, address _alchemist, address _owner)`
-- `AlchemistCurator(address _admin, address _operator)` via PermissionedProxy
-- `AlchemistAllocator(address _vault, address _admin, address _operator)` via PermissionedProxy
-- `AlchemistStrategyClassifier(address _admin)`
+- `Liquid()` -- empty, then call `initialize(LiquidInitializationParams)`
+- `LiquidPosition(address liquid_)`
+- `LiquidTransmuter(ILiquidTransmuter.TransmuterInitializationParams memory params)`
+- `LiquidETHVault(address _weth, address _liquid, address _owner)`
+- `LiquidCurator(address _admin, address _operator)` via PermissionedProxy
+- `LiquidAllocator(address _vault, address _admin, address _operator)` via PermissionedProxy
+- `LiquidStrategyClassifier(address _admin)`
 
 ## Deployment Order
-1. Deploy AlchemistV3 (empty constructor)
-2. Deploy AlchemistV3Position (needs alchemist address)
-3. Deploy Transmuter (needs debt token address)
-4. Deploy AlchemistETHVault (needs WLUX + alchemist address)
-5. Call alchemist.initialize(params) with transmuter address
-6. Call alchemist.setAlchemistPositionNFT(position)
-7. Call transmuter.setAlchemist(alchemist)
-8. Whitelist alchemist as minter on debt token (LETH)
+1. Deploy Liquid (empty constructor)
+2. Deploy LiquidPosition (needs liquid address)
+3. Deploy LiquidTransmuter (needs debt token address)
+4. Deploy LiquidETHVault (needs WLUX + liquid address)
+5. Call liquid.initialize(params) with transmuter address
+6. Call liquid.setLiquidPositionNFT(position)
+7. Call transmuter.setLiquid(liquid)
+8. Whitelist liquid as minter on debt token (LETH)
 
 ## Canonical Lux Addresses
 - LETH: `0x60E0a8167FC13dE89348978860466C9ceC24B9ba`
@@ -55,34 +59,36 @@ forge test --match-path "src/test/AlchemistV3.t.sol" -v  # Run specific test
 ## Test Failures (pre-existing)
 - Strategy fork tests (SfrxETH, MorphoYearnOGWETH, PeapodsETH, TokeAutoETH) -- need MAINNET_RPC_URL
 - IntegrationTest -- needs Ethereum mainnet fork
-- PerpetualGauge (2 tests) -- logic bugs in cap application and vote aggregation
+- LiquidGauge (2 tests) -- logic bugs in cap application and vote aggregation
 - MockERC20 IERC20 compliance -- mock doesn't implement full interface
-- AlchemistETHVault testDepositWETH -- mock WETH incomplete
+- LiquidETHVault testDepositWETH -- mock WETH incomplete
 
 ## Scripts
-- `script/DeployLux.s.sol` -- Multi-network deploy (LUX/Zoo/Hanzo)
+- `script/DeployLux.s.sol` -- Multi-network deploy (mainnet/testnet/devnet, Liquidity chain IDs)
 - `script/DeployMainnet.s.sol` -- Lux mainnet ETH deployment with canonical addresses
+- `script/DeployLocal.s.sol` -- Full local stack (Anvil/luxd)
+- `script/TestFlow.s.sol` -- E2E smoke flow against a deployed local stack
 
 ## Structure
 ```
 src/
-  AlchemistV3.sol, AlchemistV3Position.sol, Transmuter.sol
-  AlchemistETHVault.sol, AlchemistTokenVault.sol
-  AlchemistCurator.sol, AlchemistAllocator.sol
-  AlchemistStrategyClassifier.sol, MYTStrategy.sol, PerpetualGauge.sol
-  adapters/       -- AbstractFeeVault, EulerUSDCAdapter
-  base/           -- Errors, ErrorMessages, TransmuterErrors
-  external/       -- AlEth token, IDetailedERC20, ISettlerActions
+  Liquid.sol, LiquidPosition.sol, LiquidTransmuter.sol
+  LiquidETHVault.sol, LiquidTokenVault.sol
+  LiquidCurator.sol, LiquidAllocator.sol
+  LiquidStrategyClassifier.sol, LiquidStrategy.sol, LiquidGauge.sol
+  LiquidGate.sol, LiquidComplianceGate.sol
+  adapters/       -- AbstractFeeVault, EulerUSDCAdapter, SecurityTokenAdapter
+  base/           -- Errors, ErrorMessages, LiquidTransmuterErrors
+  external/       -- LETH (synthetic), interfaces
   governance/     -- LiquidGovernor, LiquidToken
   interfaces/     -- All interfaces
-  libraries/      -- FixedPointMath, SafeCast, SafeERC20, TokenUtils, StakingGraph, etc.
+  libraries/      -- FixedPointMath, SafeCast, SafeERC20, TokenUtils, StakingGraph, …
   mocks/          -- ERC20Mock, Pool, Stake, StakingPoolMock
-  strategies/     -- EETH, SfrxETH, WstethMainnet, PeapodsETH, etc.
+  strategies/     -- EETH, SfrxETH, Lido, EigenLayer, Pendle, Morpho, Yearn, …
   test/           -- All test files
-  tokens/         -- (empty)
   utils/          -- PermissionedProxy, Whitelist, ZeroXSwapVerifier
 script/
-  DeployLux.s.sol, DeployMainnet.s.sol
+  DeployLux.s.sol, DeployMainnet.s.sol, DeployLocal.s.sol, TestFlow.s.sol
 lib/
   forge-std, openzeppelin-contracts, openzeppelin-contracts-upgradeable
   vault-v2, permit2, solmate, chainlink-brownie-contracts, halmos-cheatcodes

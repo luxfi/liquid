@@ -1,17 +1,17 @@
 # Security Information
 
-## Link to vulnerability disclosure details (Bug Bounty).
+## Vulnerability disclosure (Bug Bounty)
 
-https://immunefi.com/bug-bounty/alchemix/
+Report vulnerabilities responsibly to the Lux security team.
 
-## Languages that our team speaks and understands.
+## Languages
 
 Preferred-Languages: en
 
-## Security contact details.
+## Security contact
 
-security@alchemix.fi
+security@lux.network
 
-## The URL for accessing the security.txt file.
+## security.txt
 
-https://alchemix.fi/security.txt
+https://lux.network/.well-known/security.txt
