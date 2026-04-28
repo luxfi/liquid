@@ -19,7 +19,7 @@ function LiquidStats() {
     // Fetch TVL
     const fetchTvl = async () => {
       try {
-        const res = await fetch("https://api.llama.fi/tvl/alchemix");
+        const res = await fetch("https://api.llama.fi/tvl/liquid");
         if (!res.ok) throw new Error("TVL fetch failed");
         const tvlValue = await res.json(); // API returns a number for TVL
         setTvl(tvlValue);
@@ -33,8 +33,8 @@ function LiquidStats() {
     const fetchPrices = async () => {
       try {
         const coins = [
-          "coingecko:alchemix", // ALCX
-          "coingecko:alchemix-eth", // alETH
+          "coingecko:liquid", // ALCX
+          "coingecko:liquid-eth", // LETH
           "coingecko:ethereum", // ETH
         ];
         const url = `https://coins.llama.fi/prices/current/${coins.join(",")}`;
@@ -43,11 +43,11 @@ function LiquidStats() {
         const data = await res.json();
         // Extract prices from the response
         const prices = data.coins;
-        const alcxUsd = prices["coingecko:alchemix"]?.price;
-        const alEthUsd = prices["coingecko:alchemix-eth"]?.price;
+        const alcxUsd = prices["coingecko:liquid"]?.price;
+        const alEthUsd = prices["coingecko:liquid-eth"]?.price;
         const ethUsd = prices["coingecko:ethereum"]?.price;
         setAlcxPrice(alcxUsd);
-        // Calculate alETH/ETH ratio if both prices are available
+        // Calculate LETH/ETH ratio if both prices are available
         if (alEthUsd != null && ethUsd != null) {
           setAlEthRatio(alEthUsd / ethUsd);
         } else {
@@ -97,7 +97,7 @@ function LiquidStats() {
         </li>
 
         <li>
-          <strong>alETH/ETH:</strong>{" "}
+          <strong>LETH/ETH:</strong>{" "}
           {priceError ? (
             <span style={{ color: "red" }}>Error loading</span>
           ) : alEthRatio !== null ? (
