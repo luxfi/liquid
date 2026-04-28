@@ -2,13 +2,13 @@
 sidebar_position: 7
 ---
 
-# AlchemistStrategyClassifier
+# LiquidStrategyClassifier
 
 ## Description
 
 This contract defines risk classes and their caps, and maps each strategy to a risk level. 
 
-> Note: This is currently not used, but will be referenced by the AlchemistAllocator in it's allocate/deallocate calls to resrict how much can be allocated/deallocated to/from a specific strategy to adhere to DAO defined boundaries around risk management.
+> Note: This is currently not used, but will be referenced by the LiquidAllocator in it's allocate/deallocate calls to resrict how much can be allocated/deallocated to/from a specific strategy to adhere to DAO defined boundaries around risk management.
 
 ## Risk Class
 
@@ -39,7 +39,7 @@ This contract defines risk classes and their caps, and maps each strategy to a r
   - **Description** - The current admin. Only this address can modify caps and assignments.  
   - **Type** - `address`
   - **Updated By**
-    - [`acceptOwnership()`](/dev/myt/alchemist-strategy-classifier-contract#AdminActions_acceptOwnership)
+    - [`acceptOwnership()`](/dev/myt/liquid-strategy-classifier-contract#AdminActions_acceptOwnership)
   - **Read By**
     - `admin()`
 </details>
@@ -49,8 +49,8 @@ This contract defines risk classes and their caps, and maps each strategy to a r
   - **Description** - The first step in a two-step process of setting a new administrator. The pendingAdmin is set by the current admin, then the pendingAdmin must accept the responsibility to lock in the change of admin. 
   - **Type** - `address`
   - **Updated By**
-    - [`transferOwnership(address _newAdmin)`](/dev/myt/alchemist-strategy-classifier-contract#AdminActions_transferOwnership)
-    - [`acceptOwnership()`](/dev/myt/alchemist-strategy-classifier-contract#AdminActions_acceptOwnership)
+    - [`transferOwnership(address _newAdmin)`](/dev/myt/liquid-strategy-classifier-contract#AdminActions_transferOwnership)
+    - [`acceptOwnership()`](/dev/myt/liquid-strategy-classifier-contract#AdminActions_acceptOwnership)
   - **Read By**
     - `pendingAdmin()`
 </details>
@@ -60,10 +60,10 @@ This contract defines risk classes and their caps, and maps each strategy to a r
   - **Description** - Mapping from riskLevel ID to a Risk Class.  
   - **Type** - `mapping(uint8 => RiskClass)`
   - **Updated By**
-    - [`setRiskClass(uint8 classId, uint256 globalCap, uint256 localCap)`](/dev/myt/alchemist-strategy-classifier-contract#RiskClassManagement_setRiskClass)
+    - [`setRiskClass(uint8 classId, uint256 globalCap, uint256 localCap)`](/dev/myt/liquid-strategy-classifier-contract#RiskClassManagement_setRiskClass)
   - **Read By**
-    - [`getGlobalCap(uint8 riskLevel)`](/dev/myt/alchemist-strategy-classifier-contract#ReadingState_getGlobalCap)
-    - [`getIndividualCap(uint256 strategyId)`](/dev/myt/alchemist-strategy-classifier-contract#ReadingState_getIndividualCap)
+    - [`getGlobalCap(uint8 riskLevel)`](/dev/myt/liquid-strategy-classifier-contract#ReadingState_getGlobalCap)
+    - [`getIndividualCap(uint256 strategyId)`](/dev/myt/liquid-strategy-classifier-contract#ReadingState_getIndividualCap)
 </details>
 <details>
   <summary>strategyRiskLevel</summary>
@@ -71,10 +71,10 @@ This contract defines risk classes and their caps, and maps each strategy to a r
   - **Description** - Mapping of strategyID to riskLevel, used to look up caps for a strategy.  
   - **Type** - `mapping(uint256 => uint8)`
   - **Updated By**
-    - [`assignStrategyRiskLevel(uint256 strategyId, uint8 riskLevel)`](/dev/myt/alchemist-strategy-classifier-contract#RiskClassManagement_assignStrategyRiskLevel)
+    - [`assignStrategyRiskLevel(uint256 strategyId, uint8 riskLevel)`](/dev/myt/liquid-strategy-classifier-contract#RiskClassManagement_assignStrategyRiskLevel)
   - **Read By**
-    - [`getStrategyRiskLevel(uint256 strategyId)`](/dev/myt/alchemist-strategy-classifier-contract#ReadingState_getStrategyRiskLevel)
-    - [`getIndividualCap(uint256 strategyId)`](/dev/myt/alchemist-strategy-classifier-contract#ReadingState_getIndividualCap)
+    - [`getStrategyRiskLevel(uint256 strategyId)`](/dev/myt/liquid-strategy-classifier-contract#ReadingState_getStrategyRiskLevel)
+    - [`getIndividualCap(uint256 strategyId)`](/dev/myt/liquid-strategy-classifier-contract#ReadingState_getIndividualCap)
 </details>
 
 ## Functions
@@ -101,7 +101,7 @@ This contract defines risk classes and their caps, and maps each strategy to a r
   - **State Mutability Specifier** - nonpayable  
   - **Reverts** - none
   - **Emits**
-    - [`AdminChanged(address admin)`](/dev/myt/alchemist-strategy-classifier-contract#Events_AdminChanged)
+    - [`AdminChanged(address admin)`](/dev/myt/liquid-strategy-classifier-contract#Events_AdminChanged)
 </details>
 <details id="RiskClassManagement_setRiskClass">
   <summary>setRiskClass(uint8 classId, uint256 globalCap, uint256 localCap)</summary>
@@ -114,7 +114,7 @@ This contract defines risk classes and their caps, and maps each strategy to a r
   - **State Mutability Specifier** - nonpayable  
   - **Reverts** - none
   - **Emits**
-    - [`RiskClassModified(uint8 classId, uint256 globalCap, uint256 localCap)`](/dev/myt/alchemist-strategy-classifier-contract#Events_RiskClassModified)
+    - [`RiskClassModified(uint8 classId, uint256 globalCap, uint256 localCap)`](/dev/myt/liquid-strategy-classifier-contract#Events_RiskClassModified)
 </details>
 <details id="RiskClassManagement_assignStrategyRiskLevel">
   <summary>assignStrategyRiskLevel(uint256 strategyId, uint8 riskLevel)</summary>

@@ -6,7 +6,7 @@ sidebar_position: 4
 
 ## Description
 
-The base contract for holding vaults used to fulfill Alchemist obligations in the event that it's own funds are not sufficient
+The base contract for holding vaults used to fulfill Liquid obligations in the event that it's own funds are not sufficient
 
 ## Variables
 
@@ -21,12 +21,12 @@ The base contract for holding vaults used to fulfill Alchemist obligations in th
 <details>
   <summary>authorized</summary>
 
-  - **Description** - Allowlist of accounts permitted to withdraw from the vault, such as the Alchemist and owner.
+  - **Description** - Allowlist of accounts permitted to withdraw from the vault, such as the Liquid and owner.
   - **Type** - `mapping(address => bool)`
   - **Used By**
-    - [`onlyAuthorized`](/dev/alchemist/abstract-fee-vault-contract#Modifiers_onlyAuthorized)
+    - [`onlyAuthorized`](/dev/liquid/abstract-fee-vault-contract#Modifiers_onlyAuthorized)
   - **Updated By**
-    - [`setAuthorization(address account, bool status)`](/dev/alchemist/abstract-fee-vault-contract#OwnerActions_setAuthorization)
+    - [`setAuthorization(address account, bool status)`](/dev/liquid/abstract-fee-vault-contract#OwnerActions_setAuthorization)
   - **Read By**
     - `authorized(address)`
 </details>
@@ -58,7 +58,7 @@ The base contract for holding vaults used to fulfill Alchemist obligations in th
   - **Reverts**
     - `ZeroAddress()` - when `account == address(0)`.
   - **Emits**
-    - [`AuthorizationUpdated(address indexed account, bool status)`](/dev/alchemist/abstract-fee-vault-contract#Events_AuthorizationUpdated)
+    - [`AuthorizationUpdated(address indexed account, bool status)`](/dev/liquid/abstract-fee-vault-contract#Events_AuthorizationUpdated)
 </details>
 
 ### Internal Operations

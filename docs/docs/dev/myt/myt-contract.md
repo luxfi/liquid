@@ -13,7 +13,7 @@ is a set of strategies that function as adapters for the Morpho Vault, managing 
 strategies are designed to allocate capital across a diverse range of third-party, yield-bearing DeFi protocols. Users deposit their assets
 into the Morpho Vault and receive Mix-Yield Tokens (MYT), which represent a share of the vault’s underlying assets. The value of an MYT
 share is designed to increase over time as the strategies accrue yield. The allocation of capital is managed by an Liquid admin or
-operator via the AlchemistAllocator contract to optimize returns and manage risk.
+operator via the LiquidAllocator contract to optimize returns and manage risk.
 
 This MYTStrategy contract is the base contract from which all individual strategy adapters are derived. Each adapter defines one of the many strategies used by the same MYT.
 This base contract defines the functions that allow allocation and deallocation into the strategy, in addition to claiming and withdrawing, and other general operations on the strategy.
@@ -587,8 +587,8 @@ For more specific operations tailored to individual strategies, see the contract
 
 </details>
 
-<details id="ReadingState_realAssets">
-  <summary>realAssets()</summary>
+<details id="ReadingState_relAssets">
+  <summary>relAssets()</summary>
 
 - **Description** - An empty virtual function defining internal logic for getting the actual amount of underlying assets currently held or represented by this strategy. Must be overridden by derived contracts.
 - **Visibility Specifier** - external

@@ -6,20 +6,20 @@ sidebar_position: 1
 
 ## DAOs & Treasuries
 
-Treasury managers can park idle ETH or USDC in the Mix-Yield Token (MYT) to earn a diversified return while assets remain fully on-chain. When liquidity is required, the same collateral mints alAssets that can be swapped for operating capital, vault yield then repays the debt. Any surplus alAssets can enter the Transmuter to secure a predictable, fixed-rate gain.
+Treasury managers can park idle ETH or USDC in the Mix-Yield Token (MYT) to earn a diversified return while assets remain fully on-chain. When liquidity is required, the same collateral mints lAssets that can be swapped for operating capital, vault yield then repays the debt. Any surplus lAssets can enter the Transmuter to secure a predictable, fixed-rate gain.
 
 Example flow:
 
 | Action                             | Result                                    |
 | ---------------------------------- | ----------------------------------------- |
 | Deposit 10,000 ETH → MYT           | Treasury begins earning blended yield     |
-| Mint 9,000 alETH, swap to stables  | 90% LTV runway without selling core asset |
+| Mint 9,000 LETH, swap to stables  | 90% LTV runway without selling core asset |
 | Vault yield and redemptions accrue | Debt balance shrinks automatically        |
-| Excess alETH → Transmuter          | Locks in fixed return                     |
+| Excess LETH → Transmuter          | Locks in fixed return                     |
 
 ## Money-Market Protocols
 
-Listing alUSD and alETH as collateral gives borrowers indirect access to MYT yield without the platform itself managing strategies. Because alAssets trade close to face value and carry no variable interest, they fit neatly into existing risk engines while opening new leverage paths for users.
+Listing LUSD and LETH as collateral gives borrowers indirect access to MYT yield without the platform itself managing strategies. Because lAssets trade close to face value and carry no variable interest, they fit neatly into existing risk engines while opening new leverage paths for users.
 
 ## Vault Curators
 
@@ -35,4 +35,4 @@ Aggregators can route deposits into Liquid vaults to capture dependable ETH or U
 
 ## Yield Hunters
 
-Power users can stack three angles, looped leverage on risk-adjusted yield, fixed-rate gains by buying discounted alAssets for Transmuter redemption, and like-for-like liquidity pools that eliminate impermanent loss. This creates a toolkit that delivers both predictable safe income and optional upside without variable-rate complications.
+Power users can stack three angles, looped leverage on risk-adjusted yield, fixed-rate gains by buying discounted lAssets for Transmuter redemption, and like-for-like liquidity pools that eliminate impermanent loss. This creates a toolkit that delivers both predictable safe income and optional upside without variable-rate complications.

@@ -2,11 +2,11 @@
 sidebar_position: 6
 ---
 
-# AlchemistETHVault
+# LiquidETHVault
 
 ## Description
 
-A minimal ETH/WETH  holding contract. It accepts native ETH or WETH, but always holds the balance as ETH, unwrapping the WETH if need be. Anyone can deposit, but only authorized callers can withdraw. It is used to escrow extra funds that may be used to cover obligations to liquidators and redeemers on the Alchemist. 
+A minimal ETH/WETH  holding contract. It accepts native ETH or WETH, but always holds the balance as ETH, unwrapping the WETH if need be. Anyone can deposit, but only authorized callers can withdraw. It is used to escrow extra funds that may be used to cover obligations to liquidators and redeemers on the Liquid. 
 Inherits from `AbstractFeeVault` for authorization and helpers.
 
 ## Functions
@@ -22,7 +22,7 @@ Inherits from `AbstractFeeVault` for authorization and helpers.
   - **Reverts**
     - `ZeroAmount()` - when `msg.value == 0`.  
   - **Emits**
-    - [`Deposited(address indexed from, uint256 amount)`](/dev/alchemist/alchemist-eth-vault-contract#Events_Deposited)
+    - [`Deposited(address indexed from, uint256 amount)`](/dev/liquid/liquid-eth-vault-contract#Events_Deposited)
 </details>
 <details id="UserActions_depositWETH">
   <summary>depositWETH(uint256 amount)</summary>
@@ -35,7 +35,7 @@ Inherits from `AbstractFeeVault` for authorization and helpers.
     - `ZeroAmount()` - when `amount == 0`.  
     - If the sender has insufficient allowance/balance.  
   - **Emits**
-    - [`Deposited(address indexed from, uint256 amount)`](/dev/alchemist/alchemist-eth-vault-contract#Events_Deposited)
+    - [`Deposited(address indexed from, uint256 amount)`](/dev/liquid/liquid-eth-vault-contract#Events_Deposited)
 </details>
 <details id="UserActions_receive">
   <summary>receive()</summary>
@@ -64,7 +64,7 @@ Inherits from `AbstractFeeVault` for authorization and helpers.
     - `InsufficientBalance()` - when `amount > address(this).balance`.  
     - `TransferFailed()` - when the ETH transfer fails.  
   - **Emits**
-    - [`Withdrawn(address indexed recipient, uint256 amount)`](/dev/alchemist/alchemist-eth-vault-contract#Events_Withdrawn)
+    - [`Withdrawn(address indexed recipient, uint256 amount)`](/dev/liquid/liquid-eth-vault-contract#Events_Withdrawn)
 </details>
 
 ### Internal Operations
@@ -77,7 +77,7 @@ Inherits from `AbstractFeeVault` for authorization and helpers.
   - **State Mutability Specifier** - nonpayable  
   - **Reverts** - none  
   - **Emits**
-    - [`Deposited(address indexed from, uint256 amount)`](/dev/alchemist/alchemist-eth-vault-contract#Events_Deposited)
+    - [`Deposited(address indexed from, uint256 amount)`](/dev/liquid/liquid-eth-vault-contract#Events_Deposited)
 </details>
 
 ### Reading State
