@@ -43,12 +43,12 @@ interface IAdapter {
 /// @title TestFlow — end-to-end Liquid Protocol demo
 contract TestFlow is Script {
     // Deployed addresses (from DeployLocal)
-    address constant WLUX  = 0x5FbDB2315678afecb367f032d93F642f64180aa3;
-    address constant LUSD  = 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512;
-    address constant IBIT  = 0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0;
+    address constant WLUX = 0x5FbDB2315678afecb367f032d93F642f64180aa3;
+    address constant LUSD = 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512;
+    address constant IBIT = 0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0;
     address constant LIQUID = 0x5FC8d32690cc91D4c39d9d3abcBD16989F875707;
     address constant POSITION = 0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6;
-    address constant GATE  = 0x0B306BF915C4d645ff596e518fAf3F9669b97016;
+    address constant GATE = 0x0B306BF915C4d645ff596e518fAf3F9669b97016;
     address constant IBIT_ADAPTER = 0x9A676e781A523b5d0C0e43731313A708CB607508;
 
     function run() external {
@@ -102,7 +102,7 @@ contract TestFlow is Script {
         console.log("IBIT balance:", IDevToken(IBIT).balanceOf(user));
 
         // 7. Update NAV (simulate price movement)
-        adapter.updateNAV(55.00e18); // IBIT went from $52.34 to $55.00
+        adapter.updateNAV(55.0e18); // IBIT went from $52.34 to $55.00
         console.log("Updated NAV:", adapter.nav());
 
         // 8. Check compliance

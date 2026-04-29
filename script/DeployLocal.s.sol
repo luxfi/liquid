@@ -9,7 +9,7 @@ import {LiquidETHVault} from "../src/LiquidETHVault.sol";
 import {LiquidTokenVault} from "../src/LiquidTokenVault.sol";
 import {LiquidCurator} from "../src/LiquidCurator.sol";
 import {LiquidStrategyClassifier} from "../src/LiquidStrategyClassifier.sol";
-import {LiquidComplianceGate} from "../src/LiquidComplianceGate.sol";
+import {LiquidCompliance} from "../src/LiquidCompliance.sol";
 import {SecurityTokenAdapter} from "../src/adapters/SecurityTokenAdapter.sol";
 import {ILiquid, LiquidInitializationParams} from "../src/interfaces/ILiquid.sol";
 import {ILiquidTransmuter} from "../src/interfaces/ILiquidTransmuter.sol";
@@ -29,22 +29,29 @@ contract DevToken {
     constructor(string memory _name, string memory _symbol, uint256 _premint) {
         name = _name;
         symbol = _symbol;
-        if (_premint > 0) { _mint(msg.sender, _premint); }
+        if (_premint > 0) _mint(msg.sender, _premint);
     }
-    function mint(address to, uint256 amount) external { _mint(to, amount); }
+
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
+
     function _mint(address to, uint256 amount) internal {
         totalSupply += amount;
         balanceOf[to] += amount;
         emit Transfer(address(0), to, amount);
     }
+
     function approve(address spender, uint256 amount) external returns (bool) {
         allowance[msg.sender][spender] = amount;
         emit Approval(msg.sender, spender, amount);
         return true;
     }
+
     function transfer(address to, uint256 amount) external returns (bool) {
         return transferFrom(msg.sender, to, amount);
     }
+
     function transferFrom(address from, address to, uint256 amount) public returns (bool) {
         require(balanceOf[from] >= amount, "insufficient");
         if (from != msg.sender && allowance[from][msg.sender] != type(uint256).max) {
@@ -56,6 +63,7 @@ contract DevToken {
         emit Transfer(from, to, amount);
         return true;
     }
+
     receive() external payable {
         balanceOf[msg.sender] += msg.value;
         totalSupply += msg.value;
@@ -105,12 +113,7 @@ contract DeployLocal is Script {
 
         // 3. Deploy Transmuter with LUSD as synthetic token
         ILiquidTransmuter.TransmuterInitializationParams memory tParams = ILiquidTransmuter.TransmuterInitializationParams({
-            syntheticToken: address(lusd),
-            feeReceiver: deployer,
-            timeToTransmute: 45 days,
-            transmutationFee: 0.005e18,
-            exitFee: 0.02e18,
-            graphSize: 1000
+            syntheticToken: address(lusd), feeReceiver: deployer, timeToTransmute: 45 days, transmutationFee: 0.005e18, exitFee: 0.02e18, graphSize: 1000
         });
         LiquidTransmuter transmuter = new LiquidTransmuter(tParams);
         console.log("Transmuter:", address(transmuter));
@@ -120,9 +123,7 @@ contract DeployLocal is Script {
         console.log("TokenVault:", address(tokenVault));
 
         // 5. Deploy WLUX adapter (simple 1:1 price)
-        SecurityTokenAdapter wluxAdapter = new SecurityTokenAdapter(
-            address(wlux), "LUX", "", "", "native", 1e18
-        );
+        SecurityTokenAdapter wluxAdapter = new SecurityTokenAdapter(address(wlux), "LUX", "", "", "native", 1e18);
         console.log("WLUX Adapter:", address(wluxAdapter));
 
         // 6. Initialize Liquid
@@ -139,23 +140,21 @@ contract DeployLocal is Script {
             collateralizationLowerBound: 1.05e18,
             tokenAdapter: address(wluxAdapter),
             transmuter: address(transmuter),
-            protocolFee: 1000,       // 10% in BPS
+            protocolFee: 1000, // 10% in BPS
             protocolFeeReceiver: deployer,
-            liquidatorFee: 500,      // 5% in BPS
-            repaymentFee: 100        // 1% in BPS
+            liquidatorFee: 500, // 5% in BPS
+            repaymentFee: 100 // 1% in BPS
         });
         liquid.initialize(initParams);
         liquid.setLiquidPositionNFT(address(position));
         console.log("Liquid initialized + Position NFT set");
 
         // 7. Deploy SecurityTokenAdapter for IBIT
-        SecurityTokenAdapter ibitAdapter = new SecurityTokenAdapter(
-            address(ibit), "IBIT", "46438F101", "US46438F1012", "ETF", 52.34e18
-        );
+        SecurityTokenAdapter ibitAdapter = new SecurityTokenAdapter(address(ibit), "IBIT", "46438F101", "US46438F1012", "ETF", 52.34e18);
         console.log("IBIT Adapter:", address(ibitAdapter));
 
         // 8. Deploy ComplianceGate
-        LiquidComplianceGate gate = new LiquidComplianceGate(deployer);
+        LiquidCompliance gate = new LiquidCompliance(deployer);
         console.log("ComplianceGate:", address(gate));
 
         // Compliance is now delegated to ERC-3643 IIdentityRegistry +
