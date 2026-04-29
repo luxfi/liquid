@@ -14,7 +14,7 @@ spirals, no manual repayments — the position pays itself off.
 - **Yield routing**: VaultV2 + curated strategy adapters (Aave, Compound, Lido,
   EtherFi, Pendle, Morpho, Yearn, Ethena, EigenLayer, Maker DSR, plus native
   Lux-side strategies)
-- **Compliance**: optional `LiquidComplianceGate` for whitelisted/KYC'd
+- **Compliance**: optional `LiquidCompliance` for whitelisted/KYC'd
   redemption flows on regulated collateral
 
 ---
@@ -109,7 +109,7 @@ classifier before the curator approves it for allocation.
 | Contract | Purpose |
 |----------|---------|
 | [`LiquidGate.sol`](src/LiquidGate.sol) | Per-vault, per-account allowlist for redemptions. |
-| [`LiquidComplianceGate.sol`](src/LiquidComplianceGate.sol) | KYC-tier gate (0=none, 1=basic, 2=accredited Reg D, 3=qualified purchaser Reg S). Set per-vault required level. Used for regulated-collateral deployments. |
+| [`LiquidCompliance.sol`](src/LiquidCompliance.sol) | KYC-tier gate (0=none, 1=basic, 2=accredited Reg D, 3=qualified purchaser Reg S). Set per-vault required level. Used for regulated-collateral deployments. |
 | [`adapters/SecurityTokenAdapter.sol`](src/adapters/SecurityTokenAdapter.sol) | Adapter for tokenized securities collateral, paired with the compliance gate. |
 | [`utils/Whitelist.sol`](src/utils/Whitelist.sol) | Generic whitelist primitive. |
 | [`utils/PermissionedProxy.sol`](src/utils/PermissionedProxy.sol) | Selector-gated proxy used by curator/allocator. |
@@ -246,7 +246,7 @@ transmuter.claimRedemption(ticketId);             // proportionally vested
 
 ### Deploy a regulated variant
 
-Pair `SecurityTokenAdapter` with `LiquidComplianceGate`:
+Pair `SecurityTokenAdapter` with `LiquidCompliance`:
 
 ```solidity
 gate.setRequiredLevel(vault, 2);                  // accredited (Reg D)
@@ -287,7 +287,7 @@ src/
   LiquidETHVault.sol             LiquidTokenVault.sol
   LiquidStrategy.sol             LiquidCurator.sol      LiquidAllocator.sol
   LiquidStrategyClassifier.sol   LiquidGauge.sol
-  LiquidGate.sol                 LiquidComplianceGate.sol
+  LiquidGate.sol                 LiquidCompliance.sol
   adapters/      AbstractFeeVault, EulerUSDCAdapter, SecurityTokenAdapter
   governance/    LiquidToken, LiquidGovernor
   strategies/    Aave/Compound/Lido/EETH/SfrxETH/Pendle/Morpho/Yearn/Ethena/…
