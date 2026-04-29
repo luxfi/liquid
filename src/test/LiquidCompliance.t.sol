@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import "forge-std/Test.sol";
-import {LiquidComplianceGate} from "../LiquidComplianceGate.sol";
+import {LiquidCompliance} from "../LiquidCompliance.sol";
 import {IIdentityRegistry} from "@luxfi/erc-3643/contracts/registry/interface/IIdentityRegistry.sol";
 import {IIdentity} from "@luxfi/onchain-id/contracts/interface/IIdentity.sol";
 
@@ -23,19 +23,33 @@ contract MockRegistry {
     mapping(address => uint16) public country;
     mapping(address => address) public identityOf;
 
-    function setVerified(address user, bool v) external { verified[user] = v; }
-    function setCountry(address user, uint16 c) external { country[user] = c; }
-    function setIdentity(address user, address id) external { identityOf[user] = id; }
+    function setVerified(address user, bool v) external {
+        verified[user] = v;
+    }
 
-    function isVerified(address user) external view returns (bool) { return verified[user]; }
-    function investorCountry(address user) external view returns (uint16) { return country[user]; }
+    function setCountry(address user, uint16 c) external {
+        country[user] = c;
+    }
+
+    function setIdentity(address user, address id) external {
+        identityOf[user] = id;
+    }
+
+    function isVerified(address user) external view returns (bool) {
+        return verified[user];
+    }
+
+    function investorCountry(address user) external view returns (uint16) {
+        return country[user];
+    }
+
     function identity(address user) external view returns (IIdentity) {
         return IIdentity(identityOf[user]);
     }
 }
 
-contract LiquidComplianceGateTest is Test {
-    LiquidComplianceGate gate;
+contract LiquidComplianceTest is Test {
+    LiquidCompliance gate;
     MockRegistry registry;
 
     address owner = makeAddr("owner");
@@ -47,7 +61,7 @@ contract LiquidComplianceGateTest is Test {
 
     function setUp() public {
         vm.prank(owner);
-        gate = new LiquidComplianceGate(owner);
+        gate = new LiquidCompliance(owner);
         registry = new MockRegistry();
     }
 
