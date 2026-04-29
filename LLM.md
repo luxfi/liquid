@@ -30,7 +30,7 @@ forge test --match-path "src/test/Liquid.t.sol" -v  # Run specific test
 - `LiquidStrategyClassifier.sol` -- Risk class management (constructor: admin)
 - `LiquidStrategy.sol` -- Base strategy adapter for VaultV2 flows
 - `LiquidGauge.sol` -- Governance gauge for strategy weight voting
-- `LiquidGate.sol` / `LiquidComplianceGate.sol` -- Auth + KYC gating for redemptions
+- `LiquidGate.sol` / `LiquidCompliance.sol` -- Auth + KYC gating for redemptions
 
 ## Constructor Signatures (critical for deployment)
 - `Liquid()` -- empty, then call `initialize(LiquidInitializationParams)`
@@ -76,7 +76,7 @@ src/
   LiquidETHVault.sol, LiquidTokenVault.sol
   LiquidCurator.sol, LiquidAllocator.sol
   LiquidStrategyClassifier.sol, LiquidStrategy.sol, LiquidGauge.sol
-  LiquidGate.sol, LiquidComplianceGate.sol
+  LiquidGate.sol, LiquidCompliance.sol
   adapters/       -- AbstractFeeVault, EulerUSDCAdapter, SecurityTokenAdapter
   base/           -- Errors, ErrorMessages, LiquidTransmuterErrors
   external/       -- LETH (synthetic), interfaces

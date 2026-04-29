@@ -5,7 +5,7 @@ import {Ownable} from "@luxfi/oz/access/Ownable.sol";
 import {IIdentityRegistry} from "@luxfi/erc-3643/contracts/registry/interface/IIdentityRegistry.sol";
 import {IIdentity} from "@luxfi/onchain-id/contracts/interface/IIdentity.sol";
 
-/// @title  LiquidComplianceGate
+/// @title  LiquidCompliance
 /// @notice Per-vault compliance gate for Liquid redemptions on regulated
 ///         collateral. **Pure delegation to ERC-3643 + ONCHAINID** — no
 ///         whitelist tables, no KYC levels stored locally. The Identity
@@ -23,7 +23,7 @@ import {IIdentity} from "@luxfi/onchain-id/contracts/interface/IIdentity.sol";
 ///           2. their country is not blocked;
 ///           3. every required claim topic resolves to a non-empty claim set
 ///              on their bound ONCHAINID.
-contract LiquidComplianceGate is Ownable {
+contract LiquidCompliance is Ownable {
     struct VaultPolicy {
         IIdentityRegistry registry;
         uint256[] requiredTopics;
