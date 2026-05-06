@@ -17,7 +17,7 @@ import {ILiquidTransmuter} from "../src/interfaces/ILiquidTransmuter.sol";
 
 /// @title DeployLux
 /// @notice Deployment script for Liquid V3 on Lux Network chains
-/// @dev Supports LUX, Zoo, Hanzo, and Liquidity networks
+/// @dev Supports LUX, Zoo, and Hanzo networks
 contract DeployLux is Script {
     // Lux Network chain IDs
     uint256 constant LUX_MAINNET = 96_369;
@@ -26,10 +26,6 @@ contract DeployLux is Script {
     uint256 constant ZOO_TESTNET = 200_201;
     uint256 constant HANZO_MAINNET = 36_963;
     uint256 constant HANZO_TESTNET = 36_962;
-    // Liquidity (Liquid EVM) chain IDs
-    uint256 constant LIQUIDITY_MAINNET = 8_675_309;
-    uint256 constant LIQUIDITY_TESTNET = 8_675_310;
-    uint256 constant LIQUIDITY_DEVNET = 8_675_311;
     uint256 constant LOCAL_DEV = 1337;
 
     // Blocks per year (approx 2s block time on Lux)
