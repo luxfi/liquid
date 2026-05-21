@@ -18,11 +18,7 @@ contract HalmosLuxNativeTest is Test {
     ///         redeeming the received shares returns at least `amount` (no vault fee case).
     ///         In the general case, returned >= amount * totalAssets / (totalAssets + amount)
     ///         which for any vault with totalAssets > 0 means returned >= amount - 1 (rounding).
-    function check_allocateNeverLosesFunds(
-        uint256 amount,
-        uint256 totalAssets,
-        uint256 totalShares
-    ) public pure {
+    function check_allocateNeverLosesFunds(uint256 amount, uint256 totalAssets, uint256 totalShares) public pure {
         // Bound to realistic ranges
         vm.assume(amount > 0 && amount < type(uint96).max);
         vm.assume(totalAssets > 0 && totalAssets < type(uint96).max);
@@ -50,16 +46,11 @@ contract HalmosLuxNativeTest is Test {
 
     /// @notice Prove: yield = max(0, currentValue - lastSnapshotValue) is always >= 0.
     ///         This is structurally enforced by the conditional.
-    function check_yieldMonotonic(
-        uint256 currentValue,
-        uint256 lastSnapshotValue
-    ) public pure {
+    function check_yieldMonotonic(uint256 currentValue, uint256 lastSnapshotValue) public pure {
         vm.assume(currentValue < type(uint128).max);
         vm.assume(lastSnapshotValue < type(uint128).max);
 
-        uint256 yieldAmount = currentValue > lastSnapshotValue
-            ? currentValue - lastSnapshotValue
-            : 0;
+        uint256 yieldAmount = currentValue > lastSnapshotValue ? currentValue - lastSnapshotValue : 0;
 
         // Yield is never negative (always >= 0)
         assert(yieldAmount >= 0); // trivially true for uint, but proves the logic path
@@ -76,12 +67,7 @@ contract HalmosLuxNativeTest is Test {
 
     /// @notice Prove: redeeming shares returns assets proportional to the share
     ///         of the vault, bounded by the actual vault balance.
-    function check_deallocateReturnsExpected(
-        uint256 withdrawAmount,
-        uint256 totalAssets,
-        uint256 totalShares,
-        uint256 strategyShares
-    ) public pure {
+    function check_deallocateReturnsExpected(uint256 withdrawAmount, uint256 totalAssets, uint256 totalShares, uint256 strategyShares) public pure {
         vm.assume(totalAssets > 0 && totalAssets < type(uint96).max);
         vm.assume(totalShares > 0 && totalShares < type(uint96).max);
         vm.assume(strategyShares > 0 && strategyShares <= totalShares);
@@ -116,11 +102,7 @@ contract HalmosLuxNativeTest is Test {
 
     /// @notice Prove: depositing assets into a vault with no fee does not decrease
     ///         the price per share for existing holders.
-    function check_depositDoesNotDilute(
-        uint256 depositAmount,
-        uint256 totalAssets,
-        uint256 totalShares
-    ) public pure {
+    function check_depositDoesNotDilute(uint256 depositAmount, uint256 totalAssets, uint256 totalShares) public pure {
         vm.assume(depositAmount > 0 && depositAmount < type(uint96).max);
         vm.assume(totalAssets > 0 && totalAssets < type(uint96).max);
         vm.assume(totalShares > 0 && totalShares < type(uint96).max);
@@ -147,11 +129,7 @@ contract HalmosLuxNativeTest is Test {
     // ════════════════════════════════════════════════════════════════════════
 
     /// @notice Prove: adding fees (assets without minting shares) increases PPS.
-    function check_feeInjectionIncreasesValue(
-        uint256 feeAmount,
-        uint256 totalAssets,
-        uint256 totalShares
-    ) public pure {
+    function check_feeInjectionIncreasesValue(uint256 feeAmount, uint256 totalAssets, uint256 totalShares) public pure {
         vm.assume(feeAmount > 0 && feeAmount < type(uint96).max);
         vm.assume(totalAssets > 0 && totalAssets < type(uint96).max);
         vm.assume(totalShares > 0 && totalShares < type(uint96).max);

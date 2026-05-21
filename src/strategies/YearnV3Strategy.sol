@@ -28,14 +28,9 @@ contract YearnV3Strategy is LiquidStrategy {
     /// @notice Maximum loss tolerance in basis points for withdrawals (default 1bp)
     uint256 public maxLossBps;
 
-    constructor(
-        address _vault,
-        StrategyParams memory _params,
-        address _yearnVault,
-        uint256 _maxLossBps
-    ) LiquidStrategy(_vault, _params) {
+    constructor(address _vault, StrategyParams memory _params, address _yearnVault, uint256 _maxLossBps) LiquidStrategy(_vault, _params) {
         require(_yearnVault != address(0), "Zero yearnVault");
-        require(_maxLossBps <= 10000, "Max loss > 100%");
+        require(_maxLossBps <= 10_000, "Max loss > 100%");
         yearnVault = IYearnV3Vault(_yearnVault);
         underlying = yearnVault.asset();
         maxLossBps = _maxLossBps;
@@ -61,7 +56,7 @@ contract YearnV3Strategy is LiquidStrategy {
     }
 
     function setMaxLossBps(uint256 _maxLossBps) external onlyOwner {
-        require(_maxLossBps <= 10000, "Max loss > 100%");
+        require(_maxLossBps <= 10_000, "Max loss > 100%");
         maxLossBps = _maxLossBps;
     }
 

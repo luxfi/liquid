@@ -77,8 +77,10 @@ contract LiquidGauge is ReentrancyGuard {
         require(strategyIds.length == weights.length && strategyIds.length > 0, "Invalid input");
 
         uint256 totalWeight = 0;
-        for (uint256 i; i < weights.length; i++) totalWeight += weights[i];
-        require(totalWeight <= 10000, "Weights exceed 100%");
+        for (uint256 i; i < weights.length; i++) {
+            totalWeight += weights[i];
+        }
+        require(totalWeight <= 10_000, "Weights exceed 100%");
 
         uint256 lastAdded = lastStrategyAddedAt[ytId];
         Vote storage existing = votes[ytId][msg.sender];

@@ -46,13 +46,7 @@ contract AaveV3Strategy is LiquidStrategy {
     IAaveV3DataProvider public immutable dataProvider;
     address public immutable underlying;
 
-    constructor(
-        address _vault,
-        StrategyParams memory _params,
-        address _pool,
-        address _aToken,
-        address _dataProvider
-    ) LiquidStrategy(_vault, _params) {
+    constructor(address _vault, StrategyParams memory _params, address _pool, address _aToken, address _dataProvider) LiquidStrategy(_vault, _params) {
         require(_pool != address(0), "Zero pool");
         require(_aToken != address(0), "Zero aToken");
         require(_dataProvider != address(0), "Zero dataProvider");
@@ -80,7 +74,7 @@ contract AaveV3Strategy is LiquidStrategy {
 
     function _computeBaseRatePerSecond() internal override returns (uint256 ratePerSec, uint256 newIndex) {
         // Aave V3 liquidityRate is in RAY (1e27) per second
-        (,,,,, uint256 liquidityRate,,,,uint256 liquidityIndex,,) = dataProvider.getReserveData(underlying);
+        (,,,,, uint256 liquidityRate,,,, uint256 liquidityIndex,,) = dataProvider.getReserveData(underlying);
         newIndex = liquidityIndex;
         // Convert RAY rate to WAD rate
         ratePerSec = liquidityRate / 1e9;

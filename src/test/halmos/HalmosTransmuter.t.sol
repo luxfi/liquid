@@ -70,11 +70,7 @@ contract HalmosTransmuterTest is Test {
     // ==================================================================================
 
     /// @notice Single earmark step: cumulativeEarmarked + amount <= totalDebt
-    function check_earmarkNeverExceedsDebt_singleEarmark(
-        uint256 totalDebt,
-        uint256 cumulativeEarmarked,
-        uint256 earmarkAmount
-    ) public pure {
+    function check_earmarkNeverExceedsDebt_singleEarmark(uint256 totalDebt, uint256 cumulativeEarmarked, uint256 earmarkAmount) public pure {
         // Preconditions from real contract state
         vm.assume(totalDebt > 0 && totalDebt <= type(uint128).max);
         vm.assume(cumulativeEarmarked <= totalDebt);
@@ -91,12 +87,10 @@ contract HalmosTransmuterTest is Test {
     }
 
     /// @notice Earmark followed by subDebt: clamp ensures invariant holds
-    function check_earmarkNeverExceedsDebt_earmarkThenSubDebt(
-        uint256 totalDebt,
-        uint256 cumulativeEarmarked,
-        uint256 earmarkAmount,
-        uint256 debtReduction
-    ) public pure {
+    function check_earmarkNeverExceedsDebt_earmarkThenSubDebt(uint256 totalDebt, uint256 cumulativeEarmarked, uint256 earmarkAmount, uint256 debtReduction)
+        public
+        pure
+    {
         vm.assume(totalDebt > 0 && totalDebt <= type(uint128).max);
         vm.assume(cumulativeEarmarked <= totalDebt);
         vm.assume(earmarkAmount <= type(uint128).max);
@@ -120,12 +114,10 @@ contract HalmosTransmuterTest is Test {
     }
 
     /// @notice Earmark followed by redeem: both decrease by same amount
-    function check_earmarkNeverExceedsDebt_earmarkThenRedeem(
-        uint256 totalDebt,
-        uint256 cumulativeEarmarked,
-        uint256 earmarkAmount,
-        uint256 redeemRequest
-    ) public pure {
+    function check_earmarkNeverExceedsDebt_earmarkThenRedeem(uint256 totalDebt, uint256 cumulativeEarmarked, uint256 earmarkAmount, uint256 redeemRequest)
+        public
+        pure
+    {
         vm.assume(totalDebt > 0 && totalDebt <= type(uint128).max);
         vm.assume(cumulativeEarmarked <= totalDebt);
         vm.assume(earmarkAmount <= type(uint128).max);
@@ -227,8 +219,7 @@ contract HalmosTransmuterTest is Test {
 
         // --- Mirror: claimRedemption() lines 211-253 ---
         // amountNottransmuted calculation with ceiling division
-        uint256 rounded = positionAmount * blocksLeft / transmutationTime
-            + (positionAmount * blocksLeft % transmutationTime == 0 ? 0 : 1);
+        uint256 rounded = positionAmount * blocksLeft / transmutationTime + (positionAmount * blocksLeft % transmutationTime == 0 ? 0 : 1);
         uint256 amountNotTransmuted = blocksLeft > 0 ? rounded : 0;
 
         // Guard: amountNotTransmuted must not exceed positionAmount
@@ -279,12 +270,7 @@ contract HalmosTransmuterTest is Test {
     // ==================================================================================
 
     /// @notice After a position is claimed, its maturationBlock is zero (deleted)
-    function check_noDoubleRedeem(
-        uint256 positionAmount,
-        uint256 startBlock,
-        uint256 maturationBlock,
-        bool claimed
-    ) public pure {
+    function check_noDoubleRedeem(uint256 positionAmount, uint256 startBlock, uint256 maturationBlock, bool claimed) public pure {
         vm.assume(positionAmount > 0 && positionAmount <= type(uint96).max);
         vm.assume(startBlock > 0 && startBlock < maturationBlock);
         vm.assume(maturationBlock <= type(uint64).max);
@@ -316,11 +302,7 @@ contract HalmosTransmuterTest is Test {
 
     /// @notice Symbolic proof that the position guard rejects claimed IDs
     /// @dev Models the exact sequence: create → claim → second claim reverts
-    function check_noDoubleRedeem_sequence(
-        uint256 depositAmount,
-        uint256 timeToTransmute,
-        uint256 currentBlock
-    ) public pure {
+    function check_noDoubleRedeem_sequence(uint256 depositAmount, uint256 timeToTransmute, uint256 currentBlock) public pure {
         vm.assume(depositAmount > 0 && depositAmount <= type(uint96).max);
         vm.assume(timeToTransmute > 0 && timeToTransmute <= type(uint32).max);
         vm.assume(currentBlock > 0 && currentBlock <= type(uint32).max);
@@ -365,12 +347,10 @@ contract HalmosTransmuterTest is Test {
     // ==================================================================================
 
     /// @notice Single deposit: totalLocked + deposit <= totalSyntheticsIssued
-    function check_transmuteLockConservation_deposit(
-        uint256 totalLocked,
-        uint256 totalSyntheticsIssued,
-        uint256 depositAmount,
-        uint256 depositCap
-    ) public pure {
+    function check_transmuteLockConservation_deposit(uint256 totalLocked, uint256 totalSyntheticsIssued, uint256 depositAmount, uint256 depositCap)
+        public
+        pure
+    {
         vm.assume(totalSyntheticsIssued > 0 && totalSyntheticsIssued <= type(uint128).max);
         vm.assume(totalLocked <= totalSyntheticsIssued);
         vm.assume(depositAmount > 0 && depositAmount <= type(uint96).max);
@@ -390,12 +370,10 @@ contract HalmosTransmuterTest is Test {
     }
 
     /// @notice Deposit then claim: totalLocked conservation through full lifecycle
-    function check_transmuteLockConservation_depositThenClaim(
-        uint128 _totalLocked,
-        uint128 _totalSynthetics,
-        uint128 _depositAmount,
-        uint128 _amountTransmuted
-    ) public pure {
+    function check_transmuteLockConservation_depositThenClaim(uint128 _totalLocked, uint128 _totalSynthetics, uint128 _depositAmount, uint128 _amountTransmuted)
+        public
+        pure
+    {
         uint256 totalLocked = uint256(_totalLocked);
         uint256 totalSyntheticsIssued = uint256(_totalSynthetics);
         uint256 depositAmount = uint256(_depositAmount);
@@ -481,12 +459,10 @@ contract HalmosTransmuterTest is Test {
     // ==================================================================================
 
     /// @notice Single earmark step: weight never decreases
-    function check_earmarkWeightMonotonic_singleStep(
-        uint256 earmarkWeight,
-        uint256 totalDebt,
-        uint256 cumulativeEarmarked,
-        uint256 rawEarmarkAmount
-    ) public pure {
+    function check_earmarkWeightMonotonic_singleStep(uint256 earmarkWeight, uint256 totalDebt, uint256 cumulativeEarmarked, uint256 rawEarmarkAmount)
+        public
+        pure
+    {
         vm.assume(totalDebt > 0 && totalDebt <= type(uint128).max);
         vm.assume(cumulativeEarmarked <= totalDebt);
         vm.assume(rawEarmarkAmount <= type(uint128).max);
@@ -553,11 +529,7 @@ contract HalmosTransmuterTest is Test {
     }
 
     /// @notice Weight with zero earmark amount: no change
-    function check_earmarkWeightMonotonic_zeroAmount(
-        uint256 earmarkWeight,
-        uint256 totalDebt,
-        uint256 cumulativeEarmarked
-    ) public pure {
+    function check_earmarkWeightMonotonic_zeroAmount(uint256 earmarkWeight, uint256 totalDebt, uint256 cumulativeEarmarked) public pure {
         vm.assume(totalDebt > 0 && totalDebt <= type(uint128).max);
         vm.assume(cumulativeEarmarked <= totalDebt);
 
@@ -589,13 +561,10 @@ contract HalmosTransmuterTest is Test {
     // ==================================================================================
 
     /// @notice Repay reduces earmarks correctly: global earmarked stays consistent
-    function check_repayEarmarkConsistency(
-        uint256 accountDebt,
-        uint256 accountEarmarked,
-        uint256 cumulativeEarmarked,
-        uint256 totalDebt,
-        uint256 repayCredit
-    ) public pure {
+    function check_repayEarmarkConsistency(uint256 accountDebt, uint256 accountEarmarked, uint256 cumulativeEarmarked, uint256 totalDebt, uint256 repayCredit)
+        public
+        pure
+    {
         vm.assume(totalDebt > 0 && totalDebt <= type(uint128).max);
         vm.assume(cumulativeEarmarked <= totalDebt);
         vm.assume(accountDebt > 0 && accountDebt <= totalDebt);
@@ -635,18 +604,13 @@ contract HalmosTransmuterTest is Test {
     // ==================================================================================
 
     /// @notice Transmuted + untransmuted == total position (no value created)
-    function check_transmuterAmountConservation(
-        uint256 positionAmount,
-        uint256 blocksLeft,
-        uint256 transmutationTime
-    ) public pure {
+    function check_transmuterAmountConservation(uint256 positionAmount, uint256 blocksLeft, uint256 transmutationTime) public pure {
         vm.assume(positionAmount > 0 && positionAmount <= type(uint96).max);
         vm.assume(transmutationTime > 0 && transmutationTime <= type(uint32).max);
         vm.assume(blocksLeft <= transmutationTime);
 
         // --- Mirror: claimRedemption() lines 211-215 ---
-        uint256 rounded = positionAmount * blocksLeft / transmutationTime
-            + (positionAmount * blocksLeft % transmutationTime == 0 ? 0 : 1);
+        uint256 rounded = positionAmount * blocksLeft / transmutationTime + (positionAmount * blocksLeft % transmutationTime == 0 ? 0 : 1);
         uint256 amountNotTransmuted = blocksLeft > 0 ? rounded : 0;
 
         // The ceiling division can push amountNotTransmuted above positionAmount
