@@ -62,11 +62,7 @@ contract HalmosLiquidTest is Test {
 
     /// @notice Prove: redemption amount is capped by cumulative earmarked debt
     /// @dev Mirrors redeem() in Liquid.sol: if amount > liveEarmarked, amount = liveEarmarked
-    function check_redemptionAlwaysBacked(
-        uint256 requestedAmount,
-        uint256 cumulativeEarmarked,
-        uint256 totalDebt
-    ) public pure {
+    function check_redemptionAlwaysBacked(uint256 requestedAmount, uint256 cumulativeEarmarked, uint256 totalDebt) public pure {
         vm.assume(totalDebt > 0 && totalDebt < type(uint128).max);
         vm.assume(cumulativeEarmarked <= totalDebt);
         vm.assume(requestedAmount > 0 && requestedAmount < type(uint128).max);
@@ -86,11 +82,7 @@ contract HalmosLiquidTest is Test {
 
     /// @notice Prove: earmarking never exceeds unearmarked debt
     /// @dev Mirrors _earmark() in Liquid.sol: cap amount to liveUnearmarked
-    function check_earmarkConservation(
-        uint256 totalDebt,
-        uint256 cumulativeEarmarked,
-        uint256 earmarkAmount
-    ) public pure {
+    function check_earmarkConservation(uint256 totalDebt, uint256 cumulativeEarmarked, uint256 earmarkAmount) public pure {
         vm.assume(totalDebt > 0 && totalDebt < type(uint128).max);
         vm.assume(cumulativeEarmarked <= totalDebt);
         vm.assume(earmarkAmount > 0 && earmarkAmount < type(uint128).max);
@@ -203,11 +195,7 @@ contract HalmosLiquidTest is Test {
     // ==================================================================================
 
     /// @notice Prove: position that passes _validate() has ratio >= minimumCollateralization
-    function check_collateralizationConsistency(
-        uint256 collateralValue,
-        uint256 debt,
-        uint256 minimumCollateralization
-    ) public pure {
+    function check_collateralizationConsistency(uint256 collateralValue, uint256 debt, uint256 minimumCollateralization) public pure {
         vm.assume(debt > 0 && debt < type(uint96).max);
         vm.assume(collateralValue > 0 && collateralValue < type(uint96).max);
         vm.assume(minimumCollateralization >= FIXED_POINT_SCALAR);

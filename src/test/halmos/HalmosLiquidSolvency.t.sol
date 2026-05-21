@@ -38,23 +38,22 @@ contract HalmosLiquidSolvency is Test {
     //  Conversion helpers -- mirrors Liquid.sol at 18 decimals, convFactor=1
     // -----------------------------------------------------------------------
 
-    function _yieldToDebt(uint256 amount, uint256 price)
-        internal pure returns (uint256)
-    {
+    function _yieldToDebt(uint256 amount, uint256 price) internal pure returns (uint256) {
         return (amount * price / DECIMALS_SCALE) * CONV_FACTOR;
     }
 
-    function _debtToYield(uint256 amount, uint256 price)
-        internal pure returns (uint256)
-    {
+    function _debtToYield(uint256 amount, uint256 price) internal pure returns (uint256) {
         if (price == 0) return 0;
         return (amount / CONV_FACTOR) * DECIMALS_SCALE / price;
     }
 
     /// @dev Mirror of Liquid.calculateLiquidation (pure function, lines 1249-1296)
     function _calculateLiquidation(
-        uint256 collateral, uint256 debt, uint256 targetCollateralization,
-        uint256 liquidCurrentCollateralization, uint256 liquidMinimumCollateralization,
+        uint256 collateral,
+        uint256 debt,
+        uint256 targetCollateralization,
+        uint256 liquidCurrentCollateralization,
+        uint256 liquidMinimumCollateralization,
         uint256 feeBps
     ) internal pure returns (uint256 grossCollateralToSeize, uint256 debtToBurn, uint256 fee, uint256 outsourcedFee) {
         if (debt >= collateral) {
@@ -89,11 +88,7 @@ contract HalmosLiquidSolvency is Test {
     // =======================================================================
 
     /// @notice PROVE: _addDebt/_subDebt preserves exact arithmetic identity.
-    function check_debtConservation(
-        uint128 initialDebt,
-        uint128 addAmount,
-        uint128 subAmount
-    ) public pure {
+    function check_debtConservation(uint128 initialDebt, uint128 addAmount, uint128 subAmount) public pure {
         uint256 afterAdd = uint256(initialDebt) + uint256(addAmount);
         vm.assume(uint256(subAmount) <= afterAdd);
 
@@ -107,11 +102,7 @@ contract HalmosLiquidSolvency is Test {
     }
 
     /// @notice PROVE: Global totalDebt tracks consistently with per-account debt.
-    function check_totalDebtTracking(
-        uint128 globalDebt,
-        uint128 accountDebt,
-        uint128 addAmount
-    ) public pure {
+    function check_totalDebtTracking(uint128 globalDebt, uint128 accountDebt, uint128 addAmount) public pure {
         vm.assume(uint256(accountDebt) <= uint256(globalDebt));
 
         uint256 newAccountDebt = uint256(accountDebt) + uint256(addAmount);
@@ -123,11 +114,7 @@ contract HalmosLiquidSolvency is Test {
     }
 
     /// @notice PROVE: Same-block mint+burn always triggers the flash loan guard.
-    function check_flashLoanBlocked(
-        uint128 mintBlock,
-        uint128 burnBlock,
-        bool sameBlock
-    ) public pure {
+    function check_flashLoanBlocked(uint128 mintBlock, uint128 burnBlock, bool sameBlock) public pure {
         uint256 lastMintBlock = uint256(mintBlock);
         uint256 currentBlock;
 
@@ -140,15 +127,12 @@ contract HalmosLiquidSolvency is Test {
 
         bool wouldRevert = (currentBlock == lastMintBlock);
 
-        if (sameBlock)  assert(wouldRevert);
-        else            assert(!wouldRevert);
+        if (sameBlock) assert(wouldRevert);
+        else assert(!wouldRevert);
     }
 
     /// @notice PROVE: lastMintBlock correctly arms the guard.
-    function check_flashLoanGuardArmed(
-        uint128 mintBlock,
-        uint128 burnBlock
-    ) public pure {
+    function check_flashLoanGuardArmed(uint128 mintBlock, uint128 burnBlock) public pure {
         uint256 lastMintBlock = uint256(mintBlock);
 
         if (uint256(burnBlock) == uint256(mintBlock)) {
@@ -160,11 +144,7 @@ contract HalmosLiquidSolvency is Test {
     }
 
     /// @notice PROVE: _subDebt clamp ensures cumulativeEarmarked <= totalDebt.
-    function check_earmarkedNeverExceedsDebt(
-        uint128 totalDebt,
-        uint128 cumulativeEarmarked,
-        uint128 subAmount
-    ) public pure {
+    function check_earmarkedNeverExceedsDebt(uint128 totalDebt, uint128 cumulativeEarmarked, uint128 subAmount) public pure {
         vm.assume(uint256(subAmount) <= uint256(totalDebt));
 
         uint256 newTotalDebt = uint256(totalDebt) - uint256(subAmount);
@@ -175,22 +155,15 @@ contract HalmosLiquidSolvency is Test {
     }
 
     /// @notice PROVE: Bad debt triggers full liquidation.
-    function check_badDebtFullLiquidation(
-        uint128 collateral,
-        uint128 debt,
-        uint128 targetCollat,
-        uint16 feeBps
-    ) public pure {
+    function check_badDebtFullLiquidation(uint128 collateral, uint128 debt, uint128 targetCollat, uint16 feeBps) public pure {
         vm.assume(debt > 0);
         vm.assume(collateral > 0);
         vm.assume(targetCollat > FIXED_POINT_SCALAR);
         vm.assume(uint256(feeBps) <= BPS);
         vm.assume(uint256(debt) >= uint256(collateral));
 
-        (uint256 grossSeize, uint256 debtBurn,,) = _calculateLiquidation(
-            uint256(collateral), uint256(debt), uint256(targetCollat),
-            uint256(targetCollat), uint256(targetCollat), uint256(feeBps)
-        );
+        (uint256 grossSeize, uint256 debtBurn,,) =
+            _calculateLiquidation(uint256(collateral), uint256(debt), uint256(targetCollat), uint256(targetCollat), uint256(targetCollat), uint256(feeBps));
 
         assert(grossSeize == uint256(collateral));
         assert(debtBurn == uint256(debt));
@@ -203,11 +176,7 @@ contract HalmosLiquidSolvency is Test {
     // =======================================================================
 
     /// @notice PROVE: If _validate passes, the collateralization ratio holds.
-    function check_validateEnforcesSolvency(
-        uint48 collateralBalance,
-        uint48 debt,
-        uint48 price
-    ) public pure {
+    function check_validateEnforcesSolvency(uint48 collateralBalance, uint48 debt, uint48 price) public pure {
         vm.assume(price > 0);
         vm.assume(collateralBalance > 0);
         vm.assume(debt > 0);
@@ -222,12 +191,7 @@ contract HalmosLiquidSolvency is Test {
     }
 
     /// @notice PROVE: _addDebt prevents collateral shortfall.
-    function check_addDebtPreventsShortfall(
-        uint96 collateralBalance,
-        uint96 existingDebt,
-        uint96 newAmount,
-        uint96 price
-    ) public pure {
+    function check_addDebtPreventsShortfall(uint96 collateralBalance, uint96 existingDebt, uint96 newAmount, uint96 price) public pure {
         vm.assume(price > 0);
         vm.assume(collateralBalance > 0);
         vm.assume(newAmount > 0);
@@ -241,11 +205,7 @@ contract HalmosLiquidSolvency is Test {
     }
 
     /// @notice PROVE: Minted debt bounded by collateral at LTV.
-    function check_mintNeverExceedsCollateral(
-        uint48 collateralBalance,
-        uint48 mintAmount,
-        uint48 price
-    ) public pure {
+    function check_mintNeverExceedsCollateral(uint48 collateralBalance, uint48 mintAmount, uint48 price) public pure {
         vm.assume(price > 0);
         vm.assume(collateralBalance > 0);
         vm.assume(mintAmount > 0);
@@ -258,19 +218,11 @@ contract HalmosLiquidSolvency is Test {
 
         // Mint bounded by collateral value (with 1 unit rounding tolerance from division)
         uint256 collateralValueInDebt = _yieldToDebt(collateralBalance, uint256(price));
-        assert(
-            uint256(mintAmount) * MIN_COLLAT
-                <= (collateralValueInDebt + CONV_FACTOR) * FIXED_POINT_SCALAR
-        );
+        assert(uint256(mintAmount) * MIN_COLLAT <= (collateralValueInDebt + CONV_FACTOR) * FIXED_POINT_SCALAR);
     }
 
     /// @notice PROVE: Withdrawal leaves position with locked >= required.
-    function check_withdrawRespectsSolvency(
-        uint96 collateralBalance,
-        uint96 debt,
-        uint96 withdrawAmount,
-        uint96 price
-    ) public pure {
+    function check_withdrawRespectsSolvency(uint96 collateralBalance, uint96 debt, uint96 withdrawAmount, uint96 price) public pure {
         vm.assume(price > 0);
         vm.assume(collateralBalance > 0);
         vm.assume(debt > 0);
@@ -286,11 +238,7 @@ contract HalmosLiquidSolvency is Test {
     }
 
     /// @notice PROVE: _totalLocked monotonically increases with _addDebt.
-    function check_lockedCollateralMonotonicity(
-        uint96 totalLocked,
-        uint96 addAmount,
-        uint96 price
-    ) public pure {
+    function check_lockedCollateralMonotonicity(uint96 totalLocked, uint96 addAmount, uint96 price) public pure {
         vm.assume(price > 0);
         vm.assume(addAmount > 0);
 
@@ -310,34 +258,22 @@ contract HalmosLiquidSolvency is Test {
     // =======================================================================
 
     /// @notice PROVE: debtToBurn <= debt, grossSeize <= collateral.
-    function check_liquidationReducesDebt(
-        uint48 collateral,
-        uint48 debt
-    ) public pure {
+    function check_liquidationReducesDebt(uint48 collateral, uint48 debt) public pure {
         vm.assume(debt > 0);
         vm.assume(collateral > 0);
 
-        (uint256 grossSeize, uint256 debtBurn,,) = _calculateLiquidation(
-            uint256(collateral), uint256(debt), MIN_COLLAT,
-            MIN_COLLAT, MIN_COLLAT, LIQUIDATOR_FEE
-        );
+        (uint256 grossSeize, uint256 debtBurn,,) = _calculateLiquidation(uint256(collateral), uint256(debt), MIN_COLLAT, MIN_COLLAT, MIN_COLLAT, LIQUIDATOR_FEE);
 
         assert(debtBurn <= uint256(debt));
         assert(grossSeize <= uint256(collateral));
     }
 
     /// @notice PROVE: Partial liquidation improves collateralization ratio.
-    function check_liquidationImprovesSolvency(
-        uint48 collateral,
-        uint48 debt
-    ) public pure {
+    function check_liquidationImprovesSolvency(uint48 collateral, uint48 debt) public pure {
         vm.assume(debt > 0);
         vm.assume(collateral > debt);
 
-        (uint256 grossSeize, uint256 debtBurn,,) = _calculateLiquidation(
-            uint256(collateral), uint256(debt), MIN_COLLAT,
-            MIN_COLLAT, MIN_COLLAT, LIQUIDATOR_FEE
-        );
+        (uint256 grossSeize, uint256 debtBurn,,) = _calculateLiquidation(uint256(collateral), uint256(debt), MIN_COLLAT, MIN_COLLAT, MIN_COLLAT, LIQUIDATOR_FEE);
 
         vm.assume(debtBurn > 0);
         vm.assume(debtBurn < uint256(debt));
@@ -353,10 +289,7 @@ contract HalmosLiquidSolvency is Test {
     }
 
     /// @notice PROVE: Liquidation fee from surplus never exceeds the surplus.
-    function check_liquidationFeeNeverExceedsSurplus(
-        uint96 collateral,
-        uint96 debt
-    ) public pure {
+    function check_liquidationFeeNeverExceedsSurplus(uint96 collateral, uint96 debt) public pure {
         vm.assume(uint256(collateral) > uint256(debt));
         vm.assume(debt > 0);
 

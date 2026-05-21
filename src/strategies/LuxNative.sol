@@ -32,11 +32,7 @@ contract LuxNativeStrategy is LiquidStrategy {
     error ZeroXLUXAddress();
     error AssetMismatch();
 
-    constructor(
-        address _vault,
-        StrategyParams memory _params,
-        address _xLUX
-    ) LiquidStrategy(_vault, _params) {
+    constructor(address _vault, StrategyParams memory _params, address _xLUX) LiquidStrategy(_vault, _params) {
         if (_xLUX == address(0)) revert ZeroXLUXAddress();
         xLUX = ILiquidLUX(_xLUX);
 

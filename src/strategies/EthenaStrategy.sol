@@ -26,11 +26,7 @@ contract EthenaStrategy is LiquidStrategy {
     ISUSDe public immutable sUSDe;
     address public immutable usde;
 
-    constructor(
-        address _vault,
-        StrategyParams memory _params,
-        address _sUSDe
-    ) LiquidStrategy(_vault, _params) {
+    constructor(address _vault, StrategyParams memory _params, address _sUSDe) LiquidStrategy(_vault, _params) {
         require(_sUSDe != address(0), "Zero sUSDe");
         sUSDe = ISUSDe(_sUSDe);
         usde = sUSDe.asset();

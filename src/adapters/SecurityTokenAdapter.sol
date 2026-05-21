@@ -32,16 +32,16 @@ contract SecurityTokenAdapter is ITokenAdapter, AccessControl, ReentrancyGuard {
     address public immutable token;
     address public immutable underlyingToken;
 
-    string public ticker;      // e.g. "IBIT"
-    string public cusip;       // CUSIP: "46438F101"
-    string public isin;        // ISIN: "US46438F1012"
-    string public assetClass;  // "ETF", "equity", "bond", "reit"
+    string public ticker; // e.g. "IBIT"
+    string public cusip; // CUSIP: "46438F101"
+    string public isin; // ISIN: "US46438F1012"
+    string public assetClass; // "ETF", "equity", "bond", "reit"
 
     // -- NAV ----------------------------------------------------------------
 
-    uint256 public nav;              // Current NAV per token (18 decimals)
-    uint256 public navTimestamp;     // When NAV was last updated
-    uint256 public navStalenessMax;  // Max seconds before NAV is stale (default 24h)
+    uint256 public nav; // Current NAV per token (18 decimals)
+    uint256 public navTimestamp; // When NAV was last updated
+    uint256 public navStalenessMax; // Max seconds before NAV is stale (default 24h)
 
     // -- Dividends ----------------------------------------------------------
 
@@ -52,36 +52,43 @@ contract SecurityTokenAdapter is ITokenAdapter, AccessControl, ReentrancyGuard {
     uint256 public totalDividendsDistributed;
 
     struct DividendRecord {
-        uint256 amount;         // Total dividend amount
-        uint256 perToken;       // Per-token amount at time of distribution
-        uint256 exDate;         // Ex-dividend date
-        uint256 payDate;        // Payment date
-        uint256 recordDate;     // Record date
-        string  description;    // "Q1 2026 Distribution" etc.
+        uint256 amount; // Total dividend amount
+        uint256 perToken; // Per-token amount at time of distribution
+        uint256 exDate; // Ex-dividend date
+        uint256 payDate; // Payment date
+        uint256 recordDate; // Record date
+        string description; // "Q1 2026 Distribution" etc.
     }
     DividendRecord[] public dividendHistory;
 
     // -- Corporate Actions --------------------------------------------------
 
-    enum ActionType { SPLIT, REVERSE_SPLIT, MERGER, SPINOFF, SYMBOL_CHANGE, DELISTING }
+    enum ActionType {
+        SPLIT,
+        REVERSE_SPLIT,
+        MERGER,
+        SPINOFF,
+        SYMBOL_CHANGE,
+        DELISTING
+    }
 
     struct CorporateAction {
         ActionType actionType;
         uint256 timestamp;
-        uint256 ratio;          // For splits: numerator (e.g. 2 for 2:1 split)
-        uint256 ratioDenom;     // For splits: denominator (e.g. 1 for 2:1 split)
-        string  description;
-        bool    executed;
+        uint256 ratio; // For splits: numerator (e.g. 2 for 2:1 split)
+        uint256 ratioDenom; // For splits: denominator (e.g. 1 for 2:1 split)
+        string description;
+        bool executed;
     }
     CorporateAction[] public corporateActions;
 
     // -- Regulatory ---------------------------------------------------------
 
-    bool public halted;         // SEC trading halt active
+    bool public halted; // SEC trading halt active
 
     struct Disclosure {
-        string  filingType;     // "10-K", "8-K", "S-1", "prospectus"
-        string  uri;            // IPFS or HTTPS link to filing
+        string filingType; // "10-K", "8-K", "S-1", "prospectus"
+        string uri; // IPFS or HTTPS link to filing
         uint256 filedAt;
     }
     Disclosure[] public disclosures;
@@ -102,14 +109,7 @@ contract SecurityTokenAdapter is ITokenAdapter, AccessControl, ReentrancyGuard {
     error StaleNAV();
     error ZeroAmount();
 
-    constructor(
-        address _token,
-        string memory _ticker,
-        string memory _cusip,
-        string memory _isin,
-        string memory _assetClass,
-        uint256 _initialNav
-    ) {
+    constructor(address _token, string memory _ticker, string memory _cusip, string memory _isin, string memory _assetClass, uint256 _initialNav) {
         require(_token != address(0) && _initialNav > 0);
         token = _token;
         underlyingToken = _token;
@@ -157,26 +157,18 @@ contract SecurityTokenAdapter is ITokenAdapter, AccessControl, ReentrancyGuard {
     ///         when the underlying security pays a distribution.
     ///         The dividend amount is used by the Liquid core to repay
     ///         vault loans. Excess accrues for KYC'd claim.
-    function declareDividend(
-        uint256 amount,
-        uint256 exDate,
-        uint256 payDate,
-        uint256 recordDate,
-        string calldata description
-    ) external onlyRole(COMPLIANCE_ROLE) {
+    function declareDividend(uint256 amount, uint256 exDate, uint256 payDate, uint256 recordDate, string calldata description)
+        external
+        onlyRole(COMPLIANCE_ROLE)
+    {
         if (amount == 0) revert ZeroAmount();
         uint256 supply = IERC20(token).totalSupply();
         uint256 perToken = supply > 0 ? (amount * 1e18) / supply : 0;
         accumulatedDividendPerToken += perToken;
         totalDividendsDistributed += amount;
-        dividendHistory.push(DividendRecord({
-            amount: amount,
-            perToken: perToken,
-            exDate: exDate,
-            payDate: payDate,
-            recordDate: recordDate,
-            description: description
-        }));
+        dividendHistory.push(
+            DividendRecord({amount: amount, perToken: perToken, exDate: exDate, payDate: payDate, recordDate: recordDate, description: description})
+        );
         emit DividendDeclared(dividendHistory.length - 1, amount, perToken, exDate);
     }
 
@@ -186,20 +178,12 @@ contract SecurityTokenAdapter is ITokenAdapter, AccessControl, ReentrancyGuard {
 
     // -- Corporate Actions --------------------------------------------------
 
-    function declareCorporateAction(
-        ActionType actionType,
-        uint256 ratio,
-        uint256 ratioDenom,
-        string calldata description
-    ) external onlyRole(COMPLIANCE_ROLE) {
-        corporateActions.push(CorporateAction({
-            actionType: actionType,
-            timestamp: block.timestamp,
-            ratio: ratio,
-            ratioDenom: ratioDenom,
-            description: description,
-            executed: false
-        }));
+    function declareCorporateAction(ActionType actionType, uint256 ratio, uint256 ratioDenom, string calldata description) external onlyRole(COMPLIANCE_ROLE) {
+        corporateActions.push(
+            CorporateAction({
+                actionType: actionType, timestamp: block.timestamp, ratio: ratio, ratioDenom: ratioDenom, description: description, executed: false
+            })
+        );
         emit CorporateActionDeclared(corporateActions.length - 1, actionType, description);
     }
 
@@ -236,15 +220,8 @@ contract SecurityTokenAdapter is ITokenAdapter, AccessControl, ReentrancyGuard {
 
     // -- Disclosures --------------------------------------------------------
 
-    function fileDisclosure(
-        string calldata filingType,
-        string calldata uri
-    ) external onlyRole(COMPLIANCE_ROLE) {
-        disclosures.push(Disclosure({
-            filingType: filingType,
-            uri: uri,
-            filedAt: block.timestamp
-        }));
+    function fileDisclosure(string calldata filingType, string calldata uri) external onlyRole(COMPLIANCE_ROLE) {
+        disclosures.push(Disclosure({filingType: filingType, uri: uri, filedAt: block.timestamp}));
         emit DisclosureFiled(filingType, uri);
     }
 

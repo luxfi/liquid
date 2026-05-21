@@ -28,12 +28,7 @@ contract CompoundV3Strategy is LiquidStrategy {
     ICometRewards public immutable rewards;
     address public immutable baseToken;
 
-    constructor(
-        address _vault,
-        StrategyParams memory _params,
-        address _comet,
-        address _rewards
-    ) LiquidStrategy(_vault, _params) {
+    constructor(address _vault, StrategyParams memory _params, address _comet, address _rewards) LiquidStrategy(_vault, _params) {
         require(_comet != address(0), "Zero comet");
         require(_rewards != address(0), "Zero rewards");
         comet = IComet(_comet);
