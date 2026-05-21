@@ -21,12 +21,7 @@ contract MorphoYearnOGWETHStrategy is LiquidStrategy {
     IMorphoYearnOGVault public immutable morphoVault;
     address public immutable weth;
 
-    constructor(
-        address _vault,
-        StrategyParams memory _params,
-        address _morphoVault,
-        address _weth
-    ) LiquidStrategy(_vault, _params) {
+    constructor(address _vault, StrategyParams memory _params, address _morphoVault, address _weth) LiquidStrategy(_vault, _params) {
         require(_morphoVault != address(0), "Zero morphoVault");
         require(_weth != address(0), "Zero WETH");
         morphoVault = IMorphoYearnOGVault(_morphoVault);

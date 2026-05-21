@@ -30,12 +30,7 @@ contract MakerDSRStrategy is LiquidStrategy {
     address public immutable dai;
     IPot public immutable pot;
 
-    constructor(
-        address _vault,
-        StrategyParams memory _params,
-        address _sDAI,
-        address _pot
-    ) LiquidStrategy(_vault, _params) {
+    constructor(address _vault, StrategyParams memory _params, address _sDAI, address _pot) LiquidStrategy(_vault, _params) {
         require(_sDAI != address(0), "Zero sDAI");
         require(_pot != address(0), "Zero pot");
         sDAI = ISavingsDai(_sDAI);
