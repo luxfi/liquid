@@ -5,20 +5,13 @@ import {LiquidStrategy} from "../LiquidStrategy.sol";
 import {TokenUtils} from "../libraries/TokenUtils.sol";
 
 interface IPendleRouter {
-    function addLiquiditySingleToken(
-        address receiver,
-        address market,
-        uint256 minLpOut,
-        ApproxParams calldata guessPtReceivedFromSy,
-        TokenInput calldata input
-    ) external returns (uint256 netLpOut, uint256 netSyFee);
+    function addLiquiditySingleToken(address receiver, address market, uint256 minLpOut, ApproxParams calldata guessPtReceivedFromSy, TokenInput calldata input)
+        external
+        returns (uint256 netLpOut, uint256 netSyFee);
 
-    function removeLiquiditySingleToken(
-        address receiver,
-        address market,
-        uint256 netLpToRemove,
-        TokenOutput calldata output
-    ) external returns (uint256 netTokenOut, uint256 netSyFee);
+    function removeLiquiditySingleToken(address receiver, address market, uint256 netLpToRemove, TokenOutput calldata output)
+        external
+        returns (uint256 netTokenOut, uint256 netSyFee);
 
     struct ApproxParams {
         uint256 guessMin;
@@ -83,13 +76,7 @@ contract PendleStrategy is LiquidStrategy {
     IPendleMarket public immutable market;
     address public immutable underlying;
 
-    constructor(
-        address _vault,
-        StrategyParams memory _params,
-        address _router,
-        address _market,
-        address _underlying
-    ) LiquidStrategy(_vault, _params) {
+    constructor(address _vault, StrategyParams memory _params, address _router, address _market, address _underlying) LiquidStrategy(_vault, _params) {
         require(_router != address(0), "Zero router");
         require(_market != address(0), "Zero market");
         require(_underlying != address(0), "Zero underlying");
@@ -107,29 +94,13 @@ contract PendleStrategy is LiquidStrategy {
             netTokenIn: amount,
             tokenMintSy: underlying,
             pendleSwap: address(0),
-            swapData: IPendleRouter.SwapData({
-                swapType: IPendleRouter.SwapType.NONE,
-                extRouter: address(0),
-                extCalldata: "",
-                needScale: false
-            })
+            swapData: IPendleRouter.SwapData({swapType: IPendleRouter.SwapType.NONE, extRouter: address(0), extCalldata: "", needScale: false})
         });
 
-        IPendleRouter.ApproxParams memory approx = IPendleRouter.ApproxParams({
-            guessMin: 0,
-            guessMax: type(uint256).max,
-            guessOffchain: 0,
-            maxIteration: 256,
-            eps: 1e15
-        });
+        IPendleRouter.ApproxParams memory approx =
+            IPendleRouter.ApproxParams({guessMin: 0, guessMax: type(uint256).max, guessOffchain: 0, maxIteration: 256, eps: 1e15});
 
-        (uint256 lpOut,) = router.addLiquiditySingleToken(
-            address(this),
-            address(market),
-            0,
-            approx,
-            input
-        );
+        (uint256 lpOut,) = router.addLiquiditySingleToken(address(this), address(market), 0, approx, input);
 
         return lpOut > 0 ? amount : 0;
     }
@@ -148,20 +119,10 @@ contract PendleStrategy is LiquidStrategy {
             minTokenOut: 0,
             tokenRedeemSy: underlying,
             pendleSwap: address(0),
-            swapData: IPendleRouter.SwapData({
-                swapType: IPendleRouter.SwapType.NONE,
-                extRouter: address(0),
-                extCalldata: "",
-                needScale: false
-            })
+            swapData: IPendleRouter.SwapData({swapType: IPendleRouter.SwapType.NONE, extRouter: address(0), extCalldata: "", needScale: false})
         });
 
-        (uint256 tokenOut,) = router.removeLiquiditySingleToken(
-            address(this),
-            address(market),
-            lpToRemove,
-            output
-        );
+        (uint256 tokenOut,) = router.removeLiquiditySingleToken(address(this), address(market), lpToRemove, output);
 
         if (tokenOut > 0) {
             TokenUtils.safeApprove(underlying, msg.sender, tokenOut);

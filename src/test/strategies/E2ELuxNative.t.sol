@@ -91,9 +91,9 @@ contract E2ELuxNativeTest is Test {
         strategy = new LuxNativeStrategy(address(vault), params, address(xLUX));
 
         // 5. Fund accounts
-        wlux.mint(user, 1_000e18);
-        wlux.mint(address(vault), 1_000e18);
-        wlux.mint(feeSource, 1_000e18);
+        wlux.mint(user, 1000e18);
+        wlux.mint(address(vault), 1000e18);
+        wlux.mint(feeSource, 1000e18);
     }
 
     // ═══════════════════════════════════════════════════════════════════════

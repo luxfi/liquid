@@ -50,12 +50,7 @@ contract EigenLayerStrategy is LiquidStrategy {
     IEigenStrategy public immutable eigenStrategy;
     address public immutable underlyingToken;
 
-    constructor(
-        address _vault,
-        StrategyParams memory _params,
-        address _strategyManager,
-        address _eigenStrategy
-    ) LiquidStrategy(_vault, _params) {
+    constructor(address _vault, StrategyParams memory _params, address _strategyManager, address _eigenStrategy) LiquidStrategy(_vault, _params) {
         require(_strategyManager != address(0), "Zero strategyManager");
         require(_eigenStrategy != address(0), "Zero eigenStrategy");
         strategyManager = IEigenStrategyManager(_strategyManager);

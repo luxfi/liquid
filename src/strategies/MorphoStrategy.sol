@@ -25,11 +25,7 @@ contract MorphoStrategy is LiquidStrategy {
     IMorphoVault public immutable morphoVault;
     address public immutable underlying;
 
-    constructor(
-        address _vault,
-        StrategyParams memory _params,
-        address _morphoVault
-    ) LiquidStrategy(_vault, _params) {
+    constructor(address _vault, StrategyParams memory _params, address _morphoVault) LiquidStrategy(_vault, _params) {
         require(_morphoVault != address(0), "Zero morphoVault");
         morphoVault = IMorphoVault(_morphoVault);
         underlying = morphoVault.asset();

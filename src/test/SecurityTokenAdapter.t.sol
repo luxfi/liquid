@@ -56,14 +56,7 @@ contract SecurityTokenAdapterTest is Test {
 
     function setUp() public {
         secToken = new MockSecurityToken();
-        adapter = new SecurityTokenAdapter(
-            address(secToken),
-            "IBIT",
-            "46438F101",
-            "US46438F1012",
-            "ETF",
-            INITIAL_NAV
-        );
+        adapter = new SecurityTokenAdapter(address(secToken), "IBIT", "46438F101", "US46438F1012", "ETF", INITIAL_NAV);
         // Grant roles to dedicated addresses
         adapter.grantRole(adapter.ORACLE_ROLE(), oracle);
         adapter.grantRole(adapter.COMPLIANCE_ROLE(), compliance);
@@ -253,8 +246,7 @@ contract SecurityTokenAdapterTest is Test {
         // perToken = (10e18 * 1e18) / 100e18 = 0.1e18
         assertEq(adapter.accumulatedDividendPerToken(), 0.1e18);
 
-        (uint256 amount, uint256 perToken, uint256 exDate, uint256 payDate, uint256 recordDate, string memory desc) =
-            adapter.dividendHistory(0);
+        (uint256 amount, uint256 perToken, uint256 exDate, uint256 payDate, uint256 recordDate, string memory desc) = adapter.dividendHistory(0);
         assertEq(amount, 10e18);
         assertEq(perToken, 0.1e18);
         assertEq(exDate, 1000);
@@ -312,20 +304,12 @@ contract SecurityTokenAdapterTest is Test {
 
     function test_declareCorporateAction() public {
         vm.prank(compliance);
-        adapter.declareCorporateAction(
-            SecurityTokenAdapter.ActionType.SPLIT, 2, 1, "2:1 stock split"
-        );
+        adapter.declareCorporateAction(SecurityTokenAdapter.ActionType.SPLIT, 2, 1, "2:1 stock split");
 
         assertEq(adapter.corporateActionCount(), 1);
 
-        (
-            SecurityTokenAdapter.ActionType actionType,
-            uint256 timestamp,
-            uint256 ratio,
-            uint256 ratioDenom,
-            string memory desc,
-            bool executed
-        ) = adapter.corporateActions(0);
+        (SecurityTokenAdapter.ActionType actionType, uint256 timestamp, uint256 ratio, uint256 ratioDenom, string memory desc, bool executed) =
+            adapter.corporateActions(0);
 
         assertEq(uint8(actionType), uint8(SecurityTokenAdapter.ActionType.SPLIT));
         assertEq(timestamp, block.timestamp);
@@ -338,9 +322,7 @@ contract SecurityTokenAdapterTest is Test {
     function test_executeCorporateAction_split_adjusts_nav() public {
         // NAV = 50e18. After 2:1 split, NAV = 25e18
         vm.startPrank(compliance);
-        adapter.declareCorporateAction(
-            SecurityTokenAdapter.ActionType.SPLIT, 2, 1, "2:1 split"
-        );
+        adapter.declareCorporateAction(SecurityTokenAdapter.ActionType.SPLIT, 2, 1, "2:1 split");
         adapter.executeCorporateAction(0);
         vm.stopPrank();
 
@@ -350,9 +332,7 @@ contract SecurityTokenAdapterTest is Test {
     function test_executeCorporateAction_reverse_split_adjusts_nav() public {
         // NAV = 50e18. After 1:5 reverse split (ratio=5, denom=1), NAV = 250e18
         vm.startPrank(compliance);
-        adapter.declareCorporateAction(
-            SecurityTokenAdapter.ActionType.REVERSE_SPLIT, 5, 1, "1:5 reverse split"
-        );
+        adapter.declareCorporateAction(SecurityTokenAdapter.ActionType.REVERSE_SPLIT, 5, 1, "1:5 reverse split");
         adapter.executeCorporateAction(0);
         vm.stopPrank();
 
@@ -361,9 +341,7 @@ contract SecurityTokenAdapterTest is Test {
 
     function test_executeCorporateAction_merger_no_nav_change() public {
         vm.startPrank(compliance);
-        adapter.declareCorporateAction(
-            SecurityTokenAdapter.ActionType.MERGER, 0, 0, "Acquired by XYZ"
-        );
+        adapter.declareCorporateAction(SecurityTokenAdapter.ActionType.MERGER, 0, 0, "Acquired by XYZ");
         adapter.executeCorporateAction(0);
         vm.stopPrank();
 
@@ -373,9 +351,7 @@ contract SecurityTokenAdapterTest is Test {
 
     function test_executeCorporateAction_reverts_already_executed() public {
         vm.startPrank(compliance);
-        adapter.declareCorporateAction(
-            SecurityTokenAdapter.ActionType.SYMBOL_CHANGE, 0, 0, "Ticker change"
-        );
+        adapter.declareCorporateAction(SecurityTokenAdapter.ActionType.SYMBOL_CHANGE, 0, 0, "Ticker change");
         adapter.executeCorporateAction(0);
 
         vm.expectRevert("already executed");
@@ -385,9 +361,7 @@ contract SecurityTokenAdapterTest is Test {
 
     function test_executeCorporateAction_emits_event() public {
         vm.prank(compliance);
-        adapter.declareCorporateAction(
-            SecurityTokenAdapter.ActionType.SPINOFF, 0, 0, "Spinoff of subsidiary"
-        );
+        adapter.declareCorporateAction(SecurityTokenAdapter.ActionType.SPINOFF, 0, 0, "Spinoff of subsidiary");
 
         vm.expectEmit(true, false, false, true);
         emit SecurityTokenAdapter.CorporateActionExecuted(0);
@@ -397,28 +371,20 @@ contract SecurityTokenAdapterTest is Test {
 
     function test_declareCorporateAction_emits_event() public {
         vm.expectEmit(true, false, false, true);
-        emit SecurityTokenAdapter.CorporateActionDeclared(
-            0, SecurityTokenAdapter.ActionType.DELISTING, "Delisted from exchange"
-        );
+        emit SecurityTokenAdapter.CorporateActionDeclared(0, SecurityTokenAdapter.ActionType.DELISTING, "Delisted from exchange");
         vm.prank(compliance);
-        adapter.declareCorporateAction(
-            SecurityTokenAdapter.ActionType.DELISTING, 0, 0, "Delisted from exchange"
-        );
+        adapter.declareCorporateAction(SecurityTokenAdapter.ActionType.DELISTING, 0, 0, "Delisted from exchange");
     }
 
     function test_declareCorporateAction_reverts_unauthorized() public {
         vm.prank(alice);
         vm.expectRevert();
-        adapter.declareCorporateAction(
-            SecurityTokenAdapter.ActionType.SPLIT, 2, 1, "nope"
-        );
+        adapter.declareCorporateAction(SecurityTokenAdapter.ActionType.SPLIT, 2, 1, "nope");
     }
 
     function test_executeCorporateAction_reverts_unauthorized() public {
         vm.prank(compliance);
-        adapter.declareCorporateAction(
-            SecurityTokenAdapter.ActionType.SPLIT, 2, 1, "split"
-        );
+        adapter.declareCorporateAction(SecurityTokenAdapter.ActionType.SPLIT, 2, 1, "split");
 
         vm.prank(alice);
         vm.expectRevert();
@@ -504,9 +470,7 @@ contract SecurityTokenAdapterTest is Test {
 
         vm.startPrank(compliance);
         // 2:1 split: NAV 50 -> 25
-        adapter.declareCorporateAction(
-            SecurityTokenAdapter.ActionType.SPLIT, 2, 1, "2:1"
-        );
+        adapter.declareCorporateAction(SecurityTokenAdapter.ActionType.SPLIT, 2, 1, "2:1");
         adapter.executeCorporateAction(0);
         assertEq(adapter.nav(), 25e18);
 

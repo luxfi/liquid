@@ -32,13 +32,7 @@ contract LidoStrategy is LiquidStrategy {
     IWstETH public immutable wstETH;
     IWETH9 public immutable weth;
 
-    constructor(
-        address _vault,
-        StrategyParams memory _params,
-        address _stETH,
-        address _wstETH,
-        address _weth
-    ) LiquidStrategy(_vault, _params) {
+    constructor(address _vault, StrategyParams memory _params, address _stETH, address _wstETH, address _weth) LiquidStrategy(_vault, _params) {
         require(_stETH != address(0), "Zero stETH");
         require(_wstETH != address(0), "Zero wstETH");
         require(_weth != address(0), "Zero WETH");
