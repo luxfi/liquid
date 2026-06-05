@@ -28,3 +28,6 @@
 [submodule "lib/onchain-id"]
 	path = lib/onchain-id
 	url = git@github.com:luxfi/onchain-id.git
+[submodule "lib/alchemix-v3"]
+	path = lib/alchemix-v3
+	url = https://github.com/alchemix-finance/v3-poc
