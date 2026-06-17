@@ -1,4 +1,4 @@
-# LLM.md - Lux Liquid
+# Lux Liquid
 
 ## Overview
 Self-repaying lending protocol on Lux. Users deposit yield-bearing collateral,
