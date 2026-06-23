@@ -1,33 +1,33 @@
-[submodule "lib/solmate"]
-	path = lib/solmate
-	url = https://github.com/transmissions11/solmate
-[submodule "lib/openzeppelin-contracts"]
-	path = lib/openzeppelin-contracts
-	url = https://github.com/OpenZeppelin/openzeppelin-contracts
-[submodule "lib/openzeppelin-contracts-upgradeable"]
-	path = lib/openzeppelin-contracts-upgradeable
-	url = https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable
-[submodule "lib/chainlink-brownie-contracts"]
-	path = lib/chainlink-brownie-contracts
-	url = https://github.com/smartcontractkit/chainlink-brownie-contracts
-[submodule "lib/halmos-cheatcodes"]
-	path = lib/halmos-cheatcodes
-	url = https://github.com/a16z/halmos-cheatcodes.git
-[submodule "lib/permit2"]
-	path = lib/permit2
-	url = https://github.com/Uniswap/permit2.git
-[submodule "lib/forge-std"]
-	path = lib/forge-std
-	url = https://github.com/foundry-rs/forge-std
-[submodule "lib/vault-v2"]
-	path = lib/vault-v2
-	url = https://github.com/morpho-org/vault-v2
 [submodule "lib/erc-3643"]
 	path = lib/erc-3643
-	url = git@github.com:luxfi/erc-3643.git
+	url = https://github.com/luxfi/erc-3643.git
 [submodule "lib/onchain-id"]
 	path = lib/onchain-id
-	url = git@github.com:luxfi/onchain-id.git
+	url = https://github.com/luxfi/onchain-id.git
 [submodule "lib/alchemix-v3"]
 	path = lib/alchemix-v3
 	url = https://github.com/alchemix-finance/v3-poc
+[submodule "lib/forge-std"]
+	path = lib/forge-std
+	url = https://github.com/foundry-rs/forge-std.git
+[submodule "lib/openzeppelin-contracts"]
+	path = lib/openzeppelin-contracts
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts.git
+[submodule "lib/openzeppelin-contracts-upgradeable"]
+	path = lib/openzeppelin-contracts-upgradeable
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable.git
+[submodule "lib/solmate"]
+	path = lib/solmate
+	url = https://github.com/transmissions11/solmate.git
+[submodule "lib/permit2"]
+	path = lib/permit2
+	url = https://github.com/Uniswap/permit2.git
+[submodule "lib/chainlink-brownie-contracts"]
+	path = lib/chainlink-brownie-contracts
+	url = https://github.com/smartcontractkit/chainlink-brownie-contracts.git
+[submodule "lib/halmos-cheatcodes"]
+	path = lib/halmos-cheatcodes
+	url = https://github.com/a16z/halmos-cheatcodes.git
+[submodule "lib/vault-v2"]
+	path = lib/vault-v2
+	url = https://github.com/morpho-org/vault-v2.git
