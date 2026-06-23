@@ -1,0 +1,10 @@
+{
+  "network": "mainnet",
+  "chainId": 96369,
+  "rpc": "https://api.lux.network/ext/bc/C/rpc",
+  "deployer": "0x9011E888251AB053B7bD1cdB598Db4f9DEd94714",
+  "script": "script/DeployMainnet.s.sol",
+  "status": "BLOCKED",
+  "addresses": {},
+  "blocker": "DeployMainnet.s.sol uses the canonical mainnet LETH (0x60E0a8167FC13dE89348978860466C9ceC24B9ba) as the synthetic debt token and, in steps 8-9, calls LETH.setWhitelist(liquid,true) + LETH.setCeiling(liquid, cap) to authorize Liquid as an LETH minter. Those are owner-gated. On-chain LETH.owner() = 0xbe7A89F41fA7371b856b9685Dd025d0BCC6C7a25 (a distinct EOA, codesize 0), NOT the treasury deployer 0x9011. So the deployer cannot whitelist Liquid; the script would deploy contracts 1-7 then REVERT at step 8, leaving a partial/broken on-chain state and wasting gas. Mainnet is irreversible, so per the deploy bar this was reported rather than risked. UNBLOCK: have the LETH owner (0xbe7A89...) whitelist the deployed Liquid as an LETH minter and set the ceiling, OR transfer LETH ownership to 0x9011 for the deploy, OR add a deployer-controlled synthetic (mint-authority held by 0x9011) to DeployMainnet. Secondary issue: the public api.lux.network gateway is a non-archive node and cannot serve forge's broadcast state probe (\"missing trie node\" / \"cannot query unfinalized data\"); the in-cluster RPC (kubectl port-forward luxd-0:9630) is required for any mainnet C-Chain broadcast (used successfully for the DAO mainnet deploy)."
+}
