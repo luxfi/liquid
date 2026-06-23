@@ -1,0 +1,24 @@
+{
+  "network": "testnet",
+  "chainId": 96368,
+  "rpc": "https://api.lux-test.network/ext/bc/C/rpc",
+  "deployer": "0x9011E888251AB053B7bD1cdB598Db4f9DEd94714",
+  "script": "script/DeployLocal.s.sol",
+  "note": "Self-contained Liquid stack: own WLUX/LUSD/IBIT DevTokens (deployer is token admin), ERC1967 proxy-pattern Liquid, initialized + Position NFT wired. Liquid impl is 30893 bytes (>EIP-170 24576); Lux C-Chain does not enforce the limit, deployed with forge --disable-code-size-limit.",
+  "addresses": {
+    "WLUX": "0x91954cf6866d557C5CA1D2f384D204bcE9DFfd5a",
+    "LUSD": "0x26328AC03d07BD9A7Caaafbde39F9b56B5449240",
+    "IBIT": "0x97c265001EB088E1dE2F77A13a62B708014c9e68",
+    "LiquidStrategyClassifier": "0x1fe145582c7D5683C7C69c0a2BCe0e3ffe901160",
+    "LiquidImpl": "0xc5372B943bec0DAD2CB4f51ae709824f5a708dd2",
+    "Liquid": "0x316520ca05eaC5d2418F562a116091F1b22Bf6e0",
+    "LiquidCurator": "0x4a7971C204E60373001670fBe7f8fF668D0fD9a7",
+    "LiquidETHVault": "0xcd7ee976df9C8a2709a14bda8463af43e6097A56",
+    "LiquidPosition": "0x00947BbdC619974b0eddAF103b981f3273a3e8DA",
+    "LiquidTransmuter": "0x43222597839515180E7aD564C94a3b5c16EB987C",
+    "LiquidTokenVault": "0x4EC24Da7d598CAC1540F2E8078D05869e36a4ef1",
+    "WLUXAdapter": "0x351ED96ACF1cB731047fA9cb7b26CD15E9E1B521",
+    "IBITAdapter": "0x0B48fDb9E1A19B351C7a0a1C519AbeCecBD9373a",
+    "LiquidCompliance": "0x5ED08c64FbF027966C04E6fc87E6b58a91De4dB2"
+  }
+}
