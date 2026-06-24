@@ -136,8 +136,7 @@ classifier before the curator approves it for allocation.
 | LBTC            | `0x1E48D32a4F5e9f08DB9aE4959163300FaF8A6C8e` |
 
 Network IDs supported by [`script/DeployLux.s.sol`](script/DeployLux.s.sol):
-Lux mainnet/testnet/devnet, plus Liquidity chain IDs `8675309/10/11`,
-local dev `1337`/`31337`.
+Lux mainnet/testnet/devnet, plus local dev `1337`/`31337`.
 
 ---
 
