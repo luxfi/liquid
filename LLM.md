@@ -64,7 +64,7 @@ forge test --match-path "src/test/Liquid.t.sol" -v  # Run specific test
 - LiquidETHVault testDepositWETH -- mock WETH incomplete
 
 ## Scripts
-- `script/DeployLux.s.sol` -- Multi-network deploy (mainnet/testnet/devnet, Liquidity chain IDs)
+- `script/DeployLux.s.sol` -- Multi-network deploy (mainnet/testnet/devnet)
 - `script/DeployMainnet.s.sol` -- Lux mainnet ETH deployment with canonical addresses
 - `script/DeployLocal.s.sol` -- Full local stack (Anvil/luxd)
 - `script/TestFlow.s.sol` -- E2E smoke flow against a deployed local stack
