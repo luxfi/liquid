@@ -1,3 +1,5 @@
+<p align="center"><img src=".github/hero.svg" alt="liquid" width="880"></p>
+
 # Liquid Protocol
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
