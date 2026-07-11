@@ -10,7 +10,7 @@ on:
 jobs:
   check-main:
     if: github.base_ref == 'main'
-    runs-on: ubuntu-latest
+    runs-on: lux-build-amd64
     steps:
       - name: Log
         run: |
