@@ -24,7 +24,7 @@ jobs:
   # ═══════════════════════════════════════════════════════════════════════════
   slither:
     name: Slither Analysis
-    runs-on: ubuntu-latest
+    runs-on: lux-build-amd64
     permissions:
       security-events: write
       contents: read
@@ -87,7 +87,7 @@ jobs:
   # ═══════════════════════════════════════════════════════════════════════════
   echidna:
     name: Echidna Fuzzing
-    runs-on: ubuntu-latest
+    runs-on: lux-build-amd64
     steps:
       - uses: actions/checkout@v4
         with:
@@ -133,7 +133,7 @@ jobs:
   # ═══════════════════════════════════════════════════════════════════════════
   medusa:
     name: Medusa Fuzzing
-    runs-on: ubuntu-latest
+    runs-on: lux-build-amd64
     steps:
       - uses: actions/checkout@v4
         with:
@@ -188,7 +188,7 @@ jobs:
   # ═══════════════════════════════════════════════════════════════════════════
   semgrep:
     name: Semgrep SAST
-    runs-on: ubuntu-latest
+    runs-on: lux-build-amd64
     permissions:
       security-events: write
       contents: read
@@ -237,7 +237,7 @@ jobs:
   # ═══════════════════════════════════════════════════════════════════════════
   codeql:
     name: CodeQL Analysis
-    runs-on: ubuntu-latest
+    runs-on: lux-build-amd64
     permissions:
       security-events: write
       contents: read
@@ -268,7 +268,7 @@ jobs:
   # ═══════════════════════════════════════════════════════════════════════════
   aderyn:
     name: Aderyn Analysis
-    runs-on: ubuntu-latest
+    runs-on: lux-build-amd64
     steps:
       - uses: actions/checkout@v4
         with:
@@ -313,7 +313,7 @@ jobs:
   # ═══════════════════════════════════════════════════════════════════════════
   forge-fuzz:
     name: Forge Fuzz Tests
-    runs-on: ubuntu-latest
+    runs-on: lux-build-amd64
     steps:
       - uses: actions/checkout@v4
         with:
@@ -347,7 +347,7 @@ jobs:
   security-summary:
     name: Security Summary
     needs: [slither, echidna, medusa, semgrep, codeql, aderyn, forge-fuzz]
-    runs-on: ubuntu-latest
+    runs-on: lux-build-amd64
     if: always()
     steps:
       - name: Download all artifacts
