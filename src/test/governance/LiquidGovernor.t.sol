@@ -76,7 +76,7 @@ contract LiquidGovernorTest is Test {
         values[0] = 0;
         calldatas[0] = abi.encodeWithSignature("mint(address,uint256)", bob, 1000 * 1e18);
 
-        vm.roll(block.number + 1); // Advance block for voting power checkpoint
+        vm.roll(vm.getBlockNumber() + 1); // Advance block for voting power checkpoint
 
         vm.prank(alice);
         uint256 proposalId = governor.propose(targets, values, calldatas, "Mint tokens to Bob");
@@ -101,26 +101,26 @@ contract LiquidGovernorTest is Test {
         values[0] = 0;
         calldatas[0] = abi.encodeWithSignature("mint(address,uint256)", bob, 1000 * 1e18);
 
-        vm.roll(block.number + 1);
+        vm.roll(vm.getBlockNumber() + 1);
 
         vm.prank(alice);
         uint256 proposalId = governor.propose(targets, values, calldatas, "Mint tokens to Bob");
 
         // Advance past voting delay
-        vm.roll(block.number + governor.votingDelay() + 1);
+        vm.roll(vm.getBlockNumber() + governor.votingDelay() + 1);
 
         // Vote
         vm.prank(alice);
         governor.castVote(proposalId, 1); // For
 
         // Advance past voting period
-        vm.roll(block.number + governor.votingPeriod() + 1);
+        vm.roll(vm.getBlockNumber() + governor.votingPeriod() + 1);
 
         // Queue
         governor.queue(targets, values, calldatas, keccak256(bytes("Mint tokens to Bob")));
 
         // Advance past timelock delay
-        vm.warp(block.timestamp + 1 days + 1);
+        vm.warp(vm.getBlockTimestamp() + 1 days + 1);
 
         // Execute
         governor.execute(targets, values, calldatas, keccak256(bytes("Mint tokens to Bob")));

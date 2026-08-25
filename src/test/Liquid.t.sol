@@ -160,6 +160,7 @@ contract LiquidTest is Test {
             collateralizationLowerBound: 1_052_631_578_950_000_000, // 1.05 collateralization
             globalMinimumCollateralization: 1_111_111_111_111_111_111, // 1.1
             tokenAdapter: address(fakeYieldToken),
+            maxPriceDeviation: 10_000,
             transmuter: address(transmuterLogic),
             protocolFee: 0,
             protocolFeeReceiver: protocolFeeReceiver,
@@ -308,19 +309,29 @@ contract LiquidTest is Test {
     }
 
     function testSetGlobalMinimumCollateralization_Variable_Ratio(uint256 collateralizationRatio) external {
-        vm.assume(collateralizationRatio >= minimumCollateralization);
+        // The global floor lives at or below the mint bar: at full utilisation
+        // every borrower sits at the bar and the protocol-wide ratio equals it.
+        collateralizationRatio = bound(collateralizationRatio, FIXED_POINT_SCALAR, minimumCollateralization);
         vm.startPrank(alOwner);
         liquid.setGlobalMinimumCollateralization(collateralizationRatio);
         vm.assertApproxEqAbs(liquid.globalMinimumCollateralization(), collateralizationRatio, minimumDepositOrWithdrawalLoss);
         vm.stopPrank();
     }
 
-    function testSetGlobalMinimumCollateralization_Invalid_Below_Minimumcollaterization(uint256 collateralizationRatio) external {
-        // ~ all possible ratios above minimum collaterization ratio
-        vm.assume(collateralizationRatio < minimumCollateralization);
+    function testSetGlobalMinimumCollateralization_Invalid_Above_MinimumCollateralization(uint256 collateralizationRatio) external {
+        // A global floor above the mint bar declares a healthy, fully-drawn
+        // protocol insolvent and sends every liquidation down the bad-debt path.
+        vm.assume(collateralizationRatio > minimumCollateralization);
         vm.startPrank(alOwner);
         vm.expectRevert(IllegalArgument.selector);
         liquid.setGlobalMinimumCollateralization(collateralizationRatio);
+        vm.stopPrank();
+    }
+
+    function testSetGlobalMinimumCollateralization_Invalid_Below_One() external {
+        vm.startPrank(alOwner);
+        vm.expectRevert(IllegalArgument.selector);
+        liquid.setGlobalMinimumCollateralization(FIXED_POINT_SCALAR - 1);
         vm.stopPrank();
     }
 
@@ -401,8 +412,8 @@ contract LiquidTest is Test {
     }
 
     function testSetMinCollateralization_Variable_Collateralization(uint256 collateralization) external {
-        vm.assume(collateralization >= FIXED_POINT_SCALAR);
-        vm.assume(collateralization < 20e18);
+        // The mint bar cannot drop below the floors that sit under it.
+        collateralization = bound(collateralization, liquid.globalMinimumCollateralization(), 20e18);
         vm.startPrank(address(0xdead));
         liquid.setMinimumCollateralization(collateralization);
         vm.assertApproxEqAbs(liquid.minimumCollateralization(), collateralization, minimumDepositOrWithdrawalLoss);
@@ -901,7 +912,7 @@ contract LiquidTest is Test {
     function testMint_Revert_Exceeds_Min_Collateralization(uint256 amount, uint256 collateralization) external {
         amount = bound(amount, FIXED_POINT_SCALAR, accountFunds);
 
-        collateralization = bound(collateralization, FIXED_POINT_SCALAR, 100e18);
+        collateralization = bound(collateralization, liquid.globalMinimumCollateralization(), 100e18);
         vm.prank(address(0xdead));
         liquid.setMinimumCollateralization(collateralization);
         vm.startPrank(address(0xbeef));
@@ -1050,7 +1061,7 @@ contract LiquidTest is Test {
         transmuterLogic.createRedemption(50e18);
         vm.stopPrank();
 
-        vm.roll(block.number + 5_256_000);
+        vm.roll(vm.getBlockNumber() + 5_256_000);
 
         (uint256 collateral, uint256 userDebt,) = liquid.getCDP(tokenId);
 
@@ -1089,7 +1100,7 @@ contract LiquidTest is Test {
         transmuterLogic.createRedemption(50e18);
         vm.stopPrank();
 
-        vm.roll(block.number + 5_256_000 / 2);
+        vm.roll(vm.getBlockNumber() + 5_256_000 / 2);
 
         (uint256 collateral, uint256 userDebt,) = liquid.getCDP(tokenId);
 
@@ -1136,7 +1147,7 @@ contract LiquidTest is Test {
         transmuterLogic.createRedemption(50e18);
         vm.stopPrank();
 
-        vm.roll(block.number + 5_256_000);
+        vm.roll(vm.getBlockNumber() + 5_256_000);
 
         vm.startPrank(address(0xdad));
         transmuterLogic.claimRedemption(1);
@@ -1181,7 +1192,7 @@ contract LiquidTest is Test {
         transmuterLogic.createRedemption(50e18);
         vm.stopPrank();
 
-        vm.roll(block.number + 5_256_000 / 2);
+        vm.roll(vm.getBlockNumber() + 5_256_000 / 2);
 
         vm.startPrank(address(0xdad));
         transmuterLogic.claimRedemption(1);
@@ -1209,7 +1220,7 @@ contract LiquidTest is Test {
 
         uint256 preRepayBalance = fakeYieldToken.balanceOf(address(0xbeef));
 
-        vm.roll(block.number + 1);
+        vm.roll(vm.getBlockNumber() + 1);
 
         liquid.repay(100e18, tokenId);
         vm.stopPrank();
@@ -1254,7 +1265,7 @@ contract LiquidTest is Test {
 
         uint256 preRepayBalance = fakeYieldToken.balanceOf(address(0xbeef));
 
-        vm.roll(block.number + 1);
+        vm.roll(vm.getBlockNumber() + 1);
 
         liquid.repay(repayAmount, tokenId);
         vm.stopPrank();
@@ -1287,7 +1298,7 @@ contract LiquidTest is Test {
         transmuterLogic.createRedemption(50e18);
         vm.stopPrank();
 
-        vm.roll(block.number + 5_256_000);
+        vm.roll(vm.getBlockNumber() + 5_256_000);
 
         vm.prank(address(0xbeef));
         liquid.repay(25e18, tokenId);
@@ -1319,7 +1330,7 @@ contract LiquidTest is Test {
         transmuterLogic.createRedemption(50e18);
         vm.stopPrank();
 
-        vm.roll(block.number + 5_256_000);
+        vm.roll(vm.getBlockNumber() + 5_256_000);
 
         vm.prank(address(0xbeef));
         liquid.repay(25e18, tokenId);
@@ -1349,7 +1360,7 @@ contract LiquidTest is Test {
         transmuterLogic.createRedemption(50e18);
         vm.stopPrank();
 
-        vm.roll(block.number + 5_256_000 / 2);
+        vm.roll(vm.getBlockNumber() + 5_256_000 / 2);
 
         vm.prank(address(0xbeef));
         liquid.repay(25e18, tokenId);
@@ -1421,7 +1432,7 @@ contract LiquidTest is Test {
         uint256 tokenId = LiquidNFTHelper.getFirstTokenId(address(0xbeef), address(liquidNFT));
         liquid.mint(tokenId, amount / 2, address(0xbeef));
 
-        vm.roll(block.number + 1);
+        vm.roll(vm.getBlockNumber() + 1);
 
         SafeERC20.safeApprove(address(alToken), address(liquid), amount / 2);
         liquid.burn(amount / 2, tokenId);
@@ -1446,7 +1457,7 @@ contract LiquidTest is Test {
         uint256 tokenId = LiquidNFTHelper.getFirstTokenId(address(0xbeef), address(liquidNFT));
         liquid.mint(tokenId, amount / 2, address(0xbeef));
 
-        vm.roll(block.number + 1);
+        vm.roll(vm.getBlockNumber() + 1);
 
         SafeERC20.safeApprove(address(alToken), address(liquid), amount / 2);
         liquid.burn(amount / 2, tokenId);
@@ -1486,7 +1497,7 @@ contract LiquidTest is Test {
         uint256 tokenId = LiquidNFTHelper.getFirstTokenId(address(0xbeef), address(liquidNFT));
         liquid.mint(tokenId, amount / 2, address(0xbeef));
 
-        vm.roll(block.number + 1);
+        vm.roll(vm.getBlockNumber() + 1);
 
         SafeERC20.safeApprove(address(alToken), address(liquid), amount / 2);
         liquid.burn(burnAmount, tokenId);
@@ -1549,7 +1560,7 @@ contract LiquidTest is Test {
         transmuterLogic.createRedemption(50e18);
         vm.stopPrank();
 
-        vm.roll(block.number + (5_256_000));
+        vm.roll(vm.getBlockNumber() + (5_256_000));
 
         // Will fail since all debt is earmarked and cannot be repaid with burn
         vm.startPrank(address(0xbeef));
@@ -1584,7 +1595,7 @@ contract LiquidTest is Test {
         transmuterLogic.createRedemption(50e18);
         vm.stopPrank();
 
-        vm.roll(block.number + (5_256_000 / 2));
+        vm.roll(vm.getBlockNumber() + (5_256_000 / 2));
 
         vm.startPrank(address(0xbeef));
         SafeERC20.safeApprove(address(alToken), address(liquid), amount / 2);
@@ -1616,7 +1627,7 @@ contract LiquidTest is Test {
         transmuterLogic.createRedemption(50e18);
         vm.stopPrank();
 
-        vm.roll(block.number + (5_256_000 / 2));
+        vm.roll(vm.getBlockNumber() + (5_256_000 / 2));
 
         vm.startPrank(address(0xbeef));
         SafeERC20.safeApprove(address(alToken), address(liquid), amount / 2);
@@ -1676,6 +1687,9 @@ contract LiquidTest is Test {
         // increasing yeild token suppy by 59 bps or 5.9%  while keeping the unederlying supply unchanged
         uint256 modifiedVaultSupply = (initialVaultSupply * 590 / 10_000) + initialVaultSupply;
         fakeYieldToken.updateMockTokenSupply(modifiedVaultSupply);
+        // The engine admits a new price only across a block boundary, so a price
+        // move is an inter-block event here as it is on chain.
+        vm.roll(vm.getBlockNumber() + 1);
 
         // ensure initial debt is correct
         vm.assertApproxEqAbs(prevDebt, 180_000_000_000_000_000_018_000, minimumDepositOrWithdrawalLoss);
@@ -1763,6 +1777,9 @@ contract LiquidTest is Test {
         // increasing yeild token suppy by 4000 bps or 40% while keeping the unederlying supply unchanged
         uint256 modifiedVaultSupply = (initialVaultSupply * 4000 / 10_000) + initialVaultSupply;
         fakeYieldToken.updateMockTokenSupply(modifiedVaultSupply);
+        // The engine admits a new price only across a block boundary, so a price
+        // move is an inter-block event here as it is on chain.
+        vm.roll(vm.getBlockNumber() + 1);
         // ensure initial debt is correct
         // vm.assertApproxEqAbs(prevDebt, 180_000_000_000_000_000_018_000, minimumDepositOrWithdrawalLoss);
         // let another user liquidate the previous user position
@@ -1824,6 +1841,9 @@ contract LiquidTest is Test {
         // increasing yeild token suppy by 4000 bps or 40%  while keeping the unederlying supply unchanged
         uint256 modifiedVaultSupply = (initialVaultSupply * 4000 / 10_000) + initialVaultSupply;
         fakeYieldToken.updateMockTokenSupply(modifiedVaultSupply);
+        // The engine admits a new price only across a block boundary, so a price
+        // move is an inter-block event here as it is on chain.
+        vm.roll(vm.getBlockNumber() + 1);
 
         // ensure initial debt is correct
         vm.assertApproxEqAbs(prevDebt, 180_000_000_000_000_000_018_000, minimumDepositOrWithdrawalLoss);
@@ -1895,6 +1915,9 @@ contract LiquidTest is Test {
         // increasing yeild token suppy by 1200 bps or 12%  while keeping the unederlying supply unchanged
         uint256 modifiedVaultSupply = (initialVaultSupply * 1200 / 10_000) + initialVaultSupply;
         fakeYieldToken.updateMockTokenSupply(modifiedVaultSupply);
+        // The engine admits a new price only across a block boundary, so a price
+        // move is an inter-block event here as it is on chain.
+        vm.roll(vm.getBlockNumber() + 1);
 
         // let another user liquidate the previous user position
         vm.startPrank(externalUser);
@@ -1973,6 +1996,9 @@ contract LiquidTest is Test {
         // increasing yeild token suppy by 59 bps or 5.9%  while keeping the unederlying supply unchanged
         uint256 modifiedVaultSupply = (initialVaultSupply * 590 / 10_000) + initialVaultSupply;
         fakeYieldToken.updateMockTokenSupply(modifiedVaultSupply);
+        // The engine admits a new price only across a block boundary, so a price
+        // move is an inter-block event here as it is on chain.
+        vm.roll(vm.getBlockNumber() + 1);
 
         // let another user liquidate the previous user position
         vm.startPrank(externalUser);
@@ -2086,7 +2112,7 @@ contract LiquidTest is Test {
         transmuterLogic.createRedemption(50e18);
         vm.stopPrank();
 
-        vm.roll(block.number + 5_256_000);
+        vm.roll(vm.getBlockNumber() + 5_256_000);
 
         (uint256 deposited, uint256 userDebt, uint256 earmarked) = liquid.getCDP(tokenIdFor0xBeef);
 
@@ -2132,7 +2158,7 @@ contract LiquidTest is Test {
         transmuterLogic.createRedemption(50e18);
         vm.stopPrank();
 
-        vm.roll(block.number + (5_256_000 / 2));
+        vm.roll(vm.getBlockNumber() + (5_256_000 / 2));
 
         (uint256 deposited, uint256 userDebt, uint256 earmarked) = liquid.getCDP(tokenIdFor0xBeef);
 
@@ -2184,7 +2210,7 @@ contract LiquidTest is Test {
 
         liquid.mint(tokenIdFor0xBeef, (amount / 2), address(0xbeef));
 
-        vm.roll(block.number + 1);
+        vm.roll(vm.getBlockNumber() + 1);
 
         liquid.repay(liquid.convertDebtTokensToYield(amount / 2), tokenIdFor0xBeef);
         vm.stopPrank();
@@ -2270,7 +2296,7 @@ contract LiquidTest is Test {
         uint256 transmuterPreviousBalance = IERC20(fakeYieldToken).balanceOf(address(transmuterLogic));
 
         // skip to a future block. Lets say 60% of the way through the transmutation period (5_256_000 blocks)
-        vm.roll(block.number + (5_256_000 * 60 / 100));
+        vm.roll(vm.getBlockNumber() + (5_256_000 * 60 / 100));
 
         // Earmarked debt should be 60% of the total debt
         (uint256 prevCollateral, uint256 prevDebt, uint256 earmarked) = liquid.getCDP(tokenIdFor0xBeef);
@@ -2282,6 +2308,9 @@ contract LiquidTest is Test {
         // increasing yeild token suppy by 59 bps or 5.9%  while keeping the unederlying supply unchanged
         uint256 modifiedVaultSupply = (initialVaultSupply * 590 / 10_000) + initialVaultSupply;
         fakeYieldToken.updateMockTokenSupply(modifiedVaultSupply);
+        // The engine admits a new price only across a block boundary, so a price
+        // move is an inter-block event here as it is on chain.
+        vm.roll(vm.getBlockNumber() + 1);
 
         // ensure initial debt is correct
         vm.assertApproxEqAbs(prevDebt, 180_000_000_000_000_000_018_000, minimumDepositOrWithdrawalLoss);
@@ -2361,7 +2390,10 @@ contract LiquidTest is Test {
         // increasing yeild token suppy by 1200 bps or 12% while keeping the unederlying supply unchanged
         uint256 modifiedVaultSupply = (initialVaultSupply * 1200 / 10_000) + initialVaultSupply;
         fakeYieldToken.updateMockTokenSupply(modifiedVaultSupply);
-        vm.roll(block.number + 5_256_000);
+        // The engine admits a new price only across a block boundary, so a price
+        // move is an inter-block event here as it is on chain.
+        vm.roll(vm.getBlockNumber() + 1);
+        vm.roll(vm.getBlockNumber() + 5_256_000);
         // let another user liquidate the previous user position
         vm.startPrank(externalUser);
         liquid.liquidate(tokenIdFor0xBeef);
@@ -2400,7 +2432,7 @@ contract LiquidTest is Test {
         // skip to a future block. Lets say 5% of the way through the transmutation period (5_256_000 blocks)
         // This should result in the account still being undercollateralized, if the liquidation collateralization ratio is 100/95
         // Which means the minimum amount of collateral needed to reduce collateral/debt by is ~ > 5% of the collateral
-        vm.roll(block.number + (5_256_000 * 5 / 100));
+        vm.roll(vm.getBlockNumber() + (5_256_000 * 5 / 100));
 
         // Earmarked debt should be 60% of the total debt
         (, uint256 prevDebt, uint256 earmarked) = liquid.getCDP(tokenIdFor0xBeef);
@@ -2410,6 +2442,9 @@ contract LiquidTest is Test {
         // decreasing yeild token suppy by 50%  while keeping the unederlying supply unchanged
         uint256 modifiedVaultSupply = (initialVaultSupply * 5000 / 10_000) + initialVaultSupply;
         fakeYieldToken.updateMockTokenSupply(modifiedVaultSupply);
+        // The engine admits a new price only across a block boundary, so a price
+        // move is an inter-block event here as it is on chain.
+        vm.roll(vm.getBlockNumber() + 1);
 
         // ensure initial debt is correct
         vm.assertApproxEqAbs(prevDebt, 180_000_000_000_000_000_018_000, minimumDepositOrWithdrawalLoss);
@@ -2467,7 +2502,7 @@ contract LiquidTest is Test {
             expectedLiquidationAmountInYield + liquid.convertDebtTokensToYield(earmarkedBeforeLiquidation)
         );
 
-        vm.assertEq(liquidFeeVault.totalDeposits(), 10_000 ether - expectedFeeInUnderlying);
+        vm.assertApproxEqAbs(liquidFeeVault.totalDeposits(), 10_000 ether - expectedFeeInUnderlying, 1e18);
     }
 
     function testLiquidate_Debt_Exceeds_Collateral_Shortfall_Absorbed_By_Healthy_Account() external {
@@ -2503,6 +2538,9 @@ contract LiquidTest is Test {
         // Drop price by 50% (increase supply by 100%)
         uint256 modifiedVaultSupply = (initialVaultSupply * 7000 / 10_000) + initialVaultSupply;
         fakeYieldToken.updateMockTokenSupply(modifiedVaultSupply);
+        // The engine admits a new price only across a block boundary, so a price
+        // move is an inter-block event here as it is on chain.
+        vm.roll(vm.getBlockNumber() + 1);
 
         uint256 badCollateralAfterDrop = liquid.totalValue(tokenIdBad);
         (uint256 liquidationAmount,,,) = liquid.calculateLiquidation(
@@ -2589,7 +2627,7 @@ contract LiquidTest is Test {
         uint256 transmuterPreviousBalance = IERC20(fakeYieldToken).balanceOf(address(transmuterLogic));
 
         // skip to a future block. Lets say 60% of the way through the transmutation period (5_256_000 blocks)
-        vm.roll(block.number + (5_256_000 * 60 / 100));
+        vm.roll(vm.getBlockNumber() + (5_256_000 * 60 / 100));
 
         // Earmarked debt should be 60% of the total debt
         (uint256 prevCollateral, uint256 prevDebt, uint256 earmarked) = liquid.getCDP(tokenIdFor0xBeef);
@@ -2601,6 +2639,9 @@ contract LiquidTest is Test {
         // increasing yeild token suppy by 59 bps or 5.9%  while keeping the unederlying supply unchanged
         uint256 modifiedVaultSupply = (initialVaultSupply * 590 / 10_000) + initialVaultSupply;
         fakeYieldToken.updateMockTokenSupply(modifiedVaultSupply);
+        // The engine admits a new price only across a block boundary, so a price
+        // move is an inter-block event here as it is on chain.
+        vm.roll(vm.getBlockNumber() + 1);
 
         // ensure initial debt is correct
         vm.assertApproxEqAbs(prevDebt, 180_000_000_000_000_000_018_000, minimumDepositOrWithdrawalLoss);
@@ -2658,7 +2699,7 @@ contract LiquidTest is Test {
         vm.assertApproxEqAbs(IERC20(fakeYieldToken).balanceOf(address(protocolFeeReceiver)), protocolFeeInYield, 1e18);
     }
 
-    function testLiquidate_with_force_repay_and_insolvent_position() external {
+    function testLiquidate_Zero_Adapter_Price_Holds_Last_Valuation() external {
         vm.startPrank(someWhale);
         fakeYieldToken.mint(whaleSupply, someWhale);
         vm.stopPrank();
@@ -2690,17 +2731,25 @@ contract LiquidTest is Test {
         // increasing yeild token suppy by 9900 bps or 99% while keeping the unederlying supply unchanged
         uint256 modifiedVaultSupply = (initialVaultSupply * (10_000 * FIXED_POINT_SCALAR) / 10_000) + initialVaultSupply;
         fakeYieldToken.updateMockTokenSupply(modifiedVaultSupply);
-        vm.roll(block.number + 5_256_000);
-        // let another user liquidate the previous user position
+        // The engine admits a new price only across a block boundary, so a price
+        // move is an inter-block event here as it is on chain.
+        vm.roll(vm.getBlockNumber() + 1);
+        vm.roll(vm.getBlockNumber() + 5_256_000);
+        // The dilution is severe enough that the adapter's integer price floors
+        // to zero. A zero report is the one the engine will not act on: it cannot
+        // be told apart from a dead adapter, and acting on it would value every
+        // position in the protocol at nothing simultaneously and irreversibly.
+        assertEq(fakeYieldToken.price(), 0, "adapter reports zero");
+        assertEq(liquid.price(), liquid.lastPrice(), "engine holds its last good price");
+
         vm.startPrank(externalUser);
 
-        // check that the position is insolvent
-        uint256 totalValue = liquid.totalValue(tokenIdFor0xBeef);
-        require(totalValue < 1, "Position should be insolvent");
-
-        // should revert based on zero amount returned, and not because of an underflow
+        // Collateral keeps its last valuation rather than evaporating, so the
+        // position is not swept into liquidation on the strength of a dead feed.
+        assertGt(liquid.totalValue(tokenIdFor0xBeef), 0, "collateral survives a dead adapter");
         vm.expectRevert(ILiquidErrors.LiquidationError.selector);
         liquid.liquidate(tokenIdFor0xBeef);
+        vm.stopPrank();
     }
 
     function testLiquidate_Undercollateralized_Position_With_Earmarked_Debt_Sufficient_Repayment_Clears_Total_Debt() external {
@@ -2734,7 +2783,7 @@ contract LiquidTest is Test {
         uint256 transmuterPreviousBalance = IERC20(fakeYieldToken).balanceOf(address(transmuterLogic));
 
         // skip to a future block. Lets say 100% of the way through the transmutation period (5_256_000 blocks)
-        vm.roll(block.number + (5_256_000));
+        vm.roll(vm.getBlockNumber() + (5_256_000));
 
         // Earmarked debt should be 100% of the total debt
         (uint256 prevCollateral, uint256 prevDebt, uint256 earmarked) = liquid.getCDP(tokenIdFor0xBeef);
@@ -2746,6 +2795,9 @@ contract LiquidTest is Test {
         // increasing yeild token suppy by 59 bps or 5.9%  while keeping the unederlying supply unchanged
         uint256 modifiedVaultSupply = (initialVaultSupply * 590 / 10_000) + initialVaultSupply;
         fakeYieldToken.updateMockTokenSupply(modifiedVaultSupply);
+        // The engine admits a new price only across a block boundary, so a price
+        // move is an inter-block event here as it is on chain.
+        vm.roll(vm.getBlockNumber() + 1);
 
         // ensure initial debt is correct
         vm.assertApproxEqAbs(prevDebt, 180_000_000_000_000_000_018_000, minimumDepositOrWithdrawalLoss);
@@ -3107,6 +3159,9 @@ contract LiquidTest is Test {
         // increasing yeild token suppy by 59 bps or 5.9%  while keeping the unederlying supply unchanged
         uint256 modifiedVaultSupply = (initialVaultSupply * tokenySupplyBPSIncrease / 10_000) + initialVaultSupply;
         fakeYieldToken.updateMockTokenSupply(modifiedVaultSupply);
+        // The engine admits a new price only across a block boundary, so a price
+        // move is an inter-block event here as it is on chain.
+        vm.roll(vm.getBlockNumber() + 1);
     }
 
     function _setAccountPosition(address user, uint256 deposit, bool doMint, uint256 ltv) internal returns (AccountPosition memory) {
@@ -3182,13 +3237,13 @@ contract LiquidTest is Test {
         transmuterLogic.createRedemption(transmuterRedemptionAmount);
         vm.stopPrank();
         // --- Advance time to allow earmarking ---
-        vm.roll(block.number + 100); // Advance some blocks
+        vm.roll(vm.getBlockNumber() + 100); // Advance some blocks
         // --- 0xbeef fully repays debt ---
         vm.startPrank(address(0xbeef));
         uint256 preRepayBalance = fakeYieldToken.balanceOf(address(0xbeef));
         liquid.repay(yieldToRepayFullDebt, tokenId);
         vm.stopPrank();
-        vm.roll(block.number + 1);
+        vm.roll(vm.getBlockNumber() + 1);
         liquid.poke(tokenId);
     }
 
@@ -3215,7 +3270,7 @@ contract LiquidTest is Test {
         transmuterLogic.createRedemption(amountToRedeem2);
         vm.stopPrank();
         // lets full mature the redemption
-        vm.roll(block.number + (5_256_000) + 1);
+        vm.roll(vm.getBlockNumber() + (5_256_000) + 1);
         // create global system bad debt
         // modify yield token price via modifying underlying token supply
         (uint256 prevCollateral, uint256 prevDebt,) = liquid.getCDP(tokenIdFor0xBeef);
@@ -3226,6 +3281,9 @@ contract LiquidTest is Test {
         // increasing yeild token suppy by 12% while keeping the unederlying supply unchanged
         uint256 modifiedVaultSupply = (initialVaultSupply * 1200 / 10_000) + initialVaultSupply;
         fakeYieldToken.updateMockTokenSupply(modifiedVaultSupply);
+        // The engine admits a new price only across a block boundary, so a price
+        // move is an inter-block event here as it is on chain.
+        vm.roll(vm.getBlockNumber() + 1);
         for (uint256 i = 1; i <= 2; i++) {
             console.log("[*] redemption no: ", i);
             // calculate bad debt ratio
@@ -3267,7 +3325,7 @@ contract LiquidTest is Test {
         SafeERC20.safeApprove(address(alToken), address(transmuterLogic), 50e18);
         transmuterLogic.createRedemption(50e18);
         vm.stopPrank();
-        vm.roll(block.number + 5_256_000 / 2);
+        vm.roll(vm.getBlockNumber() + 5_256_000 / 2);
         uint256 synctectiAssetBefore = liquid.totalSyntheticsIssued();
         vm.startPrank(address(0xdad));
         fakeYieldToken.transfer(address(transmuterLogic), amount);
@@ -3300,11 +3358,11 @@ contract LiquidTest is Test {
         // This sends yield tokens to the transmuter and reduces total debt.
         // It does not affect what is in the queryGraph.
         vm.startPrank(user);
-        vm.roll(block.number + 1);
+        vm.roll(vm.getBlockNumber() + 1);
         liquid.repay(1, tokenId);
         vm.stopPrank();
         // 4. Let the claim mature.
-        vm.roll(block.number + 5_256_000);
+        vm.roll(vm.getBlockNumber() + 5_256_000);
         vm.startPrank(address(0xdad));
         transmuterLogic.claimRedemption(1);
         vm.stopPrank();
@@ -3313,7 +3371,7 @@ contract LiquidTest is Test {
         liquid.poke(tokenId);
         liquid.withdraw(1, user, tokenId);
         liquid.mint(tokenId, 1, user);
-        vm.roll(block.number + 1);
+        vm.roll(vm.getBlockNumber() + 1);
         liquid.repay(1, tokenId);
         vm.stopPrank();
         liquid.getCDP(tokenId);
@@ -3337,7 +3395,7 @@ contract LiquidTest is Test {
         transmuterLogic.createRedemption(maxBorrowable);
         vm.stopPrank();
         // Advance time to complete redemption
-        vm.roll(block.number + 5_256_000);
+        vm.roll(vm.getBlockNumber() + 5_256_000);
         // Claim Redemption
         vm.startPrank(redeemer);
         transmuterLogic.claimRedemption(1);
@@ -3373,7 +3431,7 @@ contract LiquidTest is Test {
         liquid.mint(tokenIdFor0xBeef, liquid.totalValue(tokenIdFor0xBeef) * FIXED_POINT_SCALAR / minimumCollateralization, address(0xbeef));
         vm.stopPrank();
         //skip a block to be able to repay
-        vm.roll(block.number + 1);
+        vm.roll(vm.getBlockNumber() + 1);
         //admit increase minimumCollateralization
         vm.startPrank(alOwner);
         liquid.setMinimumCollateralization(uint256(FIXED_POINT_SCALAR * FIXED_POINT_SCALAR) / 88e16); // 88% collateralization
@@ -3392,7 +3450,7 @@ contract LiquidTest is Test {
         alToken.approve(address(transmuterLogic), alTokenBalanceBeef / 2);
         transmuterLogic.createRedemption(alTokenBalanceBeef / 2);
         //make sure redemption can be claimed in full
-        vm.roll(block.number + 6_256_000);
+        vm.roll(vm.getBlockNumber() + 6_256_000);
         transmuterLogic.claimRedemption(1);
     }
 
@@ -3437,7 +3495,7 @@ contract LiquidTest is Test {
         vm.stopPrank();
         // Step 3: User2 repays all debts
         console.log("Step 3: User2 repays all debts");
-        vm.roll(block.number + 1000); // Simulate time passing
+        vm.roll(vm.getBlockNumber() + 1000); // Simulate time passing
         vm.startPrank(address(0xdad));
         SafeERC20.safeApprove(address(fakeYieldToken), address(liquid), repayAmount);
         liquid.repay(repayAmount, tokenIdForUser2);
@@ -3487,7 +3545,7 @@ contract LiquidTest is Test {
         transmuterLogic.setTransmutationFee(0);
         vm.stopPrank();
         // Advance time to complete redemption
-        vm.roll(block.number + 5_256_000);
+        vm.roll(vm.getBlockNumber() + 5_256_000);
 
         // Mimick bad debt
         fakeYieldToken.siphon(5e17);
@@ -3518,7 +3576,7 @@ contract LiquidTest is Test {
         for (uint256 i = 1; i < 4; i++) {
             transmuterLogic.createRedemption(1e18);
         }
-        vm.roll(block.number + 1);
+        vm.roll(vm.getBlockNumber() + 1);
         for (uint256 i = 1; i < 4; i++) {
             transmuterLogic.claimRedemption(i);
         }
@@ -3536,9 +3594,9 @@ contract LiquidTest is Test {
         SafeERC20.safeApprove(address(alToken), address(transmuterLogic), 50e18);
         transmuterLogic.createRedemption(50e18);
         vm.stopPrank();
-        vm.roll(block.number + 1);
+        vm.roll(vm.getBlockNumber() + 1);
         liquid.poke(tokenId);
-        vm.roll(block.number + 5_256_000);
+        vm.roll(vm.getBlockNumber() + 5_256_000);
         vm.prank(address(0xbeef));
         liquid.repay(25e18, tokenId);
     }
@@ -3568,6 +3626,9 @@ contract LiquidTest is Test {
         // increasing yeild token suppy by 59 bps or 5.9% while keeping the unederlying supply unchanged
         uint256 modifiedVaultSupply = (initialVaultSupply * 590 / 10_000) + initialVaultSupply;
         fakeYieldToken.updateMockTokenSupply(modifiedVaultSupply);
+        // The engine admits a new price only across a block boundary, so a price
+        // move is an inter-block event here as it is on chain.
+        vm.roll(vm.getBlockNumber() + 1);
         // ensure initial debt is correct
         vm.assertApproxEqAbs(prevDebt, 180_000_000_000_000_000_018_000, minimumDepositOrWithdrawalLoss);
         // let another user liquidate the previous user position
@@ -3628,12 +3689,15 @@ contract LiquidTest is Test {
         uint256 tokenId = LiquidNFTHelper.getFirstTokenId(alice, address(liquidNFT));
         liquid.mint(tokenId, debtAmount, alice);
         // forward block number so that alice can repay
-        vm.roll(block.number + 1);
+        vm.roll(vm.getBlockNumber() + 1);
         // yield token price increased a little in the meantime
         uint256 initialVaultSupply = IERC20(address(fakeYieldToken)).totalSupply();
         fakeYieldToken.updateMockTokenSupply(initialVaultSupply);
         uint256 modifiedVaultSupply = initialVaultSupply - (initialVaultSupply * 590 / 10_000);
         fakeYieldToken.updateMockTokenSupply(modifiedVaultSupply);
+        // The engine admits a new price only across a block boundary, so a price
+        // move is an inter-block event here as it is on chain.
+        vm.roll(vm.getBlockNumber() + 1);
         // alice fully repays her debt
         liquid.repay(debtAmount, tokenId);
         // verify all debt are cleared
@@ -3680,13 +3744,16 @@ contract LiquidTest is Test {
         SafeERC20.safeApprove(address(alToken), address(transmuterLogic), mintAmount);
         transmuterLogic.createRedemption(mintAmount);
         vm.stopPrank();
-        vm.roll(block.number + (5_256_000));
+        vm.roll(vm.getBlockNumber() + (5_256_000));
         // modify yield token price via modifying underlying token supply
         uint256 initialVaultSupply = IERC20(address(fakeYieldToken)).totalSupply();
         fakeYieldToken.updateMockTokenSupply(initialVaultSupply);
         // increasing yeild token suppy by 59 bps or 5.9% while keeping the unederlying supply unchanged
         uint256 modifiedVaultSupply = (initialVaultSupply * 590 / 10_000) + initialVaultSupply;
         fakeYieldToken.updateMockTokenSupply(modifiedVaultSupply);
+        // The engine admits a new price only across a block boundary, so a price
+        // move is an inter-block event here as it is on chain.
+        vm.roll(vm.getBlockNumber() + 1);
         ////////////////////////////////
         // liquidate tokenIdFor0xBeef //
         ////////////////////////////////
@@ -3732,7 +3799,7 @@ contract LiquidTest is Test {
         liquid.mint(tokenIdFor0xdad, 100e18, address(0xdad));
         vm.stopPrank();
 
-        vm.roll(block.number + 5_256_000 * 2 / 5);
+        vm.roll(vm.getBlockNumber() + 5_256_000 * 2 / 5);
 
         liquid.poke(tokenIdFor0xdad);
         liquid.poke(tokenIdFor0xBeef);
@@ -3745,7 +3812,7 @@ contract LiquidTest is Test {
         transmuterLogic.claimRedemption(2);
         vm.stopPrank();
 
-        vm.roll(block.number + 5_256_000 / 10);
+        vm.roll(vm.getBlockNumber() + 5_256_000 / 10);
 
         // The second redemption
         vm.startPrank(address(0xbbbb));

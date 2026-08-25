@@ -137,8 +137,8 @@ classifier before the curator approves it for allocation.
 | WLUX            | `0x4888E4a2Ee0F03051c72D2BD3ACf755eD3498B3E` |
 | LBTC            | `0x1E48D32a4F5e9f08DB9aE4959163300FaF8A6C8e` |
 
-Network IDs supported by [`script/DeployLux.s.sol`](script/DeployLux.s.sol):
-Lux mainnet/testnet/devnet, plus local dev `1337`/`31337`.
+Brand L1s deploy through [`script/DeployBrandL1.s.sol`](script/DeployBrandL1.s.sol),
+one market per run, on Lux mainnet/testnet/devnet and local dev `1337`/`31337`.
 
 ---
 
@@ -295,11 +295,11 @@ src/
   libraries/     StakingGraph, PositionDecay, FixedPointMath, SafeCast, …
   interfaces/    ILiquid*, ITokenAdapter, IWETH, IYieldToken, …
   utils/         PermissionedProxy, Whitelist, ZeroXSwapVerifier
-  external/      AlEth (canonical synthetic), interfaces
+  external/      interfaces
   test/          unit + fuzz + integration
 script/
-  DeployLux.s.sol     multi-network (mainnet/testnet/devnet + Liquidity IDs)
-  DeployMainnet.s.sol Lux mainnet, canonical LETH/WLUX/LBTC
+  DeployBrandL1.s.sol any brand L1, one like-kind market per run
+  DeployMainnet.s.sol Lux mainnet ETH market, canonical LETH
   DeployLocal.s.sol   end-to-end local stack on Anvil/luxd
   TestFlow.s.sol      smoke test against a deployed local stack
 lib/

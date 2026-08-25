@@ -44,7 +44,7 @@ verbosity = 2
 ffi = true
 
 [profile.default.optimizer_details]
-yul = false
+yul = true
 
 remappings = [
   "forge-std=lib/forge-std/src",

@@ -40,9 +40,14 @@ contract InvariantBaseTest is InvariantsTest {
         fakeUnderlyingToken.mint(onBehalf, amount);
         vm.startPrank(onBehalf);
         fakeUnderlyingToken.approve(address(fakeYieldToken), amount);
-        fakeYieldToken.mint(amount, onBehalf);
-
-        liquid.deposit(amount, onBehalf, tokenId);
+        // Deposit the shares the vault actually issued. They equal the underlying
+        // amount only at par, and the point of these runs is that the price moves.
+        uint256 shares = fakeYieldToken.mint(amount, onBehalf);
+        uint256 cap = liquid.depositCap();
+        uint256 held = liquid.getTotalDeposited();
+        uint256 room = cap > held ? cap - held : 0;
+        if (shares > room) shares = room;
+        if (shares > 0) liquid.deposit(shares, onBehalf, tokenId);
         vm.stopPrank();
     }
 
@@ -60,9 +65,8 @@ contract InvariantBaseTest is InvariantsTest {
         fakeUnderlyingToken.mint(onBehalf, amount);
         vm.startPrank(onBehalf);
         fakeUnderlyingToken.approve(address(fakeYieldToken), amount);
-        fakeYieldToken.mint(amount, onBehalf);
-
-        liquid.repay(amount, tokenId);
+        uint256 shares = fakeYieldToken.mint(amount, onBehalf);
+        if (shares > 0) liquid.repay(shares, tokenId);
         vm.stopPrank();
     }
 
@@ -72,15 +76,17 @@ contract InvariantBaseTest is InvariantsTest {
     }
 
     function _stake(uint256 amount, address onBehalf) internal logCall("stake") {
+        // Stake synthetic the account actually borrowed. Minting it here instead
+        // would let locked stake grow without any debt behind it, and the
+        // transmuter's whole claim on the protocol is that debt.
         vm.startPrank(onBehalf);
-        alToken.mint(onBehalf, amount);
         alToken.approve(address(transmuterLogic), amount);
         transmuterLogic.createRedemption(amount);
         vm.stopPrank();
     }
 
     function _claim(uint256 amount) internal logCall("stake") {
-        vm.roll(block.number + 10);
+        vm.roll(vm.getBlockNumber() + 10);
         vm.startPrank(address(transmuterLogic));
         liquid.redeem(amount);
         vm.stopPrank();
@@ -89,6 +95,7 @@ contract InvariantBaseTest is InvariantsTest {
     /* HANDLERS */
 
     function depositCollateral(uint256 amount, uint256 onBehalfSeed) external {
+        if (liquid.inBadDebt()) return;
         address onBehalf = _randomDepositor(targetSenders(), onBehalfSeed);
         if (onBehalf == address(0)) return;
 
@@ -111,26 +118,56 @@ contract InvariantBaseTest is InvariantsTest {
         if (onBehalf == address(0)) return;
 
         uint256 tokenId = LiquidNFTHelper.getFirstTokenId(onBehalf, address(liquidNFT));
+        if (tokenId == 0) return;
 
+        liquid.poke(tokenId);
         (uint256 collat, uint256 debt,) = liquid.getCDP(tokenId);
-        uint256 debtToCollateral = liquid.convertDebtTokensToYield(debt);
-        uint256 maxWithdraw = (collat * FIXED_POINT_SCALAR / liquid.minimumCollateralization()) > debtToCollateral
-            ? (collat * FIXED_POINT_SCALAR / liquid.minimumCollateralization()) - debtToCollateral
-            : 0;
+        // Mirror the engine's own ceiling exactly: it converts the debt to yield
+        // first and scales by the bar second. Scaling first and converting after
+        // is a different number under integer division, and the difference is
+        // what the engine rejects.
+        uint256 keep = liquid.convertDebtTokensToYield(debt) * liquid.minimumCollateralization() / FIXED_POINT_SCALAR;
+        uint256 maxWithdraw = collat > keep ? collat - keep : 0;
+        // Stay just inside the bar rather than exactly on it. Reconstructing the
+        // engine's rounding to the last wei only tests the reconstruction; the
+        // withdrawals themselves are what the invariants care about.
+        maxWithdraw = maxWithdraw * 99 / 100;
 
         amount = bound(amount, 0, maxWithdraw);
         if (amount == 0) return;
+
+        // The engine admits a withdrawal on one formula and then validates the
+        // result on another, converting in opposite directions; at dust amounts
+        // the two disagree by a wei. Check the post-condition the engine
+        // actually enforces, on the state the withdrawal would leave behind.
+        if (debt > 0) {
+            uint256 remaining = liquid.convertYieldTokensToDebt(collat - amount) * FIXED_POINT_SCALAR / debt;
+            if (remaining < liquid.minimumCollateralization()) return;
+        }
 
         _withdraw(tokenId, amount, onBehalf);
     }
 
     function borrowCollateral(uint256 amount, uint256 onBehalfSeed) external {
+        if (liquid.inBadDebt()) return;
         address onBehalf = _randomMinter(targetSenders(), onBehalfSeed);
         if (onBehalf == address(0)) return;
 
         uint256 tokenId = LiquidNFTHelper.getFirstTokenId(onBehalf, address(liquidNFT));
+        if (tokenId == 0) return;
 
-        amount = bound(amount, 0, liquid.getMaxBorrowable(tokenId));
+        liquid.poke(tokenId);
+        // The borrow ceiling and the collateralization check round in different
+        // places, so drawing to the last wei of the ceiling can land a wei the
+        // wrong side of the bar. Stay just inside it -- a position at 89% of the
+        // limit is still fully levered for anything these runs are testing.
+        uint256 ceiling = liquid.getMaxBorrowable(tokenId) * 99 / 100;
+        // Keep the book in the same range the deposits are drawn from. Left
+        // unbounded, borrowing against a book compounded over a campaign runs
+        // the debt into magnitudes no market reaches and the arithmetic stops
+        // describing anything real.
+        if (ceiling > MAX_TEST_VALUE) ceiling = MAX_TEST_VALUE;
+        amount = bound(amount, 0, ceiling);
         if (amount == 0) return;
 
         _borrow(tokenId, amount, onBehalf);
@@ -140,10 +177,20 @@ contract InvariantBaseTest is InvariantsTest {
         address onBehalf = _randomRepayer(targetSenders(), onBehalfSeed);
         if (onBehalf == address(0)) return;
 
+        uint256 tokenId = LiquidNFTHelper.getFirstTokenId(onBehalf, address(liquidNFT));
+        if (tokenId == 0) return;
+
+        // Debt cannot be retired in the block it was drawn -- the flash-loan
+        // guard. A borrower waits a block; so does the handler. Waiting accrues
+        // earmarking, so sync before reading what is left to repay.
+        vm.roll(vm.getBlockNumber() + 1);
+        liquid.poke(tokenId);
+
+        (, uint256 debt,) = liquid.getCDP(tokenId);
+        if (debt == 0) return;
+
         amount = bound(amount, 0, MAX_TEST_VALUE);
         if (amount == 0) return;
-
-        uint256 tokenId = LiquidNFTHelper.getFirstTokenId(onBehalf, address(liquidNFT));
 
         _repay(tokenId, amount, onBehalf);
     }
@@ -152,10 +199,29 @@ contract InvariantBaseTest is InvariantsTest {
         address onBehalf = _randomBurner(targetSenders(), onBehalfSeed);
         if (onBehalf == address(0)) return;
 
-        amount = bound(amount, 0, MAX_TEST_VALUE);
-        if (amount == 0) return;
-
         uint256 tokenId = LiquidNFTHelper.getFirstTokenId(onBehalf, address(liquidNFT));
+        if (tokenId == 0) return;
+
+        vm.roll(vm.getBlockNumber() + 1);
+        liquid.poke(tokenId);
+
+        (, uint256 debt, uint256 earmarked) = liquid.getCDP(tokenId);
+        if (debt <= earmarked) return; // only unearmarked debt can be burned
+
+        uint256 ceiling = debt - earmarked;
+
+        // Enough synthetic must remain outstanding to settle the transmuter.
+        uint256 locked = transmuterLogic.totalLocked();
+        uint256 issued = liquid.totalSyntheticsIssued();
+        uint256 burnable = issued > locked ? issued - locked : 0;
+        if (burnable < ceiling) ceiling = burnable;
+
+        // And the caller can only burn what it holds.
+        uint256 held = alToken.balanceOf(onBehalf);
+        if (held < ceiling) ceiling = held;
+
+        amount = bound(amount, 0, ceiling);
+        if (amount == 0) return;
 
         _burn(tokenId, amount, onBehalf);
     }
@@ -164,12 +230,21 @@ contract InvariantBaseTest is InvariantsTest {
         address onBehalf = _randomDepositor(targetSenders(), onBehalfSeed);
         if (onBehalf == address(0)) return;
 
-        // TODO: Fix after burn discussion
-        // uint256 totalLocked = transmuterLogic.totalLocked() > fakeYieldToken.balanceOf(address(transmuterLogic))
-        //     ? transmuterLogic.totalLocked() - fakeYieldToken.balanceOf(address(transmuterLogic))
-        //    : 0;
+        // A redemption can only be staked against synthetic that is issued and
+        // not already locked in another position. Bounding by total debt is a
+        // different quantity and overshoots it.
+        uint256 locked = transmuterLogic.totalLocked();
+        uint256 issued = liquid.totalSyntheticsIssued();
+        uint256 room = issued > locked ? issued - locked : 0;
 
-        amount = bound(amount, 0, liquid.totalDebt());
+        uint256 debtRoom = liquid.totalDebt() > locked ? liquid.totalDebt() - locked : 0;
+        if (debtRoom < room) room = debtRoom;
+        if (room > MAX_TEST_VALUE) room = MAX_TEST_VALUE; // graph delta packing
+
+        uint256 balance = alToken.balanceOf(onBehalf);
+        if (balance < room) room = balance;
+
+        amount = bound(amount, 0, room);
         if (amount == 0) return;
 
         _stake(amount, onBehalf);
@@ -181,5 +256,120 @@ contract InvariantBaseTest is InvariantsTest {
         // // if (amount > )
 
         // _claim(amount);
+    }
+
+    /* RISK HANDLERS */
+
+    // What the risk handlers actually achieved. A handler that always reverts
+    // and a handler that works look identical from the outside once the revert
+    // is caught, so the run counts its own effect and
+    // {test_handlers_can_drive_a_liquidation} holds it to it. Without that the
+    // suite can pass while proving nothing -- which is how it passed over three
+    // criticals.
+    uint256 public liquidations;
+    uint256 public priceMoves;
+
+    // Everything above moves value between accounts at a fixed price. Nothing
+    // above can make a position unhealthy, so nothing above ever reaches the
+    // liquidation path -- which is why a suite of eight handlers held over a
+    // protocol whose risk engine did not work. These four let collateral fall
+    // and let someone act on it.
+
+    /// Reprice the collateral. The adapter reports a new share value; the engine
+    /// admits as much of it as the deviation cap allows. Both directions, because
+    /// a rising price must not break the accounting either.
+    function movePrice(uint256 pct) external logCall("movePrice") {
+        // Down to a tenth, up to double. A halving alone cannot put a position
+        // drawn to the 90% bar under the liquidation bound, so a range that
+        // stops at 0.5x is a range in which nothing is ever liquidatable.
+        pct = bound(pct, 10, 200);
+        uint256 supply = fakeYieldToken.mockTokenSupply();
+        if (supply == 0) return;
+
+        // Price is underlying-per-share, so supply moves inversely to price.
+        uint256 newSupply = supply * 100 / pct;
+        if (newSupply == 0) return;
+
+        fakeYieldToken.updateMockTokenSupply(newSupply);
+        priceMoves++;
+        // A price move is an inter-block event, here as on chain.
+        vm.roll(vm.getBlockNumber() + 1);
+    }
+
+    /// A real loss in the strategy behind the yield token: underlying leaves the
+    /// vault and never comes back. Unlike movePrice this destroys value rather
+    /// than restating it, so it can push the whole protocol into bad debt.
+    function strategyLoss(uint256 pct) external logCall("strategyLoss") {
+        pct = bound(pct, 1, 30); // lose 1% to 30% of the vault's underlying
+        uint256 held = fakeUnderlyingToken.balanceOf(address(fakeYieldToken));
+        uint256 loss = held * pct / 100;
+        if (loss == 0) return;
+
+        fakeYieldToken.siphon(loss);
+        priceMoves++;
+        vm.roll(vm.getBlockNumber() + 1);
+    }
+
+    /// Liquidate one position. A healthy position reverts, which is the correct
+    /// answer and not a finding, so the revert is caught rather than bounded
+    /// away -- bounding it away is how a handler ends up never exercising the
+    /// path it exists for.
+    function liquidatePosition(uint256) external logCall("liquidate") {
+        uint256 tokenId = _weakestPosition();
+        if (tokenId == 0) return;
+
+        try liquid.liquidate(tokenId) returns (uint256 seized, uint256, uint256) {
+            if (seized > 0) liquidations++;
+        } catch {}
+    }
+
+    /// The position closest to insolvency, or 0 if none is under the bound.
+    ///
+    /// Picking a victim at random is what made this handler ornamental: with
+    /// eight senders and most positions healthy, every call landed on a solvent
+    /// position and {LiquidationError} was the honest answer each time. A
+    /// liquidator does not pick at random -- it watches for the position that
+    /// has fallen through the bound and takes that one.
+    function _weakestPosition() internal view returns (uint256 worst) {
+        address[] memory users = targetSenders();
+        uint256 lowest = type(uint256).max;
+
+        for (uint256 i; i < users.length; ++i) {
+            uint256 tokenId = LiquidNFTHelper.getFirstTokenId(users[i], address(liquidNFT));
+            if (tokenId == 0) continue;
+
+            (, uint256 debt,) = liquid.getCDP(tokenId);
+            if (debt == 0) continue;
+
+            uint256 ratio = liquid.totalValue(tokenId) * FIXED_POINT_SCALAR / debt;
+            if (ratio < liquid.collateralizationLowerBound() && ratio < lowest) {
+                lowest = ratio;
+                worst = tokenId;
+            }
+        }
+    }
+
+    /// Liquidate every position at once. Exercises the batch path's own
+    /// accounting, which does not share a code path with the single one.
+    function batchLiquidatePositions(uint256 seed) external logCall("batchLiquidate") {
+        address[] memory users = targetSenders();
+        if (users.length == 0) return;
+
+        uint256 offset = seed % users.length;
+        uint256[] memory ids = new uint256[](users.length);
+        uint256 n;
+        for (uint256 i; i < users.length; ++i) {
+            uint256 tokenId = LiquidNFTHelper.getFirstTokenId(users[(i + offset) % users.length], address(liquidNFT));
+            if (tokenId != 0) ids[n++] = tokenId;
+        }
+        if (n == 0) return;
+
+        assembly {
+            mstore(ids, n)
+        }
+
+        try liquid.batchLiquidate(ids) returns (uint256 seized, uint256, uint256) {
+            if (seized > 0) liquidations++;
+        } catch {}
     }
 }

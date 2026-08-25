@@ -64,8 +64,8 @@ forge test --match-path "src/test/Liquid.t.sol" -v  # Run specific test
 - LiquidETHVault testDepositWETH -- mock WETH incomplete
 
 ## Scripts
-- `script/DeployLux.s.sol` -- Multi-network deploy (mainnet/testnet/devnet)
-- `script/DeployMainnet.s.sol` -- Lux mainnet ETH deployment with canonical addresses
+- `script/DeployBrandL1.s.sol` -- Any brand L1, one like-kind market per run
+- `script/DeployMainnet.s.sol` -- Lux mainnet ETH market, canonical LETH pinned
 - `script/DeployLocal.s.sol` -- Full local stack (Anvil/luxd)
 - `script/TestFlow.s.sol` -- E2E smoke flow against a deployed local stack
 
@@ -88,7 +88,7 @@ src/
   test/           -- All test files
   utils/          -- PermissionedProxy, Whitelist, ZeroXSwapVerifier
 script/
-  DeployLux.s.sol, DeployMainnet.s.sol, DeployLocal.s.sol, TestFlow.s.sol
+  DeployBrandL1.s.sol, DeployMainnet.s.sol, DeployLocal.s.sol, TestFlow.s.sol
 lib/
   forge-std, openzeppelin-contracts, openzeppelin-contracts-upgradeable
   vault-v2, permit2, solmate, chainlink-brownie-contracts, halmos-cheatcodes

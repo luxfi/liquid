@@ -33,6 +33,12 @@ contract TestYieldToken is ITestYieldToken, ERC20 {
         return _shareValue(10 ** _decimals);
     }
 
+    /// @dev This token is its own adapter in the test harness, so the yield
+    ///      token the adapter reports is itself.
+    function token() external view returns (address) {
+        return address(this);
+    }
+
     function setSlippage(uint256 _slippage) external {
         slippage = _slippage;
     }

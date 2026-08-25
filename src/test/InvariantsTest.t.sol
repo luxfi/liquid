@@ -152,6 +152,7 @@ contract InvariantsTest is Test {
             collateralizationLowerBound: 1_052_631_578_950_000_000, // 1.05 collateralization
             globalMinimumCollateralization: 1_111_111_111_111_111_111, // 1.1
             tokenAdapter: address(fakeYieldToken),
+            maxPriceDeviation: 10_000,
             transmuter: address(transmuterLogic),
             protocolFee: 0,
             protocolFeeReceiver: address(10),
@@ -219,7 +220,7 @@ contract InvariantsTest is Test {
 
         console2.log("block number ->", block.number + blocks);
 
-        vm.roll(block.number + blocks);
+        vm.roll(vm.getBlockNumber() + blocks);
     }
 
     /* UTILS */
@@ -246,7 +247,7 @@ contract InvariantsTest is Test {
             }
         }
 
-        return _randomNonZero(users, seed);
+        return _randomNonZero(candidates, seed);
     }
 
     function _randomMinter(address[] memory users, uint256 seed) internal view returns (address) {
@@ -259,7 +260,7 @@ contract InvariantsTest is Test {
 
             uint256 borrowable;
 
-            if (tokenId != 0) liquid.getMaxBorrowable(tokenId);
+            if (tokenId != 0) borrowable = liquid.getMaxBorrowable(tokenId);
 
             if (borrowable > 0) {
                 candidates[i] = user;

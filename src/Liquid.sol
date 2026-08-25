@@ -117,6 +117,15 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
     /// @inheritdoc ILiquidState
     mapping(address => bool) public guardians;
 
+    /// @inheritdoc ILiquidState
+    uint256 public maxPriceDeviation;
+
+    /// @inheritdoc ILiquidState
+    uint256 public lastPrice;
+
+    /// @inheritdoc ILiquidState
+    uint256 public lastPriceBlock;
+
     /// @dev UQ128.128 representation of 1.0
     uint256 private constant ONE_Q128 = uint256(1) << 128;
 
@@ -174,10 +183,21 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
         _checkArgument(params.protocolFee <= BPS);
         _checkArgument(params.liquidatorFee <= BPS);
         _checkArgument(params.repaymentFee <= BPS);
+        _checkCollateralizationOrder(params.minimumCollateralization, params.globalMinimumCollateralization, params.collateralizationLowerBound);
+
+        // The engine values collateral against debt with a decimals scalar and
+        // nothing else -- see {normalizeUnderlyingTokensToDebt}. That is only
+        // sound when the debt token and the underlying token denominate the
+        // same asset, so a market is like-kind by construction: bridged ETH
+        // collateral against LETH debt, bridged BTC against LBTC. There is no
+        // cross-asset price source here and none is implied.
+        uint8 debtDecimals = TokenUtils.expectDecimals(params.debtToken);
+        uint8 underlyingDecimals = TokenUtils.expectDecimals(params.underlyingToken);
+        _checkArgument(debtDecimals >= underlyingDecimals);
 
         debtToken = params.debtToken;
         underlyingToken = params.underlyingToken;
-        underlyingConversionFactor = 10 ** (TokenUtils.expectDecimals(params.debtToken) - TokenUtils.expectDecimals(params.underlyingToken));
+        underlyingConversionFactor = 10 ** (debtDecimals - underlyingDecimals);
         yieldToken = params.yieldToken;
         depositCap = params.depositCap;
         blocksPerYear = params.blocksPerYear;
@@ -185,7 +205,6 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
         globalMinimumCollateralization = params.globalMinimumCollateralization;
         collateralizationLowerBound = params.collateralizationLowerBound;
         admin = params.admin;
-        tokenAdapter = params.tokenAdapter;
         transmuter = params.transmuter;
         protocolFee = params.protocolFee;
         protocolFeeReceiver = params.protocolFeeReceiver;
@@ -193,6 +212,12 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
         repaymentFee = params.repaymentFee;
         lastEarmarkBlock = block.number;
         lastRedemptionBlock = block.number;
+
+        maxPriceDeviation = params.maxPriceDeviation;
+        _bindTokenAdapter(params.tokenAdapter);
+        lastPrice = ITokenAdapter(params.tokenAdapter).price();
+        _checkArgument(lastPrice > 0);
+        lastPriceBlock = block.number;
     }
 
     /// @notice Emitted when a new Position NFT is minted.
@@ -284,10 +309,22 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
 
     /// @inheritdoc ILiquidAdminActions
     function setTokenAdapter(address value) external onlyAdmin {
-        _checkArgument(value != address(0));
+        _bindTokenAdapter(value);
 
-        tokenAdapter = value;
+        // A swap is a price update like any other: the new adapter's price is
+        // admitted through the same per-block clamp, so replacing the adapter
+        // cannot teleport collateral value in either direction.
+        _refreshPrice();
+
         emit TokenAdapterUpdated(value);
+    }
+
+    /// @inheritdoc ILiquidAdminActions
+    function setMaxPriceDeviation(uint256 value) external onlyAdmin {
+        _checkArgument(value <= BPS);
+
+        maxPriceDeviation = value;
+        emit MaxPriceDeviationUpdated(value);
     }
 
     /// @inheritdoc ILiquidAdminActions
@@ -300,7 +337,7 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
 
     /// @inheritdoc ILiquidAdminActions
     function setMinimumCollateralization(uint256 value) external onlyAdmin {
-        _checkArgument(value >= FIXED_POINT_SCALAR);
+        _checkCollateralizationOrder(value, globalMinimumCollateralization, collateralizationLowerBound);
         minimumCollateralization = value;
 
         emit MinimumCollateralizationUpdated(value);
@@ -308,15 +345,14 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
 
     /// @inheritdoc ILiquidAdminActions
     function setGlobalMinimumCollateralization(uint256 value) external onlyAdmin {
-        _checkArgument(value >= minimumCollateralization);
+        _checkCollateralizationOrder(minimumCollateralization, value, collateralizationLowerBound);
         globalMinimumCollateralization = value;
         emit GlobalMinimumCollateralizationUpdated(value);
     }
 
     /// @inheritdoc ILiquidAdminActions
     function setCollateralizationLowerBound(uint256 value) external onlyAdmin {
-        _checkArgument(value <= minimumCollateralization);
-        _checkArgument(value >= FIXED_POINT_SCALAR);
+        _checkCollateralizationOrder(minimumCollateralization, globalMinimumCollateralization, value);
         collateralizationLowerBound = value;
         emit CollateralizationLowerBoundUpdated(value);
     }
@@ -348,7 +384,11 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
     function getMaxBorrowable(uint256 tokenId) external view returns (uint256) {
         (uint256 debt,, uint256 collateral) = _calculateUnrealizedDebt(tokenId);
         uint256 debtValueOfCollateral = convertYieldTokensToDebt(collateral);
-        return (debtValueOfCollateral * FIXED_POINT_SCALAR / minimumCollateralization) - debt;
+        uint256 limit = debtValueOfCollateral * FIXED_POINT_SCALAR / minimumCollateralization;
+        // A position already past the mint bar can borrow nothing. Saturate at
+        // zero rather than underflowing, so callers can ask the question of any
+        // position rather than only the healthy ones.
+        return limit > debt ? limit - debt : 0;
     }
 
     /// @inheritdoc ILiquidState
@@ -376,6 +416,8 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
         _checkArgument(amount > 0);
         _checkState(!depositsPaused);
         _checkState(_yieldTokensDeposited + amount <= depositCap);
+        _refreshPrice();
+        _checkState(!_inBadDebt());
 
         // Only mint a new position if the id is 0
         if (tokenId == 0) {
@@ -402,6 +444,7 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
         _checkForValidAccountId(tokenId);
         _checkArgument(amount > 0);
         _checkAccountOwnership(ILiquidPosition(liquidPositionNFT).ownerOf(tokenId), msg.sender);
+        _refreshPrice();
         _earmark();
 
         _sync(tokenId);
@@ -431,6 +474,8 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
         _checkState(!loansPaused);
         _checkAccountOwnership(ILiquidPosition(liquidPositionNFT).ownerOf(tokenId), msg.sender);
 
+        _refreshPrice();
+
         // Query transmuter and earmark global debt
         _earmark();
 
@@ -450,6 +495,8 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
         // Preemptively try and decrease the minting allowance. This will save gas when the allowance is not sufficient.
         _decreaseMintAllowance(tokenId, msg.sender, amount);
 
+        _refreshPrice();
+
         // Query transmuter and earmark global debt
         _earmark();
 
@@ -467,6 +514,8 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
         // Check that the user did not mint in this same block
         // This is used to prevent flash loan repayments
         if (block.number == _accounts[recipientId].lastMintBlock) revert CannotRepayOnMintBlock();
+
+        _refreshPrice();
 
         // Query transmuter and earmark global debt
         _earmark();
@@ -511,6 +560,8 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
         // Check that the user did not mint in this same block
         // This is used to prevent flash loan repayments
         if (block.number == account.lastMintBlock) revert CannotRepayOnMintBlock();
+
+        _refreshPrice();
 
         // Query transmuter and earmark global debt
         _earmark();
@@ -559,7 +610,6 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
         _checkForValidAccountId(accountId);
         (yieldAmount, feeInYield, feeInUnderlying) = _liquidate(accountId);
         if (yieldAmount > 0) {
-            emit Liquidated(accountId, msg.sender, yieldAmount, feeInYield, feeInUnderlying);
             return (yieldAmount, feeInYield, feeInUnderlying);
         } else {
             // no liquidation amount returned, so no liquidation happened
@@ -598,6 +648,7 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
 
     /// @inheritdoc ILiquidActions
     function redeem(uint256 amount) external onlyTransmuter {
+        _refreshPrice();
         _earmark();
 
         uint256 liveEarmarked = cumulativeEarmarked;
@@ -664,6 +715,7 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
     /// @inheritdoc ILiquidActions
     function poke(uint256 tokenId) external nonReentrant {
         _checkForValidAccountId(tokenId);
+        _refreshPrice();
         _earmark();
         _sync(tokenId);
     }
@@ -703,16 +755,94 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
     /// @inheritdoc ILiquidState
     function convertYieldTokensToUnderlying(uint256 amount) public view returns (uint256) {
         uint8 decimals = TokenUtils.expectDecimals(yieldToken);
-        return (amount * ITokenAdapter(tokenAdapter).price()) / 10 ** decimals;
+        return (amount * price()) / 10 ** decimals;
     }
 
     /// @inheritdoc ILiquidState
     function convertUnderlyingTokensToYield(uint256 amount) public view returns (uint256) {
         uint8 decimals = TokenUtils.expectDecimals(yieldToken);
-        if (ITokenAdapter(tokenAdapter).price() == 0) {
+        uint256 p = price();
+        if (p == 0) {
             return 0;
         }
-        return amount * 10 ** decimals / ITokenAdapter(tokenAdapter).price();
+        return amount * 10 ** decimals / p;
+    }
+
+    /// @inheritdoc ILiquidState
+    ///
+    /// @dev The price the engine values yield tokens at right now: the adapter's
+    ///      report, admitted only as far as the rate limit allows from the last
+    ///      committed anchor. Views and state-changing calls read the same
+    ///      function, so a quote taken before a transaction is the price that
+    ///      transaction will actually use.
+    function price() public view returns (uint256) {
+        uint256 elapsed = block.number - lastPriceBlock;
+        uint256 anchor = lastPrice;
+
+        // No blocks elapsed means no movement, whatever the adapter now says.
+        // This is what denies a borrower a mint against a price that existed
+        // only for the length of their own transaction.
+        if (elapsed == 0) return anchor;
+
+        uint256 reported = ITokenAdapter(tokenAdapter).price();
+
+        // A dead adapter leaves the last good price standing rather than marking
+        // every position in the protocol worthless at once.
+        if (reported == 0) return anchor;
+
+        uint256 bps = maxPriceDeviation * elapsed;
+        if (bps > BPS) bps = BPS;
+        uint256 room = anchor * bps / BPS;
+
+        if (reported > anchor + room) return anchor + room;
+        if (reported + room < anchor) return anchor - room;
+        return reported;
+    }
+
+    /// @dev Points the engine at `adapter` after checking it describes this market.
+    ///
+    /// An adapter reports the price of one specific pair. An adapter naming a
+    /// different yield or underlying token is pricing some other asset, and
+    /// every valuation drawn from it is meaningless -- which is the whole of
+    /// the engine's collateral accounting. Checked on initialization and again
+    /// on every swap, so the admin cannot point a live market at a foreign feed.
+    function _bindTokenAdapter(address adapter) internal {
+        _checkArgument(adapter != address(0));
+        _checkArgument(ITokenAdapter(adapter).token() == yieldToken);
+        _checkArgument(ITokenAdapter(adapter).underlyingToken() == underlyingToken);
+
+        tokenAdapter = adapter;
+    }
+
+    /// @dev Commits the current vetted price as the new anchor.
+    ///
+    /// The engine values collateral at a price it has admitted, never at
+    /// whatever the adapter happens to report mid-transaction. {price} decides
+    /// how much of the adapter's report is admissible; this is what makes that
+    /// decision permanent, so the rate limit on the next move is measured from
+    /// where the price actually got to rather than from where it started.
+    ///
+    /// Called at the head of every operation that moves value, so the anchor
+    /// tracks an active market closely and a dormant one loosens gradually --
+    /// with no recent anchor there is nothing to rate-limit against, and the
+    /// adapter is believed.
+    ///
+    /// Out-of-band reports are clamped, never rejected. Reverting here would
+    /// stop deposits, repayments and liquidations at exactly the moment the
+    /// price is moving, which is when the engine most needs to keep running.
+    function _refreshPrice() internal {
+        if (block.number == lastPriceBlock) return;
+
+        uint256 accepted = price();
+        if (accepted == lastPrice) {
+            lastPriceBlock = block.number;
+            return;
+        }
+
+        lastPrice = accepted;
+        lastPriceBlock = block.number;
+
+        emit PriceUpdated(accepted, ITokenAdapter(tokenAdapter).price());
     }
 
     /// @inheritdoc ILiquidState
@@ -725,11 +855,31 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
         return amount / underlyingConversionFactor;
     }
 
+    /// @inheritdoc ILiquidState
+    function inBadDebt() external view returns (bool) {
+        return _inBadDebt();
+    }
+
+    /// @dev True when the collateral the protocol holds no longer covers the
+    ///      debt it has already issued.
+    ///
+    /// Issuing more debt against a shortfall, or accepting a new depositor into
+    /// one, hands the existing hole to whoever arrives next. Both are refused
+    /// until liquidations or repayments close it; repay, burn and liquidate stay
+    /// open throughout, so the position that closes the hole is always reachable.
+    function _inBadDebt() internal view returns (bool) {
+        uint256 debt = totalDebt;
+        if (debt == 0) return false;
+        return normalizeUnderlyingTokensToDebt(_getTotalUnderlyingValue()) < debt;
+    }
+
     /// @dev Mints debt tokens to `recipient` using the account owned by `tokenId`.
     /// @param tokenId     The tokenId of the account to mint from.
     /// @param amount    The amount to mint.
     /// @param recipient The recipient of the minted debt tokens.
     function _mint(uint256 tokenId, uint256 amount, address recipient) internal {
+        _checkState(!_inBadDebt());
+
         _addDebt(tokenId, amount);
 
         totalSyntheticsIssued += amount;
@@ -771,13 +921,26 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
 
         uint256 credit = amount > debt ? debt : amount;
         uint256 creditToYield = convertDebtTokensToYield(credit);
-        _subDebt(accountId, credit);
+
+        // The account can only retire as much debt as its collateral actually
+        // pays for. Clamp the credit to the collateral first, then derive the
+        // debt relief from the clamped amount -- crediting the full amount while
+        // transferring less leaves the difference as synthetic backed by nothing.
+        if (creditToYield > account.collateralBalance) {
+            creditToYield = account.collateralBalance;
+            credit = convertYieldTokensToDebt(creditToYield);
+            if (credit > debt) credit = debt;
+        }
 
         // Repay debt from earmarked amount of debt first
         uint256 earmarkToRemove = credit > account.earmarked ? account.earmarked : credit;
         account.earmarked -= earmarkToRemove;
 
-        creditToYield = creditToYield > account.collateralBalance ? account.collateralBalance : creditToYield;
+        uint256 earmarkPaidGlobal = cumulativeEarmarked > earmarkToRemove ? earmarkToRemove : cumulativeEarmarked;
+        cumulativeEarmarked -= earmarkPaidGlobal;
+
+        _subDebt(accountId, credit);
+
         account.collateralBalance -= creditToYield;
 
         uint256 protocolFeeTotal = creditToYield * protocolFee / BPS;
@@ -804,6 +967,19 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
     /// @return feeInYield The additional fee as a % of the liquidation amount to be sent to the liquidator
     /// @return feeInUnderlying The additional fee as a % of the liquidation amount, denominated in underlying token, to be sent to the liquidator
     function _liquidate(uint256 accountId) internal returns (uint256 amountLiquidated, uint256 feeInYield, uint256 feeInUnderlying) {
+        (amountLiquidated, feeInYield, feeInUnderlying) = _runLiquidation(accountId);
+
+        // Emitted here rather than in liquidate(), so a position cleared inside
+        // batchLiquidate reports identically to one cleared on its own. Indexers
+        // and liquidation bots see one event shape, from one place.
+        if (amountLiquidated > 0) {
+            emit Liquidated(accountId, msg.sender, amountLiquidated, feeInYield, feeInUnderlying);
+        }
+    }
+
+    /// @dev The liquidation itself. See {_liquidate}, which wraps this to report it.
+    function _runLiquidation(uint256 accountId) internal returns (uint256 amountLiquidated, uint256 feeInYield, uint256 feeInUnderlying) {
+        _refreshPrice();
         // Query transmuter and earmark global debt
         _earmark();
         // Sync current user debt before deciding how much needs to be liquidated
@@ -817,7 +993,7 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
         }
 
         // In the rare scenario where the price is 0, return 0
-        if (ITokenAdapter(tokenAdapter).price() == 0) {
+        if (price() == 0) {
             return (0, 0, 0);
         }
 
@@ -894,8 +1070,12 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
             TokenUtils.safeTransfer(yieldToken, msg.sender, feeInYield);
         }
 
-        // Handle outsourced fee from vault
-        if (outsourcedFee > 0) {
+        // Handle outsourced fee from vault. The bonus is a courtesy to the
+        // liquidator, not a precondition: with no vault configured there is
+        // simply nothing to pay, and the liquidation still clears the position.
+        // Reverting here would strand exactly the positions that most need
+        // liquidating, since this branch is the deep-underwater one.
+        if (outsourcedFee > 0 && liquidFeeVault != address(0)) {
             uint256 vaultBalance = IFeeVault(liquidFeeVault).totalDeposits();
             if (vaultBalance > 0) {
                 uint256 feeBonus = normalizeDebtTokensToUnderlying(outsourcedFee);
@@ -994,6 +1174,28 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
         if (!expression) {
             revert IllegalArgument();
         }
+    }
+
+    /// @dev The single statement of how the three collateralization levels relate.
+    ///
+    /// `minimum` is the bar a position must clear to mint. The other two sit at
+    /// or below it:
+    ///
+    ///   - `lowerBound` is where a position becomes liquidatable. Above the mint
+    ///     bar it would liquidate positions that are allowed to exist.
+    ///   - `global` is where the protocol as a whole is treated as insolvent and
+    ///     liquidations switch to full seizure. When every borrower is drawn to
+    ///     the mint bar the protocol-wide ratio equals `minimum` exactly, so a
+    ///     global floor at or above the bar declares a healthy, fully-drawn
+    ///     protocol insolvent and routes every liquidation through bad debt.
+    ///
+    /// Checked on initialization and from all three setters, so no ordering of
+    /// admin calls can leave the levels inverted.
+    function _checkCollateralizationOrder(uint256 minimum, uint256 global, uint256 lowerBound) internal pure {
+        _checkArgument(lowerBound >= FIXED_POINT_SCALAR);
+        _checkArgument(global >= FIXED_POINT_SCALAR);
+        _checkArgument(lowerBound <= minimum);
+        _checkArgument(global <= minimum);
     }
 
     /// @dev Checks if owner == sender and reverts with an {UnauthorizedAccountAccessError} error if the result is {false}.

@@ -70,7 +70,7 @@ contract MorphoYearnOGWETHStrategyTest is Test {
         liquidStrategy.allocate(prevAllocationAmount, amount, "", address(vault));
         uint256 initialRealAssets = liquidStrategy.realAssets();
         assertApproxEqAbs(initialRealAssets, amount, 1e18);
-        vm.warp(block.timestamp + 180 days);
+        vm.warp(vm.getBlockTimestamp() + 180 days);
         uint256 realAssets = liquidStrategy.realAssets();
         assertGt(realAssets, initialRealAssets);
         vm.stopPrank();

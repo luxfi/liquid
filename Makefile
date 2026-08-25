@@ -113,19 +113,21 @@ halmos: venv
 # Deploy
 # ═══════════════════════════════════════════════════════════════════
 
+# One market per run. Supply DEBT_ADDRESS, UNDERLYING_ADDRESS, YIELD_ADDRESS
+# and TOKEN_ADAPTER_ADDRESS for the market being brought up.
 deploy-devnet:
-	$(FORGE) script script/DeployLux.s.sol \
-		--rpc-url https://api.lux-dev.network/ext/bc/C/rpc \
+	LIQUID_ENV=devnet $(FORGE) script script/DeployBrandL1.s.sol \
+		--rpc-url https://api.lux-dev.network/v1/bc/C/rpc \
 		--mnemonics "$$LUX_MNEMONIC" --broadcast -vvv
 
 deploy-testnet:
-	$(FORGE) script script/DeployLux.s.sol \
-		--rpc-url https://api.lux-test.network/ext/bc/C/rpc \
+	LIQUID_ENV=testnet $(FORGE) script script/DeployBrandL1.s.sol \
+		--rpc-url https://api.lux-test.network/v1/bc/C/rpc \
 		--mnemonics "$$LUX_MNEMONIC" --broadcast -vvv
 
 deploy-mainnet:
 	$(FORGE) script script/DeployMainnet.s.sol \
-		--rpc-url https://api.lux.network/ext/bc/C/rpc \
+		--rpc-url https://api.lux.network/v1/bc/C/rpc \
 		--mnemonics "$$LUX_MNEMONIC" --broadcast -vvv
 
 deploy-all: deploy-devnet deploy-testnet deploy-mainnet

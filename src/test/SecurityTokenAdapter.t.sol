@@ -139,14 +139,14 @@ contract SecurityTokenAdapterTest is Test {
 
     function test_stale_nav_reverts_price() public {
         // Warp past staleness threshold (24h + 1s)
-        vm.warp(block.timestamp + 86_401);
+        vm.warp(vm.getBlockTimestamp() + 86_401);
         assertTrue(adapter.isNavStale());
         vm.expectRevert(SecurityTokenAdapter.StaleNAV.selector);
         adapter.price();
     }
 
     function test_nav_not_stale_within_threshold() public {
-        vm.warp(block.timestamp + 86_399);
+        vm.warp(vm.getBlockTimestamp() + 86_399);
         assertFalse(adapter.isNavStale());
         assertEq(adapter.price(), INITIAL_NAV);
     }
@@ -157,7 +157,7 @@ contract SecurityTokenAdapterTest is Test {
         assertEq(adapter.navStalenessMax(), 3600);
 
         // Warp 2h, now stale with 1h threshold
-        vm.warp(block.timestamp + 7200);
+        vm.warp(vm.getBlockTimestamp() + 7200);
         vm.expectRevert(SecurityTokenAdapter.StaleNAV.selector);
         adapter.price();
     }
@@ -169,7 +169,7 @@ contract SecurityTokenAdapterTest is Test {
     }
 
     function test_nav_refresh_clears_staleness() public {
-        vm.warp(block.timestamp + 86_401);
+        vm.warp(vm.getBlockTimestamp() + 86_401);
         assertTrue(adapter.isNavStale());
 
         vm.prank(oracle);
@@ -460,7 +460,7 @@ contract SecurityTokenAdapterTest is Test {
         vm.prank(compliance);
         adapter.halt("test");
 
-        vm.warp(block.timestamp + 86_401);
+        vm.warp(vm.getBlockTimestamp() + 86_401);
         vm.expectRevert(SecurityTokenAdapter.Halted.selector);
         adapter.price();
     }

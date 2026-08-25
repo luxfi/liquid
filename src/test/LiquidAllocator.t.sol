@@ -132,6 +132,6 @@ contract LiquidAllocatorTest is Test {
     function _vaultSubmitAndFastForward(bytes memory data) internal {
         vault.submit(data);
         bytes4 selector = bytes4(data);
-        vm.warp(block.timestamp + vault.timelock(selector));
+        vm.warp(vm.getBlockTimestamp() + vault.timelock(selector));
     }
 }
