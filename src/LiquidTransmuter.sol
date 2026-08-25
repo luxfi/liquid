@@ -222,18 +222,28 @@ contract LiquidTransmuter is ILiquidTransmuter, ERC721, ReentrancyGuard {
         // Burn position NFT
         _burn(id);
 
-        // Ratio of total synthetics issued by the liquid / underlingying value of collateral stored in the liquid
-        // If the system experiences bad debt we use this ratio to scale back the value of yield tokens that are transmuted
+        // Synthetics issued against the underlying value backing them. Above 1.0
+        // the protocol owes more than it holds, and the shortfall is shared by
+        // scaling back what each claim is worth.
+        //
+        // Both sides must be in the same units for the 1.0 comparison to mean
+        // anything: the collateral total is denominated in underlying tokens,
+        // the synthetics in debt tokens, and for a market like bridged BTC (8dp)
+        // against LBTC (18dp) those differ by ten orders of magnitude. Normalize
+        // the collateral into debt units first, then take the ratio in 1e18.
+        //
+        // Rounded up, so a rounding remainder registers as bad debt rather than
+        // disappearing -- the haircut may be a hair too deep, never too shallow.
         uint256 yieldTokenBalance = TokenUtils.safeBalanceOf(liquid.yieldToken(), address(this));
+        uint256 backing = liquid.normalizeUnderlyingTokensToDebt(liquid.getTotalUnderlyingValue() + liquid.convertYieldTokensToUnderlying(yieldTokenBalance));
         // Avoid divide by 0
-        uint256 denominator = liquid.getTotalUnderlyingValue() + liquid.convertYieldTokensToUnderlying(yieldTokenBalance) > 0
-            ? liquid.getTotalUnderlyingValue() + liquid.convertYieldTokensToUnderlying(yieldTokenBalance)
-            : 1;
-        uint256 badDebtRatio = liquid.totalSyntheticsIssued() * 10 ** TokenUtils.expectDecimals(liquid.yieldToken()) / denominator;
+        if (backing == 0) backing = 1;
+        uint256 issued = liquid.totalSyntheticsIssued();
+        uint256 badDebtRatio = (issued * FIXED_POINT_SCALAR + backing - 1) / backing;
 
         uint256 scaledTransmuted = amountTransmuted;
 
-        if (badDebtRatio > 1e18) {
+        if (badDebtRatio > FIXED_POINT_SCALAR) {
             scaledTransmuted = amountTransmuted * FIXED_POINT_SCALAR / badDebtRatio;
         }
 
@@ -249,12 +259,24 @@ contract LiquidTransmuter is ILiquidTransmuter, ERC721, ReentrancyGuard {
         uint256 balAfterRedeem = TokenUtils.safeBalanceOf(liquid.yieldToken(), address(this));
         uint256 distributable = totalYield <= balAfterRedeem ? totalYield : balAfterRedeem;
 
+        // Whatever the payout fell short of is synthetic the claimant was never
+        // paid for. It goes back to them rather than into the burn: the bad-debt
+        // haircut above is a loss they are meant to bear, a liquidity shortfall
+        // here is not, and burning through it would destroy the claim silently
+        // along with the position.
+        uint256 unpaid;
+        if (distributable < totalYield) {
+            unpaid = liquid.convertYieldTokensToDebt(totalYield - distributable);
+            if (unpaid > amountTransmuted) unpaid = amountTransmuted;
+        }
+        uint256 toBurn = amountTransmuted - unpaid;
+
         // Split distributable amount. Round fee down; claimant gets the remainder.
         uint256 feeYield = distributable * transmutationFee / BPS;
         uint256 claimYield = distributable - feeYield;
 
         uint256 syntheticFee = amountNottransmuted * exitFee / BPS;
-        uint256 syntheticReturned = amountNottransmuted - syntheticFee;
+        uint256 syntheticReturned = amountNottransmuted - syntheticFee + unpaid;
 
         // Remove untransmuted amount from the staking graph
         if (blocksLeft > 0) _updateStakingGraph(-position.amount.toInt256() * BLOCK_SCALING_FACTOR / transmutationTime.toInt256(), blocksLeft);
@@ -266,8 +288,8 @@ contract LiquidTransmuter is ILiquidTransmuter, ERC721, ReentrancyGuard {
         TokenUtils.safeTransfer(syntheticToken, protocolFeeReceiver, syntheticFee);
 
         // Burn remaining synths that were not returned
-        TokenUtils.safeBurn(syntheticToken, amountTransmuted);
-        liquid.reduceSyntheticsIssued(amountTransmuted);
+        TokenUtils.safeBurn(syntheticToken, toBurn);
+        liquid.reduceSyntheticsIssued(toBurn);
         liquid.setTransmuterTokenBalance(TokenUtils.safeBalanceOf(liquid.yieldToken(), address(this)));
 
         totalLocked -= position.amount;

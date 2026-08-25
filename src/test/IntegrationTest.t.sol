@@ -160,6 +160,7 @@ contract IntegrationTest is Test {
             collateralizationLowerBound: 1_052_631_578_950_000_000, // 1.05 collateralization
             globalMinimumCollateralization: 1_111_111_111_111_111_111, // 1.1
             tokenAdapter: address(vaultAdapter),
+            maxPriceDeviation: 10_000,
             transmuter: address(transmuterLogic),
             protocolFee: 100,
             protocolFeeReceiver: receiver,
@@ -245,7 +246,7 @@ contract IntegrationTest is Test {
         liquid.mint(tokenId, maxBorrow, address(0xbeef));
         IERC20(EULER_USDC).approve(address(liquid), 100_000e6);
 
-        vm.roll(block.number + 1);
+        vm.roll(vm.getBlockNumber() + 1);
 
         liquid.repay(liquid.convertDebtTokensToYield(maxBorrow), tokenId);
         vm.stopPrank();
@@ -275,7 +276,7 @@ contract IntegrationTest is Test {
         transmuterLogic.createRedemption(debtAmount);
         vm.stopPrank();
 
-        vm.roll(block.number + 5_256_000);
+        vm.roll(vm.getBlockNumber() + 5_256_000);
 
         (uint256 collateral, uint256 debt, uint256 earmarked) = liquid.getCDP(tokenId);
 
@@ -316,7 +317,7 @@ contract IntegrationTest is Test {
         transmuterLogic.createRedemption(debtAmount);
         vm.stopPrank();
 
-        vm.roll(block.number + 5_256_000 / 2);
+        vm.roll(vm.getBlockNumber() + 5_256_000 / 2);
 
         (uint256 collateral, uint256 debt, uint256 earmarked) = liquid.getCDP(tokenId);
 
@@ -357,7 +358,7 @@ contract IntegrationTest is Test {
         transmuterLogic.createRedemption(debtAmount);
         vm.stopPrank();
 
-        vm.roll(block.number + 5_256_000 / 2);
+        vm.roll(vm.getBlockNumber() + 5_256_000 / 2);
 
         (uint256 collateral, uint256 debt, uint256 earmarked) = liquid.getCDP(tokenId);
 
@@ -398,7 +399,7 @@ contract IntegrationTest is Test {
         transmuterLogic.createRedemption(debtAmount);
         vm.stopPrank();
 
-        vm.roll(block.number + 5_256_000 / 2);
+        vm.roll(vm.getBlockNumber() + 5_256_000 / 2);
 
         (uint256 collateral, uint256 debt, uint256 earmarked) = liquid.getCDP(tokenId);
 
@@ -439,7 +440,7 @@ contract IntegrationTest is Test {
         liquid.mint(tokenId, maxBorrow, address(0xbeef));
         IERC20(alUSD).approve(address(liquid), maxBorrow);
 
-        vm.roll(block.number + 1);
+        vm.roll(vm.getBlockNumber() + 1);
 
         liquid.burn(maxBorrow, tokenId);
         vm.stopPrank();
@@ -478,7 +479,7 @@ contract IntegrationTest is Test {
         transmuterLogic.createRedemption(debtAmount);
         vm.stopPrank();
 
-        vm.roll(block.number + 5_256_000 / 2);
+        vm.roll(vm.getBlockNumber() + 5_256_000 / 2);
 
         vm.startPrank(address(0xbeef));
         IERC20(alUSD).approve(address(liquid), maxBorrow);
@@ -514,7 +515,7 @@ contract IntegrationTest is Test {
         transmuterLogic.createRedemption(debtAmount);
         vm.stopPrank();
 
-        vm.roll(block.number + 5_256_000);
+        vm.roll(vm.getBlockNumber() + 5_256_000);
 
         vm.startPrank(address(0xbeef));
         IERC20(alUSD).approve(address(liquid), maxBorrow);
@@ -545,7 +546,7 @@ contract IntegrationTest is Test {
         assertEq(debt, debtAmount);
 
         // Transmuter Cycle
-        vm.roll(block.number + 5_256_000);
+        vm.roll(vm.getBlockNumber() + 5_256_000);
 
         vm.startPrank(address(0xdad));
         transmuterLogic.claimRedemption(1);

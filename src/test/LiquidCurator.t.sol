@@ -276,7 +276,7 @@ contract LiquidCuratorTest is Test {
 
     function _vaultFastForward(bytes memory data) internal {
         bytes4 selector = bytes4(data);
-        vm.warp(block.timestamp + vault.timelock(selector));
+        vm.warp(vm.getBlockTimestamp() + vault.timelock(selector));
     }
 
     function _submitAndSetStrategy(address adapter, address vault) internal {

@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {StdCheats} from "forge-std/StdCheats.sol";
 
 import {Liquid} from "../Liquid.sol";
-import {LETH} from "../external/LETH.sol";
+import {LiquidMintableToken} from "./mocks/LiquidMintableToken.sol";
 import {LiquidTransmuter} from "../LiquidTransmuter.sol";
 import {StakingGraph} from "../libraries/StakingGraph.sol";
 import {console} from "../../lib/forge-std/src/console.sol";
@@ -15,14 +15,14 @@ import "../interfaces/ILiquidTransmuter.sol";
 import "../base/LiquidTransmuterErrors.sol";
 
 contract MockLiquid {
-    LETH collateral;
+    LiquidMintableToken collateral;
 
     uint256 public constant FIXED_POINT_SCALAR = 1e18;
 
     uint256 public underlyingValue;
     uint256 public syntheticsIssued;
 
-    constructor(LETH _collateral) {
+    constructor(LiquidMintableToken _collateral) {
         collateral = _collateral;
     }
 
@@ -50,8 +50,17 @@ contract MockLiquid {
         return amount * FIXED_POINT_SCALAR / (2 * FIXED_POINT_SCALAR);
     }
 
+    /// @dev Debt and underlying share decimals in this harness, so the scalar is 1.
+    function normalizeUnderlyingTokensToDebt(uint256 amount) external pure returns (uint256) {
+        return amount;
+    }
+
+    /// @dev Pays what it can. A real Liquid whose collateral has been eroded by
+    ///      a strategy loss also settles a redemption for less than was asked.
     function redeem(uint256 underlying) external {
-        collateral.transfer(msg.sender, convertUnderlyingTokensToYield(underlying));
+        uint256 owed = convertUnderlyingTokensToYield(underlying);
+        uint256 held = collateral.balanceOf(address(this));
+        collateral.transfer(msg.sender, owed < held ? owed : held);
     }
 
     function totalDebt() external pure returns (uint256) {
@@ -86,9 +95,9 @@ contract MockLiquid {
 contract TransmuterTest is Test {
     using StakingGraph for StakingGraph.Graph;
 
-    LETH public alETH;
-    LETH public collateralToken;
-    LETH public underlyingToken;
+    LiquidMintableToken public alETH;
+    LiquidMintableToken public collateralToken;
+    LiquidMintableToken public underlyingToken;
     LiquidTransmuter public transmuter;
 
     MockLiquid public liquid;
@@ -96,9 +105,9 @@ contract TransmuterTest is Test {
     StakingGraph.Graph private graph;
 
     function setUp() public {
-        alETH = new LETH();
-        collateralToken = new LETH();
-        underlyingToken = new LETH();
+        alETH = new LiquidMintableToken("Liquid ETH", "LETH", 0);
+        collateralToken = new LiquidMintableToken("Collateral", "COLL", 0);
+        underlyingToken = new LiquidMintableToken("Underlying", "UNDER", 0);
 
         liquid = new MockLiquid(collateralToken);
 
@@ -223,7 +232,7 @@ contract TransmuterTest is Test {
         vm.prank(address(0xbeef));
         transmuter.createRedemption(100e18);
 
-        vm.roll(block.number + 5_256_000);
+        vm.roll(vm.getBlockNumber() + 5_256_000);
 
         assertEq(collateralToken.balanceOf(address(0xbeef)), 0);
         assertEq(alETH.balanceOf(address(transmuter)), 100e18);
@@ -241,7 +250,7 @@ contract TransmuterTest is Test {
         vm.prank(address(0xbeef));
         transmuter.createRedemption(100e18);
 
-        vm.roll(block.number + 5_256_000);
+        vm.roll(vm.getBlockNumber() + 5_256_000);
 
         assertEq(collateralToken.balanceOf(address(0xbeef)), 0);
         assertEq(alETH.balanceOf(address(transmuter)), 100e18);
@@ -261,7 +270,7 @@ contract TransmuterTest is Test {
         vm.prank(address(0xbeef));
         transmuter.createRedemption(100e18);
 
-        vm.roll(block.number + 5_256_000);
+        vm.roll(vm.getBlockNumber() + 5_256_000);
 
         assertEq(collateralToken.balanceOf(address(0xbeef)), 0);
         assertEq(alETH.balanceOf(address(transmuter)), 100e18);
@@ -277,7 +286,7 @@ contract TransmuterTest is Test {
         vm.prank(address(0xbeef));
         transmuter.createRedemption(100e18);
 
-        vm.roll(block.number + 5_256_000);
+        vm.roll(vm.getBlockNumber() + 5_256_000);
 
         assertEq(collateralToken.balanceOf(address(0xbeef)), 0);
         assertEq(alETH.balanceOf(address(transmuter)), 100e18);
@@ -302,7 +311,7 @@ contract TransmuterTest is Test {
         vm.prank(address(0xbeef));
         transmuter.createRedemption(amount);
 
-        vm.roll(block.number + 5_256_000);
+        vm.roll(vm.getBlockNumber() + 5_256_000);
 
         assertEq(collateralToken.balanceOf(address(0xbeef)), 0);
 
@@ -323,7 +332,7 @@ contract TransmuterTest is Test {
         vm.prank(address(0xbeef));
         transmuter.createRedemption(100e18);
 
-        vm.roll(block.number + 5_256_000);
+        vm.roll(vm.getBlockNumber() + 5_256_000);
 
         assertEq(collateralToken.balanceOf(address(0xbeef)), 0);
 
@@ -346,7 +355,7 @@ contract TransmuterTest is Test {
         vm.prank(address(0xbeef));
         transmuter.createRedemption(100e18);
 
-        vm.roll(block.number + 5_256_000);
+        vm.roll(vm.getBlockNumber() + 5_256_000);
 
         assertEq(collateralToken.balanceOf(address(0xbeef)), 0);
 
@@ -369,7 +378,7 @@ contract TransmuterTest is Test {
         // uint256 query = transmuter.queryGraph(block.number + 1, block.number + 5256000);
         // assertEq(query, 100e18);
 
-        vm.roll(block.number + (5_256_000 / 2));
+        vm.roll(vm.getBlockNumber() + (5_256_000 / 2));
 
         vm.prank(address(0xbeef));
         transmuter.claimRedemption(1);
@@ -398,7 +407,7 @@ contract TransmuterTest is Test {
         uint256 query = transmuter.queryGraph(block.number + 1, block.number + 5_256_000);
         assertEq(query, 100e18);
 
-        vm.roll(block.number + time);
+        vm.roll(vm.getBlockNumber() + time);
 
         vm.prank(address(0xbeef));
         transmuter.claimRedemption(1);
@@ -424,7 +433,7 @@ contract TransmuterTest is Test {
 
         uint256 balanceBefore = alETH.balanceOf(address(0xbeef));
 
-        vm.roll(block.number + (5_256_000 / 2));
+        vm.roll(vm.getBlockNumber() + (5_256_000 / 2));
 
         vm.prank(address(0xbeef));
         transmuter.claimRedemption(1);
@@ -441,7 +450,7 @@ contract TransmuterTest is Test {
         vm.prank(address(0xbeef));
         transmuter.createRedemption(100e18);
 
-        vm.roll(block.number + 5_256_000);
+        vm.roll(vm.getBlockNumber() + 5_256_000);
 
         uint256 treeQuery = transmuter.queryGraph(block.number - 5_256_000 + 1, block.number);
 
@@ -452,7 +461,7 @@ contract TransmuterTest is Test {
         vm.prank(address(0xbeef));
         transmuter.createRedemption(100e18);
 
-        vm.roll(block.number + (5_256_000 / 2));
+        vm.roll(vm.getBlockNumber() + (5_256_000 / 2));
 
         uint256 treeQuery = transmuter.queryGraph(block.number - (5_256_000 / 2) + 1, block.number);
 
@@ -463,7 +472,7 @@ contract TransmuterTest is Test {
         deal(address(collateralToken), address(transmuter), uint256(type(int256).max) / 1e20);
         vm.prank(address(0xbeef));
         transmuter.createRedemption(100e18);
-        vm.roll(block.number + 5_256_000); // Mature the staking position
+        vm.roll(vm.getBlockNumber() + 5_256_000); // Mature the staking position
         liquid.setUnderlyingValue(0); // Simulate all users exiting with 0 underlying left
         emit log_named_uint("total token there", liquid.getTotalUnderlyingValue());
         vm.prank(address(0xbeef));
@@ -490,5 +499,71 @@ contract TransmuterTest is Test {
         // Check that the graph queries only to its max size and does not return negative number
         int256 result = graph.queryStake(63, 63);
         assertEq(result, 0);
+    }
+}
+
+/// H3 -- a partial fill must not destroy the claimant's shortfall.
+///
+/// `claimRedemption` burned the full matured amount and deleted the position
+/// even when the transmuter could only pay part of what the claim was worth.
+/// The unpaid remainder went up in smoke along with the position that
+/// evidenced it, with no record and no way to re-present the claim.
+contract TransmuterShortfallTest is Test {
+    LiquidMintableToken alETH;
+    LiquidMintableToken collateralToken;
+    LiquidTransmuter transmuter;
+    MockLiquid liquid;
+
+    address claimant = address(0xC1A1);
+
+    function setUp() public {
+        alETH = new LiquidMintableToken("Liquid ETH", "LETH", 0);
+        collateralToken = new LiquidMintableToken("Collateral", "COLL", 0);
+        liquid = new MockLiquid(collateralToken);
+
+        transmuter = new LiquidTransmuter(ILiquidTransmuter.TransmuterInitializationParams(address(alETH), address(this), 100, 0, 0, 52_560_000 / 2));
+        transmuter.setLiquid(address(liquid));
+        transmuter.setDepositCap(uint256(type(int256).max));
+        alETH.setWhitelist(address(transmuter), true);
+
+        vm.prank(address(liquid));
+        collateralToken.approve(address(transmuter), type(uint256).max);
+    }
+
+    function testClaimRedemptionReturnsUnpaidSynthetic() external {
+        uint256 amount = 100e18;
+
+        alETH.setWhitelist(address(this), true);
+        alETH.mint(claimant, amount);
+        liquid.setSyntheticsIssued(amount);
+        liquid.setUnderlyingValue(amount);
+
+        vm.startPrank(claimant);
+        alETH.approve(address(transmuter), type(uint256).max);
+        transmuter.createRedemption(amount);
+        vm.stopPrank();
+
+        // Liquid can only settle a fraction of what the matured claim is worth.
+        deal(address(collateralToken), address(liquid), 10e18);
+
+        vm.roll(block.number + 200); // fully matured
+
+        uint256 supplyBefore = alETH.totalSupply();
+
+        vm.prank(claimant);
+        transmuter.claimRedemption(1);
+
+        uint256 paidInYield = collateralToken.balanceOf(claimant);
+        uint256 returnedSynthetic = alETH.balanceOf(claimant);
+        uint256 burned = supplyBefore - alETH.totalSupply();
+
+        assertGt(paidInYield, 0, "claimant was paid something");
+        assertLt(paidInYield, liquid.convertDebtTokensToYield(amount), "but less than the claim was worth");
+
+        // The part that went unpaid comes back as synthetic. The claimant still
+        // holds a claim on the protocol for it; it was not quietly written off.
+        assertGt(returnedSynthetic, 0, "shortfall returned to the claimant");
+        assertLt(burned, amount, "only the settled portion was burned");
+        assertApproxEqAbs(burned + returnedSynthetic, amount, 2, "every synthetic is either burned or returned");
     }
 }

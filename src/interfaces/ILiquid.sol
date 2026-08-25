@@ -21,8 +21,13 @@ struct LiquidInitializationParams {
     uint256 globalMinimumCollateralization;
     // The minimum collateralization for liquidation eligibility. between 1 and minimumCollateralization inclusive.
     uint256 collateralizationLowerBound;
-    // Token adapter used to get price for yiel tokens.
+    // Token adapter used to get price for yield tokens. Must report the market's
+    // own yieldToken and underlyingToken; the engine checks and binds to it.
     address tokenAdapter;
+    // How far, in BPS per block, the adapter's price may move the engine's
+    // stored price. Bounds how fast a compromised or thin adapter can shift
+    // borrowing power. 0 freezes the price entirely.
+    uint256 maxPriceDeviation;
     // The initial transmuter or transmuter buffer.
     address transmuter;
     // The fee on user debt paid to the protocol.
@@ -340,6 +345,13 @@ interface ILiquidAdminActions {
     /// @param value The address of token adapter.
     function setTokenAdapter(address value) external;
 
+    /// @notice Sets the per-block cap, in BPS, on how far the adapter may move the stored price.
+    ///
+    /// @notice Reverts if the caller is not the admin.
+    ///
+    /// @param value The new cap in BPS per block.
+    function setMaxPriceDeviation(uint256 value) external;
+
     /// @notice Set the minimum collateralization ratio.
     ///
     /// @notice `msg.sender` must be the admin or this call will revert with an {Unauthorized} error.
@@ -462,6 +474,17 @@ interface ILiquidEvents {
     ///
     /// @param adapter The addres of the new adapter.
     event TokenAdapterUpdated(address adapter);
+
+    /// @notice Emitted when the per-block price deviation cap is updated.
+    ///
+    /// @param value The new cap in BPS per block.
+    event MaxPriceDeviationUpdated(uint256 value);
+
+    /// @notice Emitted when the engine accepts a new price from the token adapter.
+    ///
+    /// @param price    The price the engine now values collateral at.
+    /// @param reported The price the adapter reported, before clamping.
+    event PriceUpdated(uint256 price, uint256 reported);
 
     /// @notice Emitted when the transmuter is updated.
     ///
@@ -656,6 +679,31 @@ interface ILiquidState {
     /// @return adapter The token adapter address.
     function tokenAdapter() external returns (address adapter);
 
+    /// @notice Gets the per-block cap, in BPS, on adapter price movement.
+    ///
+    /// @return value The cap in BPS per block.
+    function maxPriceDeviation() external view returns (uint256 value);
+
+    /// @notice Gets the last price the engine committed as its rate-limit anchor.
+    ///
+    /// @return price The anchor price.
+    function lastPrice() external view returns (uint256 price);
+
+    /// @notice Gets the price the engine values yield tokens at right now.
+    ///
+    /// @dev The adapter's report, admitted only as far as {maxPriceDeviation}
+    ///      allows from the anchor. This is the price every valuation in the
+    ///      engine uses, so a quote taken from here is the price a transaction
+    ///      sent in the same block will settle at.
+    ///
+    /// @return value The vetted price.
+    function price() external view returns (uint256 value);
+
+    /// @notice Gets the block at which the stored price was last accepted.
+    ///
+    /// @return blockNumber The block number.
+    function lastPriceBlock() external view returns (uint256 blockNumber);
+
     /// @notice Gets the address of the liquid fee vault.
     ///
     /// @return vault The liquid fee vault address.
@@ -772,6 +820,16 @@ interface ILiquidState {
     ///
     /// @return TVL   Total value locked.
     function getTotalUnderlyingValue() external view returns (uint256 TVL);
+
+    /// @notice Whether the protocol currently owes more debt than the collateral
+    ///         backing it is worth.
+    ///
+    /// @dev While true the engine refuses new deposits and new debt, so the
+    ///      shortfall is not passed on to anyone arriving next. Repayment,
+    ///      burning and liquidation stay open, which is how it is closed.
+    ///
+    /// @return short True when the protocol is short.
+    function inBadDebt() external view returns (bool short);
 
     /// @notice Gets the amount of debt tokens `spender` is allowed to mint on behalf of `owner`.
     ///

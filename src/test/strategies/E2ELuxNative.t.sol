@@ -131,7 +131,7 @@ contract E2ELuxNativeTest is Test {
         assertGe(realAfterFees + 1, DEPOSIT_AMOUNT + FEE_AMOUNT, "real assets should increase after fees");
 
         // ── Step 5: Snapshot yield -- should capture fee income ──
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
         uint256 yieldCaptured = strategy.snapshotYield();
         assertApproxEqAbs(yieldCaptured, FEE_AMOUNT, 1, "yield should equal fee amount");
 
@@ -162,7 +162,7 @@ contract E2ELuxNativeTest is Test {
         xLUX.simulateFees(5e18);
         vm.stopPrank();
 
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
         uint256 yield1 = strategy.snapshotYield();
         assertApproxEqAbs(yield1, 5e18, 1, "round 1 yield == 5");
 
@@ -171,7 +171,7 @@ contract E2ELuxNativeTest is Test {
         xLUX.simulateFees(5e18);
         vm.stopPrank();
 
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
         uint256 yield2 = strategy.snapshotYield();
         assertApproxEqAbs(yield2, 5e18, 1, "round 2 yield == 5");
 
@@ -188,7 +188,7 @@ contract E2ELuxNativeTest is Test {
         vault.pushToStrategy(address(strategy), DEPOSIT_AMOUNT);
         strategy.snapshotYield(); // baseline
 
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(vm.getBlockTimestamp() + 7 days);
         uint256 yield = strategy.snapshotYield();
         assertEq(yield, 0, "no fees means zero yield");
     }

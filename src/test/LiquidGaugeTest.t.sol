@@ -188,7 +188,7 @@ contract LiquidGaugeTest is Test {
         gauge.vote(1, _arr(1), _arr(100));
 
         // Warp past expiry
-        vm.warp(block.timestamp + 366 days);
+        vm.warp(vm.getBlockTimestamp() + 366 days);
         // Should reset expiry
         vm.prank(alice);
         gauge.vote(1, _arr(1), _arr(200));

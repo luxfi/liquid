@@ -15,7 +15,7 @@ import {ILiquid, LiquidInitializationParams} from "../src/interfaces/ILiquid.sol
 import {ILiquidTransmuter} from "../src/interfaces/ILiquidTransmuter.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
-/// @dev Minimal ERC-20 for local dev tokens (WLUX, LUSD, mock securities)
+/// @dev Minimal ERC-20 for local dev tokens (WLUX, LLUX, mock securities)
 contract DevToken {
     string public name;
     string public symbol;
@@ -87,8 +87,13 @@ contract DeployLocal is Script {
         DevToken wlux = new DevToken("Wrapped LUX", "WLUX", 0);
         console.log("WLUX:", address(wlux));
 
-        DevToken lusd = new DevToken("Lux USD", "LUSD", 1_000_000 ether);
-        console.log("LUSD:", address(lusd));
+        // The market's synthetic. It denominates the same asset as the
+        // collateral -- LUX against wrapped LUX -- because the engine converts
+        // underlying to debt with a decimals scalar and no price source. A
+        // dollar-denominated synthetic against LUX collateral would be a market
+        // the engine cannot value.
+        DevToken llux = new DevToken("Liquid LUX", "LLUX", 1_000_000 ether);
+        console.log("LLUX:", address(llux));
 
         DevToken ibit = new DevToken("iShares Bitcoin ETF", "IBIT", 100_000 ether);
         console.log("IBIT (mock):", address(ibit));
@@ -111,15 +116,17 @@ contract DeployLocal is Script {
         LiquidPosition position = new LiquidPosition(address(liquid));
         console.log("Position:", address(position));
 
-        // 3. Deploy Transmuter with LUSD as synthetic token
+        // 3. Deploy Transmuter with LLUX as synthetic token
         ILiquidTransmuter.TransmuterInitializationParams memory tParams = ILiquidTransmuter.TransmuterInitializationParams({
-            syntheticToken: address(lusd), feeReceiver: deployer, timeToTransmute: 45 days, transmutationFee: 0.005e18, exitFee: 0.02e18, graphSize: 1000
+            syntheticToken: address(llux), feeReceiver: deployer, timeToTransmute: 45 days, transmutationFee: 0.005e18, exitFee: 0.02e18, graphSize: 1000
         });
         LiquidTransmuter transmuter = new LiquidTransmuter(tParams);
         console.log("Transmuter:", address(transmuter));
 
-        // 4. Token vault for LUSD
-        LiquidTokenVault tokenVault = new LiquidTokenVault(address(lusd), address(liquid), deployer);
+        // 4. Fee vault. It holds the market's underlying token: the liquidator
+        //    bonus is denominated in underlying, and Liquid rejects a vault
+        //    whose token does not match.
+        LiquidTokenVault tokenVault = new LiquidTokenVault(address(wlux), address(liquid), deployer);
         console.log("TokenVault:", address(tokenVault));
 
         // 5. Deploy WLUX adapter (simple 1:1 price)
@@ -130,15 +137,19 @@ contract DeployLocal is Script {
         console.log("Initializing Liquid...");
         LiquidInitializationParams memory initParams = LiquidInitializationParams({
             admin: deployer,
-            debtToken: address(lusd),
+            debtToken: address(llux),
             underlyingToken: address(wlux),
             yieldToken: address(wlux),
             depositCap: 10_000_000 ether,
             blocksPerYear: BLOCKS_PER_YEAR,
             minimumCollateralization: 1.1111e18,
-            globalMinimumCollateralization: 1.15e18,
+            // Both floors sit below the mint bar: a global floor above it marks a
+            // fully-drawn healthy protocol insolvent and forces full seizure.
+            globalMinimumCollateralization: 1.0526e18,
             collateralizationLowerBound: 1.05e18,
             tokenAdapter: address(wluxAdapter),
+            // Freezes price movement within a block; 1 BPS/block elapsed thereafter.
+            maxPriceDeviation: 1,
             transmuter: address(transmuter),
             protocolFee: 1000, // 10% in BPS
             protocolFeeReceiver: deployer,
@@ -147,7 +158,10 @@ contract DeployLocal is Script {
         });
         liquid.initialize(initParams);
         liquid.setLiquidPositionNFT(address(position));
-        console.log("Liquid initialized + Position NFT set");
+        // Liquidation survives an unset fee vault; the incentive to perform one
+        // on a deeply underwater position does not. Seed it to exercise that path.
+        liquid.setLiquidFeeVault(address(tokenVault));
+        console.log("Liquid initialized + Position NFT and fee vault set");
 
         // 7. Deploy SecurityTokenAdapter for IBIT
         SecurityTokenAdapter ibitAdapter = new SecurityTokenAdapter(address(ibit), "IBIT", "46438F101", "US46438F1012", "ETF", 52.34e18);
