@@ -19,7 +19,12 @@ interface IDeployerTiny is IERC721Tiny {
     function prev(uint128 featureId) external view returns (address);
 }
 
-contract LiquidStrategy is ILiquidStrategy, Ownable {
+/// Abstract because the allocation hooks below have no bodies. A deployable
+/// base would answer "how much moved?" with zero after the vault had already
+/// moved the assets, and the vault records what the adapter reports -- so the
+/// money leaves and the books show nothing. Every real strategy overrides them;
+/// nothing should be able to skip that by deploying this directly.
+abstract contract LiquidStrategy is ILiquidStrategy, Ownable {
     IVaultV2 public immutable VAULT;
     uint256 public constant SECONDS_PER_YEAR = 365 days;
     uint256 public constant FIXED_POINT_SCALAR = 1e18;
@@ -65,6 +70,14 @@ contract LiquidStrategy is ILiquidStrategy, Ownable {
         onlyVault
         returns (bytes32[] memory strategyIds, int256 change)
     {
+        // Emergency mode. Bypassed rather than reverted, so the same call that
+        // stops new money going in does not also stop the vault getting its
+        // existing money out; {deallocate} stays open for the same reason.
+        //
+        // The flag was settable and read nowhere, which made every drill of this
+        // control pass and the control itself do nothing.
+        if (killSwitch) return (ids(), int256(0));
+
         uint256 oldAllocation = abi.decode(data, (uint256));
         uint256 amountAllocated = _allocate(assets);
         uint256 newAllocation = oldAllocation + amountAllocated;
@@ -118,13 +131,13 @@ contract LiquidStrategy is ILiquidStrategy, Ownable {
         _claimRewards();
     }
 
-    /// @dev override this function to handle wrapping/allocation/moving funds to
-    /// the respective protocol of this strategy
-    function _allocate(uint256 amount) internal virtual returns (uint256) {}
+    /// @dev handle wrapping/allocation/moving funds to the respective protocol
+    /// of this strategy, and answer with how much was allocated
+    function _allocate(uint256 amount) internal virtual returns (uint256);
 
-    /// @dev override this function to handle unwrapping/deallocation/moving funds from
-    /// the respective protocol of this strategy
-    function _deallocate(uint256 amount) internal virtual returns (uint256) {}
+    /// @dev handle unwrapping/deallocation/moving funds from the respective
+    /// protocol of this strategy, and answer with how much was deallocated
+    function _deallocate(uint256 amount) internal virtual returns (uint256);
 
     /// @dev override this function to handle strategies with withdrawal queue NFT
     function _claimWithdrawalQueue(uint256 positionId) internal virtual returns (uint256) {}
@@ -241,5 +254,6 @@ contract LiquidStrategy is ILiquidStrategy, Ownable {
         return abi.encode(params.protocol, address(this));
     }
 
-    function realAssets() external view virtual returns (uint256) {}
+    /// @dev what this strategy is holding, in the vault's asset
+    function realAssets() external view virtual returns (uint256);
 }

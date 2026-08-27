@@ -107,20 +107,40 @@ library PositionDecay {
 
             require(x > 0);
 
+            // Index of the top set bit. The shift and the count go together: on
+            // their own the counts ran unconditionally and msb came out 126 or
+            // 127 whatever x was, so the integer part of the logarithm was
+            // always 1 or 2 and the fraction was read off a misaligned x. What
+            // that cost is upstream, in the only caller: a redemption removing
+            // more than three quarters of the locked collateral recorded a
+            // weight for removing half or three quarters of it, and the rest
+            // stayed in the protocol charged to nobody.
             int256 msb = 0;
             uint256 xc = x;
-            if (xc >= 0x10000000000000000) xc >>= 64;
-            msb += 64;
-            if (xc >= 0x100000000) xc >>= 32;
-            msb += 32;
-            if (xc >= 0x10000) xc >>= 16;
-            msb += 16;
-            if (xc >= 0x100) xc >>= 8;
-            msb += 8;
-            if (xc >= 0x10) xc >>= 4;
-            msb += 4;
-            if (xc >= 0x4) xc >>= 2;
-            msb += 2;
+            if (xc >= 0x10000000000000000) {
+                xc >>= 64;
+                msb += 64;
+            }
+            if (xc >= 0x100000000) {
+                xc >>= 32;
+                msb += 32;
+            }
+            if (xc >= 0x10000) {
+                xc >>= 16;
+                msb += 16;
+            }
+            if (xc >= 0x100) {
+                xc >>= 8;
+                msb += 8;
+            }
+            if (xc >= 0x10) {
+                xc >>= 4;
+                msb += 4;
+            }
+            if (xc >= 0x4) {
+                xc >>= 2;
+                msb += 2;
+            }
             if (xc >= 0x2) msb += 1; // No need to shift xc anymore
 
             int256 result = (msb - 128) << 120;
