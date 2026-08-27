@@ -5,7 +5,9 @@ on:
     branches: [main, master, staging, dev, feat/**, fix/**]
 
 env:
-  FOUNDRY_PROFILE: ci
+  # forge build --sizes has to measure the bytecode that ships, and Liquid only
+  # clears EIP-170 with the via_ir and yul settings the production profile sets.
+  FOUNDRY_PROFILE: default
 
 jobs:
   check:

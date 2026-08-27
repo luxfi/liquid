@@ -13,7 +13,9 @@ on:
   workflow_dispatch:
 
 env:
-  FOUNDRY_PROFILE: ci
+  # Gas, contract size and storage layout are only meaningful against the
+  # bytecode that ships, so the audit builds with the production profile.
+  FOUNDRY_PROFILE: default
 
 jobs:
   # ═══════════════════════════════════════════════════════════════════════════
@@ -482,20 +484,22 @@ jobs:
         with:
           version: stable
 
+      # The suite is selected by the Makefile so CI and a laptop run the same set.
+      # shell: bash turns on pipefail; without it tee returns 0 over a failed run.
       - name: Run Invariant Tests
-        run: |
-          echo "## Invariant Test Results" >> $GITHUB_STEP_SUMMARY
-
-          # Run invariant tests with more runs for CI
-          forge test --match-path "test/fuzz/*.sol" -vvv --fuzz-runs 256 --fuzz-seed 42 2>&1 | tee invariant-results.txt || true
-
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          tail -50 invariant-results.txt >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+        shell: bash
+        run: make test-invariant 2>&1 | tee invariant-results.txt
         env:
           FOUNDRY_INVARIANT_RUNS: 256
           FOUNDRY_INVARIANT_DEPTH: 15
+
+      - name: Summarize Invariant Tests
+        if: always()
+        run: |
+          echo "## Invariant Test Results" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tail -50 invariant-results.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Upload Invariant Results
         uses: actions/upload-artifact@v4
@@ -510,6 +514,11 @@ jobs:
   full-tests:
     name: Full Test Suite
     runs-on: lux-build-amd64
+    # The fork tests in IntegrationTest and strategies/ read this and skip
+    # themselves when it is empty. Pull requests from forks get no secret and
+    # will keep skipping; that is GitHub, not the wiring.
+    env:
+      MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -521,14 +530,25 @@ jobs:
           version: stable
 
       - name: Run All Tests
+        shell: bash
+        run: make test 2>&1 | tee test-results.txt
+
+      - name: Summarize Test Suite
+        if: always()
+        shell: bash
         run: |
+          skipped=$(sed -n 's/.*[^0-9]\([0-9]\{1,\}\) skipped.*/\1/p' test-results.txt | awk '{s+=$1} END{print s+0}')
           echo "## Full Test Suite Results" >> $GITHUB_STEP_SUMMARY
-
-          forge test --summary -vv 2>&1 | tee test-results.txt
-
-          echo "" >> $GITHUB_STEP_SUMMARY
-          # Extract test summary
-          grep -E "(Passed|Failed|Skipped)" test-results.txt | tail -20 >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tail -30 test-results.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "Skipped: $skipped" >> $GITHUB_STEP_SUMMARY
+          # A fork URL that is set yet still leaves tests skipping means a test
+          # reads some other variable, which no summary line would reveal.
+          if [ -n "$MAINNET_RPC_URL" ] && [ "$skipped" -gt 0 ]; then
+            echo "MAINNET_RPC_URL is set but $skipped tests skipped." >&2
+            exit 1
+          fi
 
       - name: Upload Test Results
         uses: actions/upload-artifact@v4

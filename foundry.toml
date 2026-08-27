@@ -2,7 +2,6 @@
 src = "src"
 out = 'out'
 libs = ['lib']
-remappings = []
 solc_version = "0.8.28"
 evm_version = "cancun"
 optimizer_runs = 800
@@ -46,17 +45,11 @@ ffi = true
 [profile.default.optimizer_details]
 yul = true
 
-remappings = [
-  "forge-std=lib/forge-std/src",
-  "@openzeppelin/contracts=lib/openzeppelin-contracts/contracts",
-  "openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts",
-  "@chainlink/contracts/=lib/chainlink-brownie-contracts/contracts/",
-  "@luxfi/oz/=lib/openzeppelin-contracts/contracts/",
-  "@luxfi/oz-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
-  "@luxfi/erc-3643/=lib/erc-3643/",
-  "@luxfi/onchain-id/=lib/onchain-id/",
-  "@onchain-id/solidity/=lib/onchain-id/",
-]
+# Remappings live in remappings.txt and only there. A second copy here read as a
+# key of the table above it -- TOML puts a bare key under the last header, and
+# the last header is `optimizer_details` -- so it never applied to anything, and
+# the build worked the whole time on the file. Two homes for one fact, one of
+# them silent.
 
 [profile.intense.fuzz]
 runs = 10000
