@@ -141,8 +141,23 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
     /// @dev Weight of redeemed collateral and fees / value of total collateral
     uint256 private _collateralWeight;
 
-    /// @dev Total locked collateral.
-    /// Locked collateral is the collateral that cannot be withdrawn due to LTV constraints
+    /// @dev The collateral locked against outstanding debt: the sum of every
+    ///      account's `rawLocked`, and nothing else.
+    ///
+    /// A redemption divides what it took by this and hands each account
+    /// `rawLocked / total` of it, so the sum of the shares is what actually left
+    /// only while this is the sum of the parts. It was not. {_addDebt} and
+    /// {_subDebt} mirrored their own changes into it, but {_sync} restates
+    /// `rawLocked` at the live price and told it nothing, and {redeem} drained
+    /// it at par when it had been filled at the collateralization bar. The first
+    /// charged every account in proportion to how far the price had moved; the
+    /// second stranded the bar's whole margin here, on every redemption.
+    ///
+    /// {_relock} is now the only way `rawLocked` is written and it carries the
+    /// difference through to here, so the identity holds by construction rather
+    /// than by everyone remembering. Note that it holds across a price move
+    /// without either side being repriced: a share of a pot is dimensionless,
+    /// and stays itself however the pot is quoted.
     uint256 private _totalLocked;
 
     /// @dev Total yield tokens deposited
@@ -450,8 +465,7 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
 
         _sync(tokenId);
 
-        uint256 lockedCollateral = convertDebtTokensToYield(_accounts[tokenId].debt) * minimumCollateralization / FIXED_POINT_SCALAR;
-        _checkArgument(_accounts[tokenId].collateralBalance - lockedCollateral >= amount);
+        _checkArgument(_accounts[tokenId].collateralBalance - _lock(_accounts[tokenId].debt) >= amount);
 
         _accounts[tokenId].collateralBalance -= amount;
 
@@ -459,8 +473,7 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
         _validate(tokenId);
 
         // Transfer the yield tokens to msg.sender
-        TokenUtils.safeTransfer(yieldToken, recipient, amount);
-        _yieldTokensDeposited -= amount;
+        _payOut(recipient, amount);
 
         emit Withdraw(amount, tokenId, recipient);
 
@@ -540,8 +553,7 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
 
         // Debt is subject to protocol fee similar to redemptions
         _accounts[recipientId].collateralBalance -= convertDebtTokensToYield(credit) * protocolFee / BPS;
-        TokenUtils.safeTransfer(yieldToken, protocolFeeReceiver, convertDebtTokensToYield(credit) * protocolFee / BPS);
-        _yieldTokensDeposited -= convertDebtTokensToYield(credit) * protocolFee / BPS;
+        _payOut(protocolFeeReceiver, convertDebtTokensToYield(credit) * protocolFee / BPS);
 
         // Update the recipient's debt.
         _subDebt(recipientId, credit);
@@ -598,8 +610,7 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
 
         // Transfer the repaid tokens to the transmuter.
         TokenUtils.safeTransferFrom(yieldToken, msg.sender, transmuter, creditToYield);
-        TokenUtils.safeTransfer(yieldToken, protocolFeeReceiver, creditToYield * protocolFee / BPS);
-        _yieldTokensDeposited -= creditToYield * protocolFee / BPS;
+        _payOut(protocolFeeReceiver, creditToYield * protocolFee / BPS);
 
         emit Repay(msg.sender, amount, recipientTokenId, creditToYield);
 
@@ -655,6 +666,9 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
         uint256 liveEarmarked = cumulativeEarmarked;
         if (amount > liveEarmarked) amount = liveEarmarked;
 
+        // The pot every account's share is measured against.
+        uint256 pot = _totalLocked;
+
         // observed transmuter pre-balance -> potential cover
         uint256 transmuterBal = TokenUtils.safeBalanceOf(yieldToken, address(transmuter));
         uint256 deltaYield = transmuterBal > lastTransmuterTokenBalance ? transmuterBal - lastTransmuterTokenBalance : 0;
@@ -691,14 +705,22 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
         uint256 feeCollateral = collRedeemed * protocolFee / BPS;
         uint256 totalOut = collRedeemed + feeCollateral;
 
-        // update locked collateral + collateral weight
-        uint256 old = _totalLocked;
-        _totalLocked = totalOut > old ? 0 : old - totalOut;
-        _collateralWeight += PositionDecay.WeightIncrement(totalOut > old ? old : totalOut, old);
+        // What fraction of the pot left it. Each account applies that fraction
+        // to its own standing lock the next time it syncs, so the shares sum
+        // back to `totalOut` exactly while the pot is the sum of those locks.
+        //
+        // The decay compounds, so the pot has to fall by what left: the next
+        // redemption's fraction is a fraction of what remains, not of what was
+        // here before this one. Filled at the collateralization bar and drained
+        // at par, it never fell far enough -- and the margin it kept sat in the
+        // denominator of every redemption that followed, shorting each of them
+        // by the difference.
+        uint256 out = totalOut > pot ? pot : totalOut;
+        _collateralWeight += PositionDecay.WeightIncrement(out, pot);
+        _totalLocked = pot - out;
 
-        TokenUtils.safeTransfer(yieldToken, transmuter, collRedeemed);
-        TokenUtils.safeTransfer(yieldToken, protocolFeeReceiver, feeCollateral);
-        _yieldTokensDeposited -= collRedeemed + feeCollateral;
+        _payOut(transmuter, collRedeemed);
+        _payOut(protocolFeeReceiver, feeCollateral);
 
         emit Redemption(redeemedDebtTotal);
     }
@@ -867,6 +889,11 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
     }
 
     /// @inheritdoc ILiquidState
+    function totalLocked() external view returns (uint256) {
+        return _totalLocked;
+    }
+
+    /// @inheritdoc ILiquidState
     function backing() public view returns (uint256) {
         return normalizeUnderlyingTokensToDebt(_getTotalUnderlyingValue() + convertYieldTokensToUnderlying(TokenUtils.safeBalanceOf(yieldToken, transmuter)));
     }
@@ -973,12 +1000,12 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
         if (account.collateralBalance > protocolFeeTotal) {
             account.collateralBalance -= protocolFeeTotal;
             // Transfer the protocol fee to the protocol fee receiver
-            TokenUtils.safeTransfer(yieldToken, protocolFeeReceiver, protocolFeeTotal);
+            _payOut(protocolFeeReceiver, protocolFeeTotal);
         }
 
         if (creditToYield > 0) {
             // Transfer the repaid tokens from the account to the transmuter.
-            TokenUtils.safeTransfer(yieldToken, address(transmuter), creditToYield);
+            _payOut(address(transmuter), creditToYield);
         }
 
         return creditToYield;
@@ -1039,7 +1066,7 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
         // If debt is fully cleared, return with only the repaid amount, no liquidation needed, caller receives repayment fee
         if (account.debt == 0) {
             feeInYield = _resolveRepaymentFee(accountId, repaidAmountInYield);
-            TokenUtils.safeTransfer(yieldToken, msg.sender, feeInYield);
+            _payOut(msg.sender, feeInYield);
             return (repaidAmountInYield, feeInYield, 0);
         }
 
@@ -1053,7 +1080,7 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
         } else {
             // Since only a repayment happened, send repayment fee to caller
             feeInYield = _resolveRepaymentFee(accountId, repaidAmountInYield);
-            TokenUtils.safeTransfer(yieldToken, msg.sender, feeInYield);
+            _payOut(msg.sender, feeInYield);
             return (repaidAmountInYield, feeInYield, 0);
         }
     }
@@ -1088,11 +1115,11 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
         _subDebt(accountId, debtToBurn);
 
         // send liquidation amount - fee to transmuter
-        TokenUtils.safeTransfer(yieldToken, transmuter, amountLiquidated - feeInYield);
+        _payOut(transmuter, amountLiquidated - feeInYield);
 
         // send base fee to liquidator if available
         if (feeInYield > 0 && account.collateralBalance >= feeInYield) {
-            TokenUtils.safeTransfer(yieldToken, msg.sender, feeInYield);
+            _payOut(msg.sender, feeInYield);
         }
 
         // Handle outsourced fee from vault. The bonus is a courtesy to the
@@ -1132,16 +1159,11 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
     function _addDebt(uint256 tokenId, uint256 amount) internal {
         Account storage account = _accounts[tokenId];
 
-        // Update collateral variables
-        uint256 toLock = convertDebtTokensToYield(amount) * minimumCollateralization / FIXED_POINT_SCALAR;
-        uint256 lockedCollateral = convertDebtTokensToYield(account.debt) * minimumCollateralization / FIXED_POINT_SCALAR;
+        if (account.collateralBalance - _lock(account.debt) < _lock(amount)) revert Undercollateralized();
 
-        if (account.collateralBalance - lockedCollateral < toLock) revert Undercollateralized();
-
-        account.rawLocked = lockedCollateral + toLock;
-        _totalLocked += toLock;
         account.debt += amount;
         totalDebt += amount;
+        _relock(account);
     }
 
     /// @dev Subtracts the debt by `amount` for the account owned by `tokenId`.
@@ -1151,19 +1173,18 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
     function _subDebt(uint256 tokenId, uint256 amount) internal {
         Account storage account = _accounts[tokenId];
 
-        // Update collateral variables
-        uint256 toFree = convertDebtTokensToYield(amount) * minimumCollateralization / FIXED_POINT_SCALAR;
-        uint256 lockedCollateral = convertDebtTokensToYield(account.debt) * minimumCollateralization / FIXED_POINT_SCALAR;
-
-        // For cases when someone above minimum LTV gets liquidated.
-        if (toFree > _totalLocked) {
-            toFree = _totalLocked;
-        }
-
         account.debt -= amount;
-        totalDebt -= amount;
-        _totalLocked -= toFree;
-        account.rawLocked = lockedCollateral - toFree;
+        // Same reason as the clamp above, applied to the other global counter.
+        // A redemption writes debt off {totalDebt} in one step and each account
+        // learns its share of that lazily, through an exponential decay whose
+        // own approximation error the engine does not control. The parts can
+        // therefore end a wei outside the whole, and when they do it is the last
+        // borrower to repay who finds out -- by having the repayment reverted
+        // and their debt made unpayable. Letting the counter reach zero a wei
+        // early costs nothing; refusing a repayment costs the borrower the
+        // position.
+        totalDebt = totalDebt > amount ? totalDebt - amount : 0;
+        _relock(account);
 
         // Clamp to avoid underflow due to rounding later at a later time
         if (cumulativeEarmarked > totalDebt) {
@@ -1284,7 +1305,7 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
         Account storage account = _accounts[tokenId];
 
         // Collateral to remove from redemptions and fees
-        uint256 collateralToRemove = PositionDecay.ScaleByWeightDelta(account.rawLocked, _collateralWeight - account.lastCollateralWeight);
+        uint256 collateralToRemove = _redemptionShare(account);
         account.collateralBalance -= collateralToRemove;
 
         // Redemption survival now and at last sync
@@ -1308,11 +1329,11 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
         // Unwind accumulated earmarked at last sync
         uint256 unredeemedRatio = _divQ128(survivalDiff, earmarkSurvival);
         // Portion of earmark that remains after applying the redemption
-        uint256 earmarkedUnredeemed = _mulQ128(userExposure, unredeemedRatio);
+        uint256 earmarkedUnredeemed = _mulQ128Down(userExposure, unredeemedRatio);
         if (earmarkedUnredeemed > earmarkRaw) earmarkedUnredeemed = earmarkRaw;
 
         // Old earmarks that survived redemptions in the current sync window
-        uint256 exposureSurvival = _mulQ128(account.earmarked, survivalRatio);
+        uint256 exposureSurvival = _mulQ128Down(account.earmarked, survivalRatio);
         // What was redeemed from the newly earmark between last sync and now
         uint256 redeemedFromEarmarked = earmarkRaw - earmarkedUnredeemed;
         // Total overall earmarked to adjust user debt
@@ -1322,7 +1343,7 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
         account.debt = account.debt >= redeemedTotal ? account.debt - redeemedTotal : 0;
 
         // Update locked collateral
-        account.rawLocked = convertDebtTokensToYield(account.debt) * minimumCollateralization / FIXED_POINT_SCALAR;
+        _relock(account);
 
         // Advance account checkpoint
         account.lastCollateralWeight = _collateralWeight;
@@ -1433,11 +1454,11 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
         // Unwind accumulated earmarked at last sync
         uint256 unredeemedRatio = _divQ128(survivalDiff, earmarkSurvival);
         // Portion of earmark that remains after applying the redemption
-        uint256 earmarkedUnredeemed = _mulQ128(userExposure, unredeemedRatio);
+        uint256 earmarkedUnredeemed = _mulQ128Down(userExposure, unredeemedRatio);
         if (earmarkedUnredeemed > earmarkRaw) earmarkedUnredeemed = earmarkRaw;
 
         // Old earmarks that survived redemptions in the current sync window
-        uint256 exposureSurvival = _mulQ128(account.earmarked, survivalRatio);
+        uint256 exposureSurvival = _mulQ128Down(account.earmarked, survivalRatio);
 
         // What was redeemed from the newly earmark between last sync and now
         uint256 redeemedFromEarmarked = earmarkRaw - earmarkedUnredeemed;
@@ -1448,10 +1469,77 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
         uint256 newEarmarked = exposureSurvival + earmarkedUnredeemed;
 
         // Collateral from fees and redemptions
-        uint256 collateralToRemove = PositionDecay.ScaleByWeightDelta(account.rawLocked, _collateralWeight - account.lastCollateralWeight);
-        uint256 newCollateral = account.collateralBalance - collateralToRemove;
+        uint256 newCollateral = account.collateralBalance - _redemptionShare(account);
 
         return (newDebt, newEarmarked, newCollateral);
+    }
+
+    /// @dev The collateral a debt locks: the debt in yield tokens, at the bar.
+    ///
+    /// The one place debt becomes locked collateral. An account's share of the
+    /// pot and the pot itself are the same quantity asked about different debts,
+    /// and they stay comparable only while one function answers both.
+    function _lock(uint256 debt) internal view returns (uint256) {
+        return convertDebtTokensToYield(debt) * minimumCollateralization / FIXED_POINT_SCALAR;
+    }
+
+    /// @dev What this account's lock has decayed to since it last synced.
+    ///
+    /// `rawLocked` is the lock as of that sync and the redemptions since have
+    /// eaten into it, so the stored number is not what the account currently
+    /// holds in the pot. This is, and it is what {_totalLocked} is counting.
+    function _standing(Account storage account) internal view returns (uint256) {
+        return account.rawLocked - PositionDecay.ScaleByWeightDelta(account.rawLocked, _collateralWeight - account.lastCollateralWeight);
+    }
+
+    /// @dev Restate what this account has locked, and carry the difference to
+    ///      the total so the two never come apart.
+    ///
+    /// The only writer of `rawLocked`, and it must run before the account's
+    /// weight checkpoint advances -- afterwards {_standing} reads a decay of
+    /// nothing and the account's old stake is left in the total forever.
+    function _relock(Account storage account) internal {
+        uint256 relocked = _lock(account.debt);
+        _totalLocked = _totalLocked + relocked - _standing(account);
+        account.rawLocked = relocked;
+    }
+
+    /// @dev Send yield tokens out of the protocol and record that they went.
+    ///
+    /// `_yieldTokensDeposited` is what the engine believes it holds, and it is
+    /// read by {backing} and so by {_inBadDebt} and by the transmuter's haircut.
+    /// Six of the eleven paths that moved collateral out never decremented it,
+    /// all of them on the liquidation and forced-repayment side -- so the moment
+    /// a position was liquidated the protocol started counting collateral it had
+    /// already paid away, and it counted more of it with every liquidation
+    /// after. A protocol that believes it is solvent keeps issuing debt, and the
+    /// haircut that is supposed to share out a shortfall reads a backing figure
+    /// that says there is none.
+    ///
+    /// One way out, so the counter cannot be forgotten again by whoever adds the
+    /// twelfth path.
+    function _payOut(address to, uint256 amount) internal {
+        if (amount == 0) return;
+        _yieldTokensDeposited = _yieldTokensDeposited > amount ? _yieldTokensDeposited - amount : 0;
+        TokenUtils.safeTransfer(yieldToken, to, amount);
+    }
+
+    /// @dev What a redemption takes from this account, never more than it holds.
+    ///
+    /// The share is this account's `rawLocked` over the sum of every account's,
+    /// which is what {_totalLocked} is kept as. Both sides are stored numbers
+    /// read at the same moment, so nothing about how the collateral is quoted
+    /// reaches the ratio.
+    ///
+    /// The clamp is for an account whose lock has outrun its balance, which is a
+    /// liquidatable position rather than an accounting error. Unclamped the
+    /// subtraction reverts, and it reverts inside {_sync}, which every entry
+    /// point runs first -- so the position could not be read, repaid, withdrawn
+    /// from, or liquidated. Losing the liquidation is the worst of those: it is
+    /// the protocol's own remedy for exactly the position this state describes.
+    function _redemptionShare(Account storage account) internal view returns (uint256 share) {
+        share = PositionDecay.ScaleByWeightDelta(account.rawLocked, _collateralWeight - account.lastCollateralWeight);
+        if (share > account.collateralBalance) share = account.collateralBalance;
     }
 
     /// @dev Checks that the account owned by `tokenId` is properly collateralized.
@@ -1525,9 +1613,27 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
 
     // ── Q128.128 fixed-point math helpers ──────────────────────────────
 
-    /// @dev Multiply two UQ128.128 values, returning a UQ128.128 result.
-    ///      Uses 512-bit intermediate to avoid overflow.
+    /// @dev Multiply two UQ128.128 values, rounding up. 512-bit intermediate.
     function _mulQ128(uint256 aQ, uint256 bQ) private pure returns (uint256 z) {
+        z = _mulQ128Down(aQ, bQ);
+        if (z == 0) return 0;
+        unchecked {
+            // Non-zero low bits mean the product was truncated.
+            if (mulmod(aQ, bQ, uint256(1) << 128) != 0) z += 1;
+        }
+    }
+
+    /// @dev Multiply two UQ128.128 values, truncating. 512-bit intermediate.
+    ///
+    /// Which way this rounds decides who absorbs the remainder. A redemption
+    /// reduces {totalDebt} once, globally, and each account learns its share of
+    /// that later in {_sync}; rounding an account's share down means every
+    /// account gives up at least what it owes, and the parts stay within the
+    /// whole. Rounding up leaves each account holding a wei the protocol has
+    /// already written off, the parts drift past the whole, and eventually a
+    /// borrower repaying a debt larger than the protocol's own total takes
+    /// {_subDebt} through zero.
+    function _mulQ128Down(uint256 aQ, uint256 bQ) private pure returns (uint256 z) {
         if (aQ == 0 || bQ == 0) return 0;
         uint256 lo;
         uint256 hi;
@@ -1539,12 +1645,6 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
         }
         // floor((a*b) / 2^128)
         z = (hi << 128) | (lo >> 128);
-        // if there are non-zero low bits, round up
-        if (lo & ((uint256(1) << 128) - 1) != 0) {
-            unchecked {
-                z += 1;
-            }
-        }
     }
 
     /// @dev Divide two UQ128.128 values, returning a UQ128.128 result.

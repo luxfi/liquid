@@ -845,6 +845,17 @@ interface ILiquidState {
     /// @return value The backing, denominated in debt tokens.
     function backing() external view returns (uint256 value);
 
+    /// @notice The collateral locked against outstanding debt.
+    ///
+    /// @dev The denominator a redemption is divided by. Each account holds a
+    ///      share of this, and the shares have to sum back to it or a redemption
+    ///      charges the accounts something other than what it took. Exposed so
+    ///      that identity can be read from outside: held as a running counter it
+    ///      drifted from its own parts for years, and nothing could see it.
+    ///
+    /// @return amount The locked collateral, denominated in yield tokens.
+    function totalLocked() external view returns (uint256 amount);
+
     /// @notice Whether the synthetic in circulation is worth more than what
     ///         stands behind it.
     ///
