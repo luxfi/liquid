@@ -32,15 +32,22 @@ import {LiquidTokenVault} from "../LiquidTokenVault.sol";
 contract LiquidTest is Test {
     // ----- [SETUP] Variables for setting up a minimal CDP -----
 
-    // Callable contract variables
+    // Callable contract variables.
+    //
+    // `transmuter` and `proxyTransmuter` used to be declared here and never
+    // assigned. Solidity default-initializes them, so every reference read
+    // address(0): `balanceOf(address(transmuter))` was the zero address's
+    // balance, and the liquidation test that compared it before and after was
+    // asserting zero equals zero. A declaration that is never assigned is a
+    // quieter way to write an assertion that cannot fail than commenting one
+    // out, because it still looks like it names something. The transmuter this
+    // suite actually runs against is `transmuterLogic`.
     Liquid liquid;
-    LiquidTransmuter transmuter;
     LiquidPosition liquidNFT;
     LiquidTokenVault liquidFeeVault;
 
     // // Proxy variables
     TransparentUpgradeableProxy proxyLiquid;
-    TransparentUpgradeableProxy proxyTransmuter;
 
     // // Contract variables
     // CheatCodes cheats = CheatCodes(HEVM_ADDRESS);
@@ -1072,12 +1079,17 @@ contract LiquidTest is Test {
         transmuterLogic.claimRedemption(1);
         vm.stopPrank();
 
-        assertApproxEqAbs(collateral, amount, 0);
-
         (collateral, userDebt,) = liquid.getCDP(tokenId);
 
+        // The claim retires the whole debt against collateral, and the fee is
+        // struck on what was retired. Both fall out exactly -- the tolerance
+        // here used to be a fifth of the figure, wide enough to have accepted
+        // any fee rate between nothing and twice the one configured. An
+        // assertion of the same shape sat above this one against a local read
+        // before the claim, so it restated what had already been checked and
+        // could not have failed whatever the claim did.
         assertEq(userDebt, 0);
-        assertApproxEqAbs(collateral, (amount / 2) - (amount / 2) * 100 / 10_000, 10e18); // Earmark rework changes residual collateral
+        assertEq(collateral, (amount / 2) - (amount / 2) * 100 / 10_000);
     }
 
     function testMintFeeOnDebtPartial() external {
@@ -1111,10 +1123,12 @@ contract LiquidTest is Test {
         transmuterLogic.claimRedemption(1);
         vm.stopPrank();
 
-        assertApproxEqAbs(collateral, amount, 0);
-
         (collateral, userDebt,) = liquid.getCDP(tokenId);
 
+        // Half the term elapsed, so half the debt is earmarked and retired, and
+        // the fee follows what was retired. Same removal as in the full-term
+        // case above: the assertion that stood here read a local captured before
+        // the claim and so restated the check above it.
         assertEq(userDebt, amount / 4);
         assertApproxEqAbs(collateral, (3 * amount / 4) - (amount / 4) * 100 / 10_000, 1);
     }
@@ -1699,16 +1713,7 @@ contract LiquidTest is Test {
         uint256 liquidatorPrevTokenBalance = IERC20(fakeYieldToken).balanceOf(address(externalUser));
         uint256 liquidatorPrevUnderlyingBalance = IERC20(fakeUnderlyingToken).balanceOf(address(externalUser));
 
-        uint256 liquidCurrentCollateralization =
-            liquid.normalizeUnderlyingTokensToDebt(liquid.getTotalUnderlyingValue()) * FIXED_POINT_SCALAR / liquid.totalDebt();
-        (uint256 liquidationAmount, uint256 expectedDebtToBurn, uint256 expectedBaseFee,) = liquid.calculateLiquidation(
-            liquid.totalValue(tokenIdFor0xBeef),
-            prevDebt,
-            liquid.minimumCollateralization(),
-            liquidCurrentCollateralization,
-            liquid.globalMinimumCollateralization(),
-            liquidatorFeeBPS
-        );
+        (uint256 liquidationAmount, uint256 expectedDebtToBurn, uint256 expectedBaseFee) = _restoreToMinimum(liquid.totalValue(tokenIdFor0xBeef), prevDebt);
         uint256 expectedLiquidationAmountInYield = liquid.convertDebtTokensToYield(liquidationAmount);
         uint256 expectedBaseFeeInYield = liquid.convertDebtTokensToYield(expectedBaseFee);
 
@@ -1728,6 +1733,21 @@ contract LiquidTest is Test {
 
         // ensure assets is equal to liquidation amount i.e. y in (collateral - y)/(debt - y) = minimum collateral ratio
         vm.assertApproxEqAbs(assets, expectedLiquidationAmountInYield, minimumDepositOrWithdrawalLoss);
+
+        // What the ratio equation was solved for, read back off the position the
+        // engine actually wrote. Nothing here comes from the engine's own
+        // arithmetic, so an implementation that agrees with itself but not with
+        // the ratio still fails.
+        //
+        // It lands a wei under the bar rather than on it: calculateLiquidation
+        // truncates m*debt before subtracting, and 1/(m-1) carries that lost wei
+        // up by a factor of nine, so nine wei less debt is retired than the exact
+        // solve retires. Both sides end nine wei heavier and the ratio between
+        // them a wei lighter. Bounded on both sides, so an implementation that
+        // drifts further either way is caught.
+        uint256 restored = liquid.totalValue(tokenIdFor0xBeef) * FIXED_POINT_SCALAR / debt;
+        vm.assertLe(restored, liquid.minimumCollateralization());
+        vm.assertGe(restored, liquid.minimumCollateralization() - 1);
 
         // ensure liquidator fee is correct (3% of liquidation amount)
         vm.assertApproxEqAbs(feeInYield, expectedBaseFeeInYield, 1e18);
@@ -1780,30 +1800,33 @@ contract LiquidTest is Test {
         // The engine admits a new price only across a block boundary, so a price
         // move is an inter-block event here as it is on chain.
         vm.roll(vm.getBlockNumber() + 1);
-        // ensure initial debt is correct
-        // vm.assertApproxEqAbs(prevDebt, 180_000_000_000_000_000_018_000, minimumDepositOrWithdrawalLoss);
+        // Same 90% draw as the 18-decimal case. Debt is always quoted in 18
+        // decimals, so a 6-decimal underlying moves the whole figure by the
+        // scalar normalizeUnderlyingTokensToDebt applies, 10**(18-6), and by
+        // nothing else -- which is why the 18-decimal constant read wrong here
+        // and the check had been switched off rather than converted.
+        vm.assertEq(prevDebt, 180_000_000_000_000_000_018_000 * 1e12);
         // let another user liquidate the previous user position
         vm.startPrank(externalUser);
         uint256 liquidatorPrevTokenBalance = IERC20(fakeYieldToken).balanceOf(address(externalUser));
         uint256 liquidatorPrevUnderlyingBalance = IERC20(fakeUnderlyingToken).balanceOf(address(externalUser));
-        uint256 liquidCurrentCollateralization =
-            liquid.normalizeUnderlyingTokensToDebt(liquid.getTotalUnderlyingValue()) * FIXED_POINT_SCALAR / liquid.totalDebt();
-        (uint256 liquidationAmount, uint256 expectedDebtToBurn,,) = liquid.calculateLiquidation(
-            liquid.totalValue(tokenIdFor0xBeef),
-            prevDebt,
-            liquid.minimumCollateralization(),
-            liquidCurrentCollateralization,
-            liquid.globalMinimumCollateralization(),
-            liquidatorFeeBPS
-        );
-        uint256 expectedLiquidationAmountInYield = liquid.convertDebtTokensToYield(liquidationAmount);
-        uint256 expectedFeeInDebtTokens = expectedDebtToBurn * liquidatorFeeBPS / 10_000;
-        // expected debt to burn is in debt tokens. converting to underlying for testing
-        uint256 expectedFeeInUnderlying = liquid.normalizeDebtTokensToUnderlying(expectedFeeInDebtTokens);
+        // A 40% dilution puts the debt above the collateral. There is no margin
+        // left to restore and no surplus to pay an in-kind fee out of, so the
+        // whole collateral goes, the whole debt is written off, and the
+        // liquidator is paid a share of that debt out of the fee vault.
+        uint256 collateralAtLiquidation = liquid.totalValue(tokenIdFor0xBeef);
+        vm.assertLt(collateralAtLiquidation, prevDebt);
+        uint256 expectedLiquidationAmountInYield = liquid.convertDebtTokensToYield(collateralAtLiquidation);
+        // The fee is struck on debt tokens; the vault pays in underlying.
+        uint256 expectedFeeInUnderlying = liquid.normalizeDebtTokensToUnderlying(prevDebt * liquidatorFeeBPS / BPS);
         uint256 adjustedExpectedFeeInUnderlying = feeVaultPreviousBalance > expectedFeeInUnderlying ? expectedFeeInUnderlying : feeVaultPreviousBalance;
         (uint256 assets, uint256 feeInYield, uint256 feeInUnderlying) = liquid.liquidate(tokenIdFor0xBeef);
-        // (uint256 depositedCollateral, uint256 debt,) = liquid.getCDP(tokenIdFor0xBeef);
+        (uint256 depositedCollateral, uint256 debt,) = liquid.getCDP(tokenIdFor0xBeef);
         vm.stopPrank();
+        // Nothing is left of either side of an underwater position.
+        vm.assertEq(depositedCollateral, 0);
+        vm.assertEq(debt, 0);
+        vm.assertApproxEqAbs(assets, expectedLiquidationAmountInYield, minimumDepositOrWithdrawalLoss);
         // ensure liquidator fee is correct (3% of surplus (account collateral - debt)
         vm.assertApproxEqAbs(feeInYield, 0, 1e18);
         vm.assertEq(feeInUnderlying, adjustedExpectedFeeInUnderlying);
@@ -1853,23 +1876,24 @@ contract LiquidTest is Test {
         uint256 liquidatorPrevTokenBalance = IERC20(fakeYieldToken).balanceOf(address(externalUser));
         uint256 liquidatorPrevUnderlyingBalance = IERC20(fakeUnderlyingToken).balanceOf(address(externalUser));
 
-        uint256 liquidCurrentCollateralization =
-            liquid.normalizeUnderlyingTokensToDebt(liquid.getTotalUnderlyingValue()) * FIXED_POINT_SCALAR / liquid.totalDebt();
-        (uint256 liquidationAmount, uint256 expectedDebtToBurn,,) = liquid.calculateLiquidation(
-            liquid.totalValue(tokenIdFor0xBeef),
-            prevDebt,
-            liquid.minimumCollateralization(),
-            liquidCurrentCollateralization,
-            liquid.globalMinimumCollateralization(),
-            liquidatorFeeBPS
-        );
-        uint256 expectedFeeInUnderlying = expectedDebtToBurn * liquidatorFeeBPS / 10_000;
-        uint256 expectedLiquidationAmountInYield = liquid.convertDebtTokensToYield(liquidationAmount);
+        // A 40% dilution puts the debt above the collateral. There is no margin
+        // left to restore and no surplus to pay an in-kind fee out of, so the
+        // whole collateral goes, the whole debt is written off, and the
+        // liquidator is paid a share of that debt out of the fee vault.
+        uint256 collateralAtLiquidation = liquid.totalValue(tokenIdFor0xBeef);
+        vm.assertLt(collateralAtLiquidation, prevDebt);
+        uint256 expectedFeeInUnderlying = prevDebt * liquidatorFeeBPS / BPS;
+        uint256 expectedLiquidationAmountInYield = liquid.convertDebtTokensToYield(collateralAtLiquidation);
 
         (uint256 assets, uint256 feeInYield, uint256 feeInUnderlying) = liquid.liquidate(tokenIdFor0xBeef);
-        // (uint256 depositedCollateral, uint256 debt,) = liquid.getCDP(tokenIdFor0xBeef);
+        (uint256 depositedCollateral, uint256 debt,) = liquid.getCDP(tokenIdFor0xBeef);
 
         vm.stopPrank();
+
+        // Nothing is left of either side of an underwater position.
+        vm.assertEq(depositedCollateral, 0);
+        vm.assertEq(debt, 0);
+        vm.assertApproxEqAbs(assets, expectedLiquidationAmountInYield, minimumDepositOrWithdrawalLoss);
 
         // ensure liquidator fee is correct (3% of surplus (account collateral - debt)
         vm.assertApproxEqAbs(feeInYield, 0, 1e18);
@@ -1924,19 +1948,15 @@ contract LiquidTest is Test {
         uint256 liquidatorPrevTokenBalance = IERC20(fakeYieldToken).balanceOf(address(externalUser));
         uint256 liquidatorPrevUnderlyingBalance = IERC20(fakeUnderlyingToken).balanceOf(address(externalUser));
 
-        uint256 liquidCurrentCollateralization =
-            liquid.normalizeUnderlyingTokensToDebt(liquid.getTotalUnderlyingValue()) * FIXED_POINT_SCALAR / liquid.totalDebt();
-        (uint256 liquidationAmount, uint256 expectedDebtToBurn, uint256 expectedBaseFee,) = liquid.calculateLiquidation(
-            liquid.totalValue(tokenIdFor0xBeef),
-            prevDebt,
-            liquid.minimumCollateralization(),
-            liquidCurrentCollateralization,
-            liquid.globalMinimumCollateralization(),
-            liquidatorFeeBPS
-        );
-        uint256 expectedLiquidationAmountInYield = liquid.convertDebtTokensToYield(liquidationAmount);
-        uint256 expectedBaseFeeInYield = liquid.convertDebtTokensToYield(expectedBaseFee);
-        uint256 expectedFeeInUnderlying = expectedDebtToBurn * liquidatorFeeBPS / 10_000;
+        // A 12% dilution is enough to put the debt above the collateral, which is
+        // the branch that writes the position off whole: everything is taken,
+        // all the debt goes, there is no surplus for an in-kind fee, and the
+        // liquidator is paid a share of the written-off debt from the fee vault.
+        uint256 collateralAtLiquidation = liquid.totalValue(tokenIdFor0xBeef);
+        vm.assertLt(collateralAtLiquidation, prevDebt);
+        uint256 expectedLiquidationAmountInYield = liquid.convertDebtTokensToYield(collateralAtLiquidation);
+        uint256 expectedBaseFeeInYield = 0;
+        uint256 expectedFeeInUnderlying = prevDebt * liquidatorFeeBPS / BPS;
         (uint256 assets, uint256 feeInYield, uint256 feeInUnderlying) = liquid.liquidate(tokenIdFor0xBeef);
 
         (uint256 depositedCollateral, uint256 debt,) = liquid.getCDP(tokenIdFor0xBeef);
@@ -2005,21 +2025,19 @@ contract LiquidTest is Test {
         uint256 liquidatorPrevTokenBalance = IERC20(fakeYieldToken).balanceOf(address(externalUser));
         uint256 liquidatorPrevUnderlyingBalance = IERC20(fakeUnderlyingToken).balanceOf(address(externalUser));
 
+        // Nobody else deposited here, so the protocol as a whole sits under its
+        // global floor while this one position is still above water. Restoring
+        // margin is not on offer while the protocol itself is short: the debt
+        // goes in full, and collateral worth exactly that debt goes with it.
         uint256 liquidCurrentCollateralization =
             liquid.normalizeUnderlyingTokensToDebt(liquid.getTotalUnderlyingValue()) * FIXED_POINT_SCALAR / liquid.totalDebt();
-        (uint256 liquidationAmount, uint256 expectedDebtToBurn,,) = liquid.calculateLiquidation(
-            liquid.totalValue(tokenIdFor0xBeef),
-            prevDebt,
-            liquid.minimumCollateralization(),
-            liquidCurrentCollateralization,
-            liquid.globalMinimumCollateralization(),
-            liquidatorFeeBPS
-        );
-        uint256 expectedLiquidationAmountInYield = liquid.convertDebtTokensToYield(liquidationAmount);
+        vm.assertLt(liquidCurrentCollateralization, liquid.globalMinimumCollateralization());
+        vm.assertGt(liquid.totalValue(tokenIdFor0xBeef), prevDebt);
+        uint256 expectedLiquidationAmountInYield = liquid.convertDebtTokensToYield(prevDebt);
         uint256 expectedBaseFeeInYield = 0;
 
         // Account is still collateralized, but pulling from fee vault for globally bad debt scenario
-        uint256 expectedFeeInUnderlying = expectedDebtToBurn * liquidatorFeeBPS / 10_000;
+        uint256 expectedFeeInUnderlying = prevDebt * liquidatorFeeBPS / BPS;
 
         (uint256 assets, uint256 feeInYield, uint256 feeInUnderlying) = liquid.liquidate(tokenIdFor0xBeef);
 
@@ -2137,9 +2155,15 @@ contract LiquidTest is Test {
         uint256 yieldBalance = liquid.getTotalDeposited();
         uint256 borrowable = liquid.getMaxBorrowable(tokenIdFor0xBeef);
 
-        assertApproxEqAbs(yieldBalance, 50e18, 10e18); // Yield accrues with new earmark math
-        assertApproxEqAbs(deposited, 50e18, 10e18);
-        assertApproxEqAbs(borrowable, 50e18 * FIXED_POINT_SCALAR / liquid.minimumCollateralization(), 10e18);
+        // Half the deposit was redeemed against, so half of it is left, and what
+        // can be drawn against that half is the half divided by the mint bar.
+        // All three land exactly. The tolerance was a fifth of the figure, which
+        // is wider than the quantity being measured moves under any of the
+        // failures these lines exist to catch -- a redemption that took the
+        // wrong half, or a bar read upside down, both sit inside it.
+        assertEq(yieldBalance, 50e18);
+        assertEq(deposited, 50e18);
+        assertEq(borrowable, 50e18 * FIXED_POINT_SCALAR / liquid.minimumCollateralization());
     }
 
     function testEarmarkDebtAndRedeemPartial() external {
@@ -2454,23 +2478,20 @@ contract LiquidTest is Test {
         uint256 liquidatorPrevTokenBalance = IERC20(fakeYieldToken).balanceOf(address(externalUser));
         uint256 liquidatorPrevUnderlyingBalance = IERC20(fakeUnderlyingToken).balanceOf(address(externalUser));
 
+        // The forced repayment of the earmark comes first and retires debt against
+        // collateral at par, so both sides fall by the same amount. A 50% dilution
+        // leaves what remains still underwater, so the liquidation that follows
+        // takes everything and writes the rest of the debt off.
         uint256 collateralAfterRepayment = liquid.totalValue(tokenIdFor0xBeef) - earmarked;
         uint256 debtAfterRepayment = prevDebt - earmarked;
-        uint256 liquidCurrentCollateralization =
-            liquid.normalizeUnderlyingTokensToDebt(liquid.getTotalUnderlyingValue()) * FIXED_POINT_SCALAR / liquid.totalDebt();
-        (uint256 liquidationAmount, uint256 expectedDebtToBurn, uint256 expectedBaseFee,) = liquid.calculateLiquidation(
-            collateralAfterRepayment,
-            debtAfterRepayment,
-            liquid.minimumCollateralization(),
-            liquidCurrentCollateralization,
-            liquid.globalMinimumCollateralization(),
-            liquidatorFeeBPS
-        );
+        vm.assertLt(collateralAfterRepayment, debtAfterRepayment);
+        uint256 expectedDebtToBurn = debtAfterRepayment;
+        uint256 expectedBaseFee = 0;
 
         (uint256 depositedColleteralBeforeLiquidation,, uint256 earmarkedBeforeLiquidation) = liquid.getCDP(tokenIdFor0xBeef);
-        uint256 expectedLiquidationAmountInYield = liquid.convertDebtTokensToYield(liquidationAmount);
+        uint256 expectedLiquidationAmountInYield = liquid.convertDebtTokensToYield(collateralAfterRepayment);
         uint256 expectedBaseFeeInYield = liquid.convertDebtTokensToYield(expectedBaseFee);
-        uint256 expectedFeeInUnderlying = expectedDebtToBurn * liquidatorFeeBPS / 10_000;
+        uint256 expectedFeeInUnderlying = debtAfterRepayment * liquidatorFeeBPS / BPS;
 
         (uint256 assets, uint256 feeInYield, uint256 feeInUnderlying) = liquid.liquidate(tokenIdFor0xBeef);
 
@@ -2543,20 +2564,14 @@ contract LiquidTest is Test {
         vm.roll(vm.getBlockNumber() + 1);
 
         uint256 badCollateralAfterDrop = liquid.totalValue(tokenIdBad);
-        (uint256 liquidationAmount,,,) = liquid.calculateLiquidation(
-            badCollateralAfterDrop,
-            badInitialDebt,
-            liquid.minimumCollateralization(),
-            liquid.normalizeUnderlyingTokensToDebt(liquid.getTotalUnderlyingValue()) * FIXED_POINT_SCALAR / liquid.totalDebt(),
-            liquid.globalMinimumCollateralization(),
-            liquidatorFeeBPS
-        );
-
-        // Convert liquidationAmount from debt tokens to underlying tokens for comparison
-        uint256 liquidationAmountInUnderlying = liquid.normalizeDebtTokensToUnderlying(liquidationAmount);
 
         // Confirm test preconditions
         require(badInitialDebt > badCollateralAfterDrop, "Account debt should exceed collateral after price drop");
+
+        // Underwater, so the seizure is the whole collateral. Converted from debt
+        // tokens to underlying for comparison against the system's holdings.
+        uint256 liquidationAmountInUnderlying = liquid.normalizeDebtTokensToUnderlying(badCollateralAfterDrop);
+
         require(liquid.getTotalUnderlyingValue() > liquidationAmountInUnderlying, "System collateral should be enough to cover liquidation");
 
         // health account total value
@@ -2945,7 +2960,11 @@ contract LiquidTest is Test {
         accountsToLiquidate[1] = position2.tokenId;
 
         CalculateLiquidationResult memory expectedResult1 = _calculateLiquidationForAccount(position1);
-        // CalculateLiquidationResult memory expectedResult2 = _calculateLiquidationForAccount(position2);
+
+        // Position 2 drew at a 1.5 ratio rather than the bar, so the same price
+        // move leaves it above the level at which a position becomes seizable.
+        // That, and not anything about the batch, is why it is skipped below.
+        vm.assertGt(liquid.totalValue(position2.tokenId) * FIXED_POINT_SCALAR / position2.debt, liquid.collateralizationLowerBound());
 
         (uint256 assets, uint256 feeInYield, uint256 feeInUnderlying) = liquid.batchLiquidate(accountsToLiquidate);
 
@@ -3129,23 +3148,43 @@ contract LiquidTest is Test {
         vm.stopPrank();
     }
 
-    function _calculateLiquidationForAccount(AccountPosition memory position) internal view returns (CalculateLiquidationResult memory result) {
-        uint256 liquidCurrentCollateralization =
-            liquid.normalizeUnderlyingTokensToDebt(liquid.getTotalUnderlyingValue()) * FIXED_POINT_SCALAR / liquid.totalDebt();
-        (uint256 liquidationAmount, uint256 debtToBurn, uint256 baseFee, uint256 outSourcedFee) = liquid.calculateLiquidation(
-            liquid.totalValue(position.tokenId),
-            position.debt,
-            liquid.minimumCollateralization(),
-            liquidCurrentCollateralization,
-            liquid.globalMinimumCollateralization(),
-            liquidatorFeeBPS
+    /// Solves, from the ratio itself, what a liquidation has to take: the engine
+    /// says it restores (collateral - fee - seized) / (debt - burned) to
+    /// `minimumCollateralization`, with the liquidator keeping `liquidatorFeeBPS`
+    /// of the surplus the position still has over its debt. Everything is in debt
+    /// units. Asking {Liquid.calculateLiquidation} for this number instead would
+    /// only confirm that it agrees with itself.
+    function _restoreToMinimum(uint256 collateral, uint256 debt) internal view returns (uint256 seized, uint256 burned, uint256 fee) {
+        uint256 m = liquid.minimumCollateralization();
+        // Restoring margin is one of three things a liquidation can do, and the
+        // only one this solves for. Stated here so a scenario that drifts into
+        // the underwater or globally-short branch fails loudly instead of being
+        // measured against a formula that does not describe it.
+        require(collateral > debt, "position is underwater, nothing to restore");
+        require(
+            liquid.normalizeUnderlyingTokensToDebt(liquid.getTotalUnderlyingValue()) * FIXED_POINT_SCALAR / liquid.totalDebt()
+                >= liquid.globalMinimumCollateralization(),
+            "protocol is under its global floor"
         );
+        fee = (collateral - debt) * liquidatorFeeBPS / BPS;
+        // (collateral - fee - y) * 1e18 == m * (debt - y), solved for y.
+        burned = (m * debt - (collateral - fee) * FIXED_POINT_SCALAR) / (m - FIXED_POINT_SCALAR);
+        seized = burned + fee;
+    }
 
-        uint256 liquidationAmountInYield = liquid.convertDebtTokensToYield(liquidationAmount);
-        uint256 baseFeeInYield = liquid.convertDebtTokensToYield(baseFee);
+    function _calculateLiquidationForAccount(AccountPosition memory position) internal view returns (CalculateLiquidationResult memory result) {
+        // Every batch here keeps a third depositor with no debt, so the protocol
+        // stays well above its global floor and each position is still worth more
+        // than it owes. That is the branch where margin gets restored rather than
+        // the position written off, and where the fee is paid in kind out of the
+        // position's own surplus, so nothing is owed by the fee vault.
+        (uint256 liquidationAmount, uint256 debtToBurn, uint256 baseFee) = _restoreToMinimum(liquid.totalValue(position.tokenId), position.debt);
 
         result = CalculateLiquidationResult({
-            liquidationAmountInYield: liquidationAmountInYield, debtToBurn: debtToBurn, outSourcedFee: outSourcedFee, baseFeeInYield: baseFeeInYield
+            liquidationAmountInYield: liquid.convertDebtTokensToYield(liquidationAmount),
+            debtToBurn: debtToBurn,
+            outSourcedFee: 0,
+            baseFeeInYield: liquid.convertDebtTokensToYield(baseFee)
         });
 
         return result;
@@ -3336,7 +3375,6 @@ contract LiquidTest is Test {
     }
 
     function testCrashDueToWeightIncrementCheck() external {
-        bytes memory expectedError = "WeightIncrement: increment > total";
         // 1. Create a position
         uint256 amount = 100e18;
         address user = address(0xbeef);
@@ -3374,7 +3412,17 @@ contract LiquidTest is Test {
         vm.roll(vm.getBlockNumber() + 1);
         liquid.repay(1, tokenId);
         vm.stopPrank();
-        liquid.getCDP(tokenId);
+
+        // Where the sequence has to land, not merely that it got here. The
+        // redemption was drawn in full, so the borrower's debt is gone and the
+        // collateral that stood against it went with it, leaving the untouched
+        // half. Reaching the end of the calls above was the whole assertion
+        // before, alongside a revert string this test stopped expecting and
+        // never deleted -- so nothing here read the position it left behind.
+        (uint256 endCollateral, uint256 endDebt, uint256 endEarmarked) = liquid.getCDP(tokenId);
+        assertEq(endCollateral, amount / 2);
+        assertEq(endDebt, 0);
+        assertEq(endEarmarked, 0);
     }
 
     function testDebtMintingRedemptionWithdraw() external {
@@ -3635,28 +3683,21 @@ contract LiquidTest is Test {
         vm.startPrank(externalUser);
         uint256 liquidatorPrevTokenBalance = IERC20(fakeYieldToken).balanceOf(address(externalUser));
         uint256 liquidatorPrevUnderlyingBalance = IERC20(fakeUnderlyingToken).balanceOf(address(externalUser));
-        uint256 liquidCurrentCollateralization =
-            liquid.normalizeUnderlyingTokensToDebt(liquid.getTotalUnderlyingValue()) * FIXED_POINT_SCALAR / liquid.totalDebt();
-        (uint256 liquidationAmount, uint256 expectedDebtToBurn, uint256 expectedBaseFee, uint256 outsourcedFee) = liquid.calculateLiquidation(
-            liquid.totalValue(tokenIdFor0xBeef),
-            prevDebt,
-            liquid.minimumCollateralization(),
-            liquidCurrentCollateralization,
-            liquid.globalMinimumCollateralization(),
-            liquidatorFeeBPS
-        );
+        (uint256 liquidationAmount, uint256 expectedDebtToBurn, uint256 expectedBaseFee) = _restoreToMinimum(liquid.totalValue(tokenIdFor0xBeef), prevDebt);
         uint256 expectedLiquidationAmountInYield = liquid.convertDebtTokensToYield(liquidationAmount);
         uint256 expectedBaseFeeInYield = liquid.convertDebtTokensToYield(expectedBaseFee);
-        uint256 expectedFeeInUnderlying = expectedDebtToBurn * liquidatorFeeBPS / 10_000;
-        uint256 transmuterBefore = fakeYieldToken.balanceOf(address(transmuter));
-        console.log("transmuterBefore", transmuterBefore);
+        // The position keeps a surplus over its debt, so the fee is paid in kind
+        // and the vault is not touched.
+        uint256 transmuterBefore = fakeYieldToken.balanceOf(address(transmuterLogic));
         (uint256 assets, uint256 feeInYield, uint256 feeInUnderlying) = liquid.liquidate(tokenIdFor0xBeef);
         uint256 liquidatorPostTokenBalance = IERC20(fakeYieldToken).balanceOf(address(externalUser));
         uint256 liquidatorPostUnderlyingBalance = IERC20(fakeUnderlyingToken).balanceOf(address(externalUser));
         (uint256 depositedCollateral, uint256 debt,) = liquid.getCDP(tokenIdFor0xBeef);
-        uint256 transmuterAfter = fakeYieldToken.balanceOf(address(transmuter));
-        console.log("transmuterAfter", transmuterAfter);
-        assertEq(transmuterBefore, transmuterAfter);
+        uint256 transmuterAfter = fakeYieldToken.balanceOf(address(transmuterLogic));
+        // Everything seized but the liquidator's cut lands with the transmuter,
+        // which is where the redemption claims this liquidation backs are paid
+        // from. The name on this test is the failure it was written to catch.
+        vm.assertEq(transmuterAfter - transmuterBefore, assets - feeInYield);
         vm.stopPrank();
         // ensure debt is reduced by the result of (collateral - y)/(debt - y) = minimum collateral ratio
         vm.assertApproxEqAbs(debt, prevDebt - expectedDebtToBurn, minimumDepositOrWithdrawalLoss);
@@ -3669,7 +3710,8 @@ contract LiquidTest is Test {
         // liquidator gets correct amount of fee
         vm.assertApproxEqAbs(liquidatorPostTokenBalance, liquidatorPrevTokenBalance + feeInYield, 1e18);
         vm.assertEq(liquidatorPostUnderlyingBalance, liquidatorPrevUnderlyingBalance + feeInUnderlying);
-        vm.assertEq(liquidFeeVault.totalDeposits(), 10_000 ether - feeInUnderlying);
+        vm.assertEq(feeInUnderlying, 0);
+        vm.assertEq(liquidFeeVault.totalDeposits(), 10_000 ether);
     }
 
     function testRepayWithDifferentPrice() external {
@@ -3825,7 +3867,16 @@ contract LiquidTest is Test {
         (collateral, debt, earmarked) = liquid.getCDP(tokenIdFor0xdad);
         (collateralBeef, debtBeef, earmarkedBeef) = liquid.getCDP(tokenIdFor0xBeef);
 
-        assertApproxEqAbs(earmarked + earmarkedBeef, liquid.cumulativeEarmarked(), 3);
-        assertApproxEqAbs(debt + debtBeef, liquid.totalDebt(), 3);
+        // Which side the remainder falls on is the point, and this test did not
+        // say. It has to be the protocol's: an account owing more than the book
+        // records takes {Liquid._subDebt} through zero when that account repays.
+        assertLe(earmarked + earmarkedBeef, liquid.cumulativeEarmarked(), "accounts are earmarked past the protocol's total");
+        assertLe(debt + debtBeef, liquid.totalDebt(), "accounts owe more than the protocol is owed");
+
+        // Two accounts, two redemptions, and each account floors its own share of
+        // each -- so four wei, and the bound is that product rather than a
+        // number that happened to fit.
+        assertApproxEqAbs(earmarked + earmarkedBeef, liquid.cumulativeEarmarked(), 2 * 2);
+        assertApproxEqAbs(debt + debtBeef, liquid.totalDebt(), 2 * 2);
     }
 }

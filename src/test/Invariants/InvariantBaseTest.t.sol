@@ -23,6 +23,32 @@ contract InvariantBaseTest is InvariantsTest {
         selectors.push(this.mine.selector);
 
         super.setUp();
+        _openingBook();
+    }
+
+    /// A live protocol for the campaign to start from, rather than an empty one.
+    ///
+    /// Everything worth reaching here sits behind a chain of earlier calls: a
+    /// liquidation needs a drawn position, a claim needs a staked redemption,
+    /// and a staked redemption needs a borrower holding what they borrowed. From
+    /// an empty book the fuzzer has to assemble all of that by chance before it
+    /// can test any of it, and whether it manages is a property of the seed. Two
+    /// drawn and staked positions turn those paths from lucky into reachable on
+    /// the first call.
+    function _openingBook() internal virtual {
+        address[] memory users = targetSenders();
+
+        for (uint256 i; i < 2 && i < users.length; ++i) {
+            address who = users[i];
+            _deposit(0, 1_000_000e18, who);
+
+            uint256 tokenId = LiquidNFTHelper.getFirstTokenId(who, address(liquidNFT));
+            _borrow(tokenId, liquid.getMaxBorrowable(tokenId) * 99 / 100, who);
+
+            // Staking is a separate transaction from borrowing on chain too.
+            vm.roll(vm.getBlockNumber() + 1);
+            _stake(alToken.balanceOf(who) / 2, who);
+        }
     }
 
     function _targetSenders() internal virtual override {
@@ -292,13 +318,41 @@ contract InvariantBaseTest is InvariantsTest {
 
     // What the risk handlers actually achieved. A handler that always reverts
     // and a handler that works look identical from the outside once the revert
-    // is caught, so the run counts its own effect and
-    // {test_handlers_can_drive_a_liquidation} holds it to it. Without that the
-    // suite can pass while proving nothing -- which is how it passed over three
-    // criticals.
+    // is caught, so the run counts its own effect and the direct drive tests in
+    // {FullSystemInvariantsTest} hold it to it. Without that the suite can pass
+    // while proving nothing -- which is how it passed over three criticals.
+    //
+    // Those tests read them. `afterInvariant` deliberately does not, and the
+    // reason is worth writing down because it is not the obvious one.
+    //
+    // It is not that the counters are invisible there. A standalone probe on
+    // forge 1.6.0-nightly -- one contract, one handler, no dependencies -- reads
+    // exactly the last run's depth: 4096 calls over 16 runs of depth 256 read as
+    // 256, depth 10 reads 10, depth 7 reads 7, and a flag a handler set reads
+    // set. So the counters are legible, but only for the final sequence, because
+    // state rolls back between runs.
+    //
+    // That last sequence is the problem. When a campaign fails, forge shrinks it
+    // to a handful of calls and `afterInvariant` runs against the shrunk one; and
+    // forge replays a cached failure from `cache/invariant/failures` before it
+    // searches for anything new, which is short for the same reason. Either way
+    // the counters read near zero whatever the handlers can actually do, so a
+    // floor built on them fails or passes according to whether some other
+    // invariant failed first. An assertion whose result turns on a different
+    // test's outcome is the thing this file exists to remove, not to add.
+    //
+    // The floor lives in the direct drive tests instead, which reach each path
+    // on purpose, on every run, and cannot be confounded by either mechanism.
     uint256 public liquidations;
     uint256 public priceMoves;
     uint256 public claims;
+
+    // A liquidation that never happens has two very different explanations, and
+    // a single counter cannot tell them apart: either nothing was ever driven
+    // under the bound, or something was and the engine refused. Counting both
+    // sides makes the failure say which.
+    uint256 public underwater;
+    uint256 public refusals;
 
     // Everything above moves value between accounts at a fixed price. Nothing
     // above can make a position unhealthy, so nothing above ever reaches the
@@ -348,10 +402,14 @@ contract InvariantBaseTest is InvariantsTest {
     function liquidatePosition(uint256) external logCall("liquidate") {
         uint256 tokenId = _weakestPosition();
         if (tokenId == 0) return;
+        underwater++;
 
         try liquid.liquidate(tokenId) returns (uint256 seized, uint256, uint256) {
             if (seized > 0) liquidations++;
-        } catch {}
+            else refusals++;
+        } catch {
+            refusals++;
+        }
     }
 
     /// The position closest to insolvency, or 0 if none is under the bound.
