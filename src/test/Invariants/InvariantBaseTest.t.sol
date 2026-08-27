@@ -85,11 +85,9 @@ contract InvariantBaseTest is InvariantsTest {
         vm.stopPrank();
     }
 
-    function _claim(uint256 amount) internal logCall("stake") {
-        vm.roll(vm.getBlockNumber() + 10);
-        vm.startPrank(address(transmuterLogic));
-        liquid.redeem(amount);
-        vm.stopPrank();
+    function _claim(uint256 id, address onBehalf) internal logCall("claim") {
+        vm.prank(onBehalf);
+        transmuterLogic.claimRedemption(id);
     }
 
     /* HANDLERS */
@@ -250,12 +248,44 @@ contract InvariantBaseTest is InvariantsTest {
         _stake(amount, onBehalf);
     }
 
-    function transmuterClaim(uint256 amount, uint256 onBehalfSeed) external {
-        // amount = bound(amount, 0, liquid.totalDebt());
-        // if (amount == 0) return;
-        // // if (amount > )
+    /// Take a staked redemption back out.
+    ///
+    /// This is the transmuter's exit and the most involved function in the
+    /// protocol: it prices the claim against the protocol's backing, applies the
+    /// bad-debt haircut, pulls what it needs from the engine, splits fees and
+    /// burns the rest. With the handler empty none of it ran, `totalLocked` only
+    /// ever rose, and every statement about locked stake was trivially true for
+    /// the whole of every campaign.
+    function transmuterClaim(uint256 seed, uint256 onBehalfSeed) external {
+        address onBehalf = _randomDepositor(targetSenders(), onBehalfSeed);
+        if (onBehalf == address(0)) return;
 
-        // _claim(amount);
+        uint256 id = _heldRedemption(onBehalf);
+        if (id == 0) return;
+
+        // A position cannot be claimed in the block it was opened. Beyond that,
+        // let the claim land anywhere in its window: an unmatured claim returns
+        // most of the stake and a matured one returns none of it, and those are
+        // different arithmetic.
+        vm.roll(vm.getBlockNumber() + 1 + seed % 5_256_000);
+
+        claims++;
+        _claim(id, onBehalf);
+    }
+
+    /// The first redemption position `owner` still holds, or zero.
+    ///
+    /// The transmuter's positions are a plain ERC721 with no enumeration and
+    /// claiming burns the token, so the ids in play are sparse and are found by
+    /// looking. A campaign opens few enough of them that looking costs less than
+    /// making the contract enumerable for the benefit of a test.
+    function _heldRedemption(address owner) internal view returns (uint256) {
+        for (uint256 id = 1; id <= 64; ++id) {
+            try transmuterLogic.ownerOf(id) returns (address who) {
+                if (who == owner) return id;
+            } catch {}
+        }
+        return 0;
     }
 
     /* RISK HANDLERS */
@@ -268,6 +298,7 @@ contract InvariantBaseTest is InvariantsTest {
     // criticals.
     uint256 public liquidations;
     uint256 public priceMoves;
+    uint256 public claims;
 
     // Everything above moves value between accounts at a fixed price. Nothing
     // above can make a position unhealthy, so nothing above ever reaches the

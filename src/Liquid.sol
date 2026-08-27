@@ -183,6 +183,7 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
         _checkArgument(params.protocolFee <= BPS);
         _checkArgument(params.liquidatorFee <= BPS);
         _checkArgument(params.repaymentFee <= BPS);
+        _checkArgument(params.maxPriceDeviation <= FIXED_POINT_SCALAR);
         _checkCollateralizationOrder(params.minimumCollateralization, params.globalMinimumCollateralization, params.collateralizationLowerBound);
 
         // The engine values collateral against debt with a decimals scalar and
@@ -321,7 +322,7 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
 
     /// @inheritdoc ILiquidAdminActions
     function setMaxPriceDeviation(uint256 value) external onlyAdmin {
-        _checkArgument(value <= BPS);
+        _checkArgument(value <= FIXED_POINT_SCALAR);
 
         maxPriceDeviation = value;
         emit MaxPriceDeviationUpdated(value);
@@ -715,7 +716,6 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
     /// @inheritdoc ILiquidActions
     function poke(uint256 tokenId) external nonReentrant {
         _checkForValidAccountId(tokenId);
-        _refreshPrice();
         _earmark();
         _sync(tokenId);
     }
@@ -790,9 +790,16 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
         // every position in the protocol worthless at once.
         if (reported == 0) return anchor;
 
-        uint256 bps = maxPriceDeviation * elapsed;
-        if (bps > BPS) bps = BPS;
-        uint256 room = anchor * bps / BPS;
+        // The move the adapter has earned since the anchor was set: the declared
+        // per-block rate, taken over the blocks that have passed. An index that
+        // moves no faster than it declares is never clamped, so the limit costs
+        // an honest adapter nothing.
+        //
+        // Nothing saturates it. Room that keeps widening with time is the same
+        // schedule an honest index would have followed over that time, and
+        // capping it would leave a market that went quiet for years unable to
+        // ever record the yield it really earned.
+        uint256 room = anchor * maxPriceDeviation * elapsed / FIXED_POINT_SCALAR;
 
         if (reported > anchor + room) return anchor + room;
         if (reported + room < anchor) return anchor - room;
@@ -814,18 +821,22 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
         tokenAdapter = adapter;
     }
 
-    /// @dev Commits the current vetted price as the new anchor.
+    /// @dev Commits the adapter's report as the new anchor, but only a report
+    ///      the limit admitted whole.
     ///
-    /// The engine values collateral at a price it has admitted, never at
-    /// whatever the adapter happens to report mid-transaction. {price} decides
-    /// how much of the adapter's report is admissible; this is what makes that
-    /// decision permanent, so the rate limit on the next move is measured from
-    /// where the price actually got to rather than from where it started.
+    /// The anchor is the point the rate limit measures from, so what it costs to
+    /// move the anchor is what the limit is worth. Committing a clamped report
+    /// would make a price the adapter did not earn the baseline for the next
+    /// move and start a fresh allowance from there, which turns the limit into a
+    /// ratchet: whoever touches the market often compounds where whoever waits
+    /// only accrues, and touching is something a stranger can pay for. Leaving
+    /// the anchor and its clock where they are for as long as a report is being
+    /// clamped collapses the two schedules into one, and holds a compromised
+    /// adapter to the rate an honest one would have moved at.
     ///
-    /// Called at the head of every operation that moves value, so the anchor
-    /// tracks an active market closely and a dormant one loosens gradually --
-    /// with no recent anchor there is nothing to rate-limit against, and the
-    /// adapter is believed.
+    /// Called at the head of every operation that moves value. Operations that
+    /// only settle an account do not call it: an account's bookkeeping is not a
+    /// reason to restate what the collateral is worth.
     ///
     /// Out-of-band reports are clamped, never rejected. Reverting here would
     /// stop deposits, repayments and liquidations at exactly the moment the
@@ -833,16 +844,16 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
     function _refreshPrice() internal {
         if (block.number == lastPriceBlock) return;
 
+        uint256 reported = ITokenAdapter(tokenAdapter).price();
         uint256 accepted = price();
-        if (accepted == lastPrice) {
-            lastPriceBlock = block.number;
-            return;
-        }
+        if (accepted != reported) return;
+
+        lastPriceBlock = block.number;
+        if (accepted == lastPrice) return;
 
         lastPrice = accepted;
-        lastPriceBlock = block.number;
 
-        emit PriceUpdated(accepted, ITokenAdapter(tokenAdapter).price());
+        emit PriceUpdated(accepted, reported);
     }
 
     /// @inheritdoc ILiquidState
@@ -856,21 +867,35 @@ contract Liquid is ILiquid, Initializable, ReentrancyGuardUpgradeable {
     }
 
     /// @inheritdoc ILiquidState
+    function backing() public view returns (uint256) {
+        return normalizeUnderlyingTokensToDebt(_getTotalUnderlyingValue() + convertYieldTokensToUnderlying(TokenUtils.safeBalanceOf(yieldToken, transmuter)));
+    }
+
+    /// @inheritdoc ILiquidState
     function inBadDebt() external view returns (bool) {
         return _inBadDebt();
     }
 
-    /// @dev True when the collateral the protocol holds no longer covers the
-    ///      debt it has already issued.
+    /// @dev True when what the protocol holds no longer covers the synthetic it
+    ///      has already put into circulation.
     ///
-    /// Issuing more debt against a shortfall, or accepting a new depositor into
-    /// one, hands the existing hole to whoever arrives next. Both are refused
-    /// until liquidations or repayments close it; repay, burn and liquidate stay
-    /// open throughout, so the position that closes the hole is always reachable.
+    /// Measured against synthetics issued and not against borrower debt. The two
+    /// come apart the moment a borrower repays in collateral: the debt is gone,
+    /// the synthetic they sold is still out there, and the only thing behind it
+    /// is what the transmuter was handed. A guard reading borrower debt calls
+    /// that market perfectly healthy at the exact moment its claimants are the
+    /// ones exposed, and {LiquidTransmuter} is meanwhile cutting their payouts
+    /// against the other measure. One statement of solvency, used by the guard
+    /// and by the haircut, or they will disagree about which protocol this is.
+    ///
+    /// Issuing more synthetic against a shortfall, or accepting a new depositor
+    /// into one, hands the existing hole to whoever arrives next. Both are
+    /// refused until the hole closes; repay, burn, liquidate and redemption
+    /// claims stay open throughout, so closing it is always reachable.
     function _inBadDebt() internal view returns (bool) {
-        uint256 debt = totalDebt;
-        if (debt == 0) return false;
-        return normalizeUnderlyingTokensToDebt(_getTotalUnderlyingValue()) < debt;
+        uint256 issued = totalSyntheticsIssued;
+        if (issued == 0) return false;
+        return backing() < issued;
     }
 
     /// @dev Mints debt tokens to `recipient` using the account owned by `tokenId`.

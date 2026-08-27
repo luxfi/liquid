@@ -130,23 +130,63 @@ contract FullSystemInvariantsTest is InvariantBaseTest {
         assertGe(alToken.totalSupply(), liquid.totalDebt());
     }
 
-    /// Staked redemptions can never exceed the synthetic actually issued.
+    /// Whether the synthetic in circulation is backed is deliberately NOT
+    /// asserted here, and this campaign is the reason.
     ///
-    /// The obvious form of this -- that locked stake never outruns outstanding
-    /// debt once the yield already delivered is netted off -- is not true, and
-    /// cannot be. The transmuter is paid in yield tokens at the price of the day
-    /// the debt was repaid; if the collateral price then falls, what it holds is
-    /// worth less in debt terms while the claims against it stay fixed. A
-    /// campaign that moves the price finds that within a few hundred calls.
+    /// `strategyLoss` takes underlying out of the vault for good and `movePrice`
+    /// marks the collateral down. Both leave synthetic standing against less
+    /// than it was worth, which is a real shortfall and precisely the case
+    /// {LiquidTransmuter} exists to share out through its haircut. Asserting
+    /// solvency over a campaign built to destroy value would only be satisfiable
+    /// by refusing to destroy any.
     ///
-    /// That shortfall is not a leak -- it is the case {LiquidTransmuter} scales
-    /// claims for through its bad-debt ratio, and the haircut is exercised
-    /// directly in the audit regression suite. What the protocol does enforce,
-    /// on every redemption, is this: stake is only ever accepted against
-    /// synthetic that was genuinely issued.
-    function invariantTransmuterStakeBackedByIssuedSynthetic() public view {
-        assertLe(transmuterLogic.totalLocked(), liquid.totalSyntheticsIssued(), "locked stake exceeds the synthetic ever issued");
+    /// The statement that was here instead -- locked stake never exceeding
+    /// synthetic issued -- survived that, and survived everything else, because
+    /// it is an inductive consequence of the two `require`s that produce those
+    /// two numbers. It was true before the campaign started and no sequence of
+    /// calls could have made it false.
+    ///
+    /// Backing is asserted where it can fail: {ConservationInvariantsTest}, over
+    /// the handlers that only move value.
+    function afterInvariant() public view {
+        assertGt(priceMoves, 0, "the campaign never moved the price");
+        assertGt(liquidations, 0, "the campaign never reached a liquidation");
+        assertGt(claims, 0, "the campaign never claimed a redemption");
+    }
+}
+
+/// The same protocol, driven only by handlers that move value between accounts.
+///
+/// No price move, no strategy loss, nothing destroyed. Every yield token that
+/// leaves one place arrives at another, so a shortfall here is not a market
+/// event -- it is the protocol losing track of its own money, and there is no
+/// other way to produce one.
+contract ConservationInvariantsTest is InvariantBaseTest {
+    /// Synthetic in circulation is worth no more than what stands behind it.
+    ///
+    /// Behind it is collateral still in the CDPs plus what borrowers have handed
+    /// the transmuter in repayment. Both back the same claims, which is why the
+    /// engine and the haircut both read {Liquid.backing}, and why a statement
+    /// that counts one and not the other describes a different protocol.
+    function invariantSyntheticsAreBacked() public view {
+        assertLe(liquid.totalSyntheticsIssued(), liquid.backing(), "synthetic is in circulation that nothing stands behind");
     }
 
-    // Earmarked can never be more than total debt
+    /// Accounts may never claim more collateral than the protocol holds.
+    function invariantConsistentCollateral() public view {
+        address[] memory users = targetSenders();
+        uint256 claimed;
+
+        for (uint256 i; i < users.length; ++i) {
+            (uint256 collateral,,) = liquid.getCDP(LiquidNFTHelper.getFirstTokenId(users[i], address(liquidNFT)));
+            claimed += collateral;
+        }
+
+        assertLe(claimed, liquid.getTotalDeposited());
+        assertApproxEqAbs(claimed, liquid.getTotalDeposited(), users.length);
+    }
+
+    function afterInvariant() public view {
+        assertGt(claims, 0, "the campaign never claimed a redemption");
+    }
 }

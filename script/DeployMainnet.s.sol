@@ -48,11 +48,20 @@ contract DeployMainnet is Script {
     uint256 constant LIQUIDATOR_FEE = 500; // 5% in BPS
     uint256 constant REPAYMENT_FEE = 100; // 1% in BPS
 
-    // How far the adapter may move the engine's price, in BPS per block elapsed.
-    // At 2s blocks 1 BPS/block is ~18%/hour: fast enough to track real yield
-    // accrual and real loss events, slow enough that a compromised adapter
-    // cannot move borrowing power before a guardian can pause the market.
-    uint256 constant MAX_PRICE_DEVIATION = 1;
+    // How far the adapter may move the engine's price in one block, as a
+    // fraction of it in 1e18. Calibrate it against what the collateral actually
+    // earns: whatever is left over is room a compromised adapter works in for
+    // free, and 20% a year is already a generous read of a yield index.
+    //
+    // Written as the division rather than the quotient so the number can be
+    // checked against the collateral instead of against a block count. Quoting
+    // it per block invites the mistake this replaces: 1 BPS a block reads tight
+    // and is ~18% an hour, nearly eight thousand times the signal.
+    //
+    // Chasing a real loss event is not this parameter's job. A guardian's
+    // pauseLoans stops a bad price from being monetized in one transaction; the
+    // limit only has to stop it being monetized before anyone notices.
+    uint256 constant MAX_PRICE_DEVIATION = 0.2e18 / BLOCKS_PER_YEAR;
 
     // Seed for the fee vault, in bridged ETH. This is what pays the liquidator
     // bonus on positions too far underwater to fund one from their own collateral.

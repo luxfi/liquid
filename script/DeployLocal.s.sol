@@ -148,8 +148,9 @@ contract DeployLocal is Script {
             globalMinimumCollateralization: 1.0526e18,
             collateralizationLowerBound: 1.05e18,
             tokenAdapter: address(wluxAdapter),
-            // Freezes price movement within a block; 1 BPS/block elapsed thereafter.
-            maxPriceDeviation: 1,
+            // Freezes price movement within a block, and holds it to the rate
+            // the collateral earns thereafter. See DeployMainnet.
+            maxPriceDeviation: 0.2e18 / BLOCKS_PER_YEAR,
             transmuter: address(transmuter),
             protocolFee: 1000, // 10% in BPS
             protocolFeeReceiver: deployer,

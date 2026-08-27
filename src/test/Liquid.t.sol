@@ -160,7 +160,7 @@ contract LiquidTest is Test {
             collateralizationLowerBound: 1_052_631_578_950_000_000, // 1.05 collateralization
             globalMinimumCollateralization: 1_111_111_111_111_111_111, // 1.1
             tokenAdapter: address(fakeYieldToken),
-            maxPriceDeviation: 10_000,
+            maxPriceDeviation: 1e18,
             transmuter: address(transmuterLogic),
             protocolFee: 0,
             protocolFeeReceiver: protocolFeeReceiver,
@@ -1727,7 +1727,7 @@ contract LiquidTest is Test {
         vm.assertApproxEqAbs(depositedCollateral, prevCollateral - expectedLiquidationAmountInYield, minimumDepositOrWithdrawalLoss);
 
         // ensure assets is equal to liquidation amount i.e. y in (collateral - y)/(debt - y) = minimum collateral ratio
-        // vm.assertApproxEqAbs(assets, expectedLiquidationAmountInYield, minimumDepositOrWithdrawalLoss);
+        vm.assertApproxEqAbs(assets, expectedLiquidationAmountInYield, minimumDepositOrWithdrawalLoss);
 
         // ensure liquidator fee is correct (3% of liquidation amount)
         vm.assertApproxEqAbs(feeInYield, expectedBaseFeeInYield, 1e18);
@@ -1950,7 +1950,7 @@ contract LiquidTest is Test {
         vm.assertApproxEqAbs(depositedCollateral, 0, minimumDepositOrWithdrawalLoss);
 
         // ensure assets liquidated is equal (collateral - (90% of collateral))
-        // vm.assertApproxEqAbs(assets, expectedLiquidationAmountInYield, minimumDepositOrWithdrawalLoss);
+        vm.assertApproxEqAbs(assets, expectedLiquidationAmountInYield, minimumDepositOrWithdrawalLoss);
 
         // ensure liquidator fee is correct (3% of 0 if collateral fully liquidated as a result of bad debt)
         vm.assertApproxEqAbs(feeInYield, 0, 1e18);
@@ -2672,7 +2672,7 @@ contract LiquidTest is Test {
         );
 
         // ensure assets is equal to repayment of max earmarked amount
-        // vm.assertApproxEqAbs(assets, liquid.convertDebtTokensToYield(earmarked), minimumDepositOrWithdrawalLoss);
+        vm.assertApproxEqAbs(assets, liquid.convertDebtTokensToYield(earmarked), minimumDepositOrWithdrawalLoss);
 
         // ensure liquidator fee is correct (i.e.0, since only a repayment is done)
         vm.assertApproxEqAbs(feeInYield, repaymentFee, 1e18);
@@ -2820,7 +2820,7 @@ contract LiquidTest is Test {
         vm.assertApproxEqAbs(depositedCollateral, prevCollateral - liquid.convertDebtTokensToYield(earmarked) - repaymentFee, minimumDepositOrWithdrawalLoss);
 
         // ensure assets is equal to repayment of max earmarked amount
-        // vm.assertApproxEqAbs(assets, liquid.convertDebtTokensToYield(earmarked), minimumDepositOrWithdrawalLoss);
+        vm.assertApproxEqAbs(assets, liquid.convertDebtTokensToYield(earmarked), minimumDepositOrWithdrawalLoss);
 
         // ensure liquidator fee is correct (i.e. only repayment fee, since only a repayment is done)
         vm.assertApproxEqAbs(feeInYield, repaymentFee, 1e18);
