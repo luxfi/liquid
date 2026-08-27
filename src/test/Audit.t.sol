@@ -600,7 +600,21 @@ contract AuditLiquid is Test {
         // it is bounded by the collateral that existed -- the engine cannot
         // consume more collateral than the account had, which is what the
         // unclamped forced repayment effectively claimed to have done.
-        assertEq(collateralAfter, 0, "collateral fully consumed");
+        // One wei survives, and which way it falls is the whole question. The
+        // seizure converts the account's collateral to debt units and back --
+        // yield to underlying at the price, underlying to debt by the decimals
+        // factor, and the reverse -- and the price leg is a division each way,
+        // so the round trip returns at most what it started with. The remainder
+        // is left on the account rather than rounded onto the protocol's side,
+        // which is the direction that keeps every account's claim inside what
+        // the protocol still holds.
+        //
+        // Pinned, not bounded. The loss is floor-division error on the price
+        // leg, so its size goes as the price: at the 70% drop this test applies
+        // it is one wei, but a deeper drop admits more, and `assertLe(_, 1)`
+        // would read as a derived ceiling when it is really this scenario's
+        // measured value. Pinning says which it is, and moves either way.
+        assertEq(collateralAfter, 1, "collateral consumed but for the rounding wei");
         assertEq(accountDebtAfter, 0, "position wound up");
         assertLe(liquid.convertDebtTokensToYield(debtRetired), yieldMoved + collateralBefore, "no more collateral consumed than existed");
         assertGt(yieldMoved, 0, "seized collateral reached the transmuter, not nowhere");

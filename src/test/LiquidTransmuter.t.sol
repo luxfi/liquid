@@ -34,7 +34,7 @@ contract MockLiquid {
         syntheticsIssued = amount;
     }
 
-    function convertYieldTokensToUnderlying(uint256 amount) external pure returns (uint256) {
+    function convertYieldTokensToUnderlying(uint256 amount) public pure returns (uint256) {
         return (amount * 2 * FIXED_POINT_SCALAR) / FIXED_POINT_SCALAR;
     }
 
@@ -51,7 +51,7 @@ contract MockLiquid {
     }
 
     /// @dev Debt and underlying share decimals in this harness, so the scalar is 1.
-    function normalizeUnderlyingTokensToDebt(uint256 amount) external pure returns (uint256) {
+    function normalizeUnderlyingTokensToDebt(uint256 amount) public pure returns (uint256) {
         return amount;
     }
 
@@ -75,6 +75,13 @@ contract MockLiquid {
         }
     }
 
+    /// @dev The engine's one statement of what stands behind the synthetic:
+    ///      what it still holds, plus what borrowers have already handed the
+    ///      transmuter. The caller is the transmuter, so that is msg.sender.
+    function backing() public view returns (uint256) {
+        return normalizeUnderlyingTokensToDebt(getTotalUnderlyingValue() + convertYieldTokensToUnderlying(collateral.balanceOf(msg.sender)));
+    }
+
     function reduceSyntheticsIssued(uint256 amount) external {}
 
     function setTransmuterTokenBalance(uint256 amount) external {}
@@ -83,7 +90,7 @@ contract MockLiquid {
         return address(collateral);
     }
 
-    function getTotalUnderlyingValue() external view returns (uint256) {
+    function getTotalUnderlyingValue() public view returns (uint256) {
         if (underlyingValue > 0) {
             return underlyingValue;
         } else {

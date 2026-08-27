@@ -62,6 +62,7 @@ contract TestYieldToken is ITestYieldToken, ERC20 {
         uint256 value = _shareValue(shares);
         value = (value * (BPS - slippage)) / BPS;
         _burn(msg.sender, shares);
+        if (mockedSupply > shares) mockedSupply -= shares;
         TokenUtils.safeTransfer(underlyingToken, recipient, value);
 
         return value;
@@ -84,6 +85,14 @@ contract TestYieldToken is ITestYieldToken, ERC20 {
         }
         shares = (shares * (BPS - slippage)) / BPS;
         _mint(to, shares);
+        // The mocked count stands in for the share supply the price is quoted
+        // against, so it has to move with the shares. Left frozen at whatever
+        // {updateMockTokenSupply} last set, it keeps dividing a growing
+        // underlying balance by the count from one deposit ago, and the price
+        // runs away from anything a vault could report -- far enough that
+        // converting a debt to yield tokens throws away twelve digits, and the
+        // engine's own accounting appears to leak.
+        if (mockedSupply > 0) mockedSupply += shares;
         return shares;
     }
 
