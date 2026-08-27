@@ -10,7 +10,14 @@ SLITHER := $(VENV)/bin/slither
 SEMGREP := $(VENV)/bin/semgrep
 ADERYN := $(HOME)/.cyfrin/bin/aderyn
 
-.PHONY: all build test clean deploy lint fmt audit security venv halmos
+.PHONY: all build test clean deploy lint fmt audit security venv halmos test-fuzz test-invariant
+
+# Test selection, shared verbatim with .github/workflows so a green CI and a
+# green laptop mean the same thing. Fuzz runs only bite parameterized tests, so
+# the unit suite is the fuzz suite. Invariants sit outside it because their
+# harness file is not named *.t.sol.
+FUZZ := src/test/**/*.t.sol
+INVARIANT := src/test/Invariants/*.sol
 
 # ═══════════════════════════════════════════════════════════════════
 # Build & Test
@@ -33,7 +40,11 @@ test-gas:
 	$(FORGE) test --gas-report
 
 test-fuzz:
-	$(FORGE) test --match-path "src/test/fuzz/*.sol" --fuzz-runs 1000
+	$(FORGE) test --match-path "$(FUZZ)" --fuzz-runs 1000
+
+# Seeded so a reported counterexample reproduces.
+test-invariant:
+	$(FORGE) test --match-path "$(INVARIANT)" --fuzz-seed 42
 
 coverage:
 	$(FORGE) coverage --ir-minimum --report summary
@@ -60,30 +71,39 @@ venv: $(VENV)/.installed
 
 $(VENV)/.installed:
 	$(UV) venv $(VENV)
-	$(UV) pip install --python $(VENV)/bin/python slither-analyzer semgrep
+	$(UV) pip install --python $(VENV)/bin/python slither-analyzer semgrep halmos
 	@touch $@
 
+# Each scanner stops the build at the same threshold CI uses: slither at medium,
+# semgrep at error, aderyn at high. A scanner that cannot fail reports nothing.
 slither: venv
 	$(SLITHER) src/ \
 		--exclude-dependencies \
 		--exclude-informational \
 		--filter-paths "test/,mocks/,script/" \
-		--json slither-report.json || true
+		--fail-medium \
+		--json slither-report.json
 	@echo "Report: slither-report.json"
 
 semgrep: venv
 	$(SEMGREP) scan --config p/solidity --config p/smart-contracts \
-		src/ --sarif -o semgrep-results.sarif || true
+		--severity ERROR --error \
+		src/ --sarif -o semgrep-results.sarif
 	@echo "Report: semgrep-results.sarif"
 
+# Aderyn always exits 0, so the count in its own summary table is the verdict.
 aderyn:
 	@if [ ! -f "$(ADERYN)" ]; then \
 		echo "Installing aderyn..."; \
 		curl -L https://raw.githubusercontent.com/Cyfrin/aderyn/main/cyfrinup/install | bash; \
 		$(HOME)/.cyfrin/bin/cyfrinup; \
 	fi
-	$(ADERYN) . --src src/ --output aderyn-report.md || true
+	$(ADERYN) . --src src/ -x test,mocks --output aderyn-report.md
 	@echo "Report: aderyn-report.md"
+	@if grep -qE '^\| High \| [1-9]' aderyn-report.md; then \
+		grep -E '^\| High \|' aderyn-report.md; \
+		exit 1; \
+	fi
 
 # Run ALL security tools
 security: slither semgrep aderyn
@@ -106,8 +126,11 @@ audit: lint test security
 
 HALMOS := $(VENV)/bin/halmos
 
+# Unfiltered, halmos walks every contract the project compiles, lib/ included.
+# The properties live in the four Halmos* contracts under src/test/halmos.
 halmos: venv
-	$(HALMOS) --solver-timeout-branching 10s --solver-timeout-assertion 300s --function check
+	$(HALMOS) --match-contract '^Halmos' --function check \
+		--solver-timeout-branching 10s --solver-timeout-assertion 300s
 
 # ═══════════════════════════════════════════════════════════════════
 # Deploy
@@ -157,9 +180,11 @@ help:
 	@echo "  make test          Run all tests"
 	@echo "  make test-v        Tests with full traces"
 	@echo "  make test-fuzz     Fuzz tests (1000 runs)"
+	@echo "  make test-invariant Invariant suite (seeded)"
 	@echo "  make coverage      Coverage summary"
 	@echo ""
 	@echo "Security:"
+	@echo "  make halmos        Symbolic execution over the check_ properties"
 	@echo "  make security      Run slither + semgrep + aderyn"
 	@echo "  make slither       Slither static analysis"
 	@echo "  make semgrep       Semgrep SAST"

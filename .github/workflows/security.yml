@@ -16,7 +16,9 @@ on:
     - cron: '0 0 * * 0'
 
 env:
-  FOUNDRY_PROFILE: ci
+  # The only profile this tree compiles under. profile.test sets via_ir = false
+  # and Liquid.sol runs out of stack without it.
+  FOUNDRY_PROFILE: default
 
 jobs:
   # ═══════════════════════════════════════════════════════════════════════════
@@ -63,10 +65,12 @@ jobs:
           sarif_file: results.sarif
         if: always()
 
+      # Findings are gated once, by the step above. --fail-none keeps this one to
+      # writing the artifact, while a crashed slither still stops the job.
       - name: Create Slither Report
         if: always()
         run: |
-          slither src/ --exclude-dependencies --json slither-report.json || true
+          slither src/ --exclude-dependencies --fail-none --json slither-report.json
           echo "## Slither Analysis Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           if [ -f slither-report.json ]; then
@@ -107,17 +111,23 @@ jobs:
           tar -xzf echidna-2.2.5-x86_64-linux.tar.gz
           sudo mv echidna /usr/local/bin/
 
+      # Echidna drives contracts that declare echidna_ properties. Deriving the
+      # target list from the source keeps it from rotting, and an empty list is
+      # reported rather than passed over, which is what a missing glob used to do.
       - name: Run Echidna on critical contracts
+        shell: bash
         run: |
           echo "## Echidna Fuzzing Results" >> $GITHUB_STEP_SUMMARY
 
-          # Run Echidna on contracts with invariant tests
-          for contract in test/fuzz/*.sol; do
-            if [ -f "$contract" ]; then
-              name=$(basename "$contract" .sol)
-              echo "Running Echidna on $name..." >> $GITHUB_STEP_SUMMARY
-              echidna . --contract "$name" --config echidna.yaml --test-mode assertion || true
-            fi
+          if ! targets=$(grep -rl 'function echidna_' src/); then
+            echo "No echidna harness in src/: expected contracts declaring 'function echidna_' properties." >&2
+            exit 1
+          fi
+
+          for file in $targets; do
+            name=$(basename "$file" .sol)
+            echo "Running Echidna on $name" >> $GITHUB_STEP_SUMMARY
+            echidna . --contract "$name" --config echidna.yaml --test-mode assertion
           done
 
       - name: Upload Echidna corpus
@@ -158,18 +168,16 @@ jobs:
           go install github.com/crytic/medusa@latest
           echo "$HOME/go/bin" >> $GITHUB_PATH
 
+      # medusa.json is committed and carries its own timeout, so the budget and
+      # the targets both live there. It sets stopOnNoTests, meaning medusa says
+      # so itself when nothing is wired up to fuzz.
       - name: Run Medusa fuzzing
+        shell: bash
         run: |
           export PATH=$PATH:$HOME/go/bin
           echo "## Medusa Fuzzing Results" >> $GITHUB_STEP_SUMMARY
 
-          # Initialize medusa config if not exists
-          if [ ! -f medusa.json ]; then
-            medusa init || true
-          fi
-
-          # Run Medusa with timeout
-          timeout 600 medusa fuzz --config medusa.json || true
+          medusa fuzz --config medusa.json
 
           echo "Medusa fuzzing completed" >> $GITHUB_STEP_SUMMARY
 
@@ -207,15 +215,18 @@ jobs:
         env:
           SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
 
+      # The Solidity packs are noisy at info and warning, so the job gates on
+      # error-severity rules only and --error turns a finding into a red build.
       - name: Run Semgrep (local rules)
+        shell: bash
         run: |
           pip install semgrep
           echo "## Semgrep Analysis Results" >> $GITHUB_STEP_SUMMARY
 
-          # Run with Solidity-specific rules
           semgrep scan --config p/solidity --config p/smart-contracts \
+            --severity ERROR --error \
             --sarif --output semgrep-results.sarif \
-            src/ || true
+            src/
 
           echo "Semgrep scan completed" >> $GITHUB_STEP_SUMMARY
 
@@ -289,15 +300,21 @@ jobs:
           ~/.cyfrin/bin/cyfrinup
           echo "$HOME/.cyfrin/bin" >> $GITHUB_PATH
 
+      # Aderyn exits 0 whatever it finds, so the count in its own summary table
+      # is the verdict. Tests and mocks are excluded to match forge lint and
+      # .slither.config.json, leaving the production contracts.
       - name: Run Aderyn
+        shell: bash
         run: |
           export PATH=$PATH:$HOME/.cyfrin/bin
           echo "## Aderyn Analysis Results" >> $GITHUB_STEP_SUMMARY
 
-          aderyn . --output aderyn-report.md
+          aderyn . --src src/ -x test,mocks --output aderyn-report.md
+          cat aderyn-report.md >> $GITHUB_STEP_SUMMARY
 
-          if [ -f aderyn-report.md ]; then
-            cat aderyn-report.md >> $GITHUB_STEP_SUMMARY
+          if grep -qE '^\| High \| [1-9]' aderyn-report.md; then
+            grep -E '^\| High \|' aderyn-report.md >&2
+            exit 1
           fi
 
       - name: Upload Aderyn Report
@@ -324,15 +341,21 @@ jobs:
         with:
           version: stable
 
+      # The suite is selected by the Makefile so CI and a laptop run the same set.
+      # shell: bash turns on pipefail; without it tee returns 0 over a failed run.
       - name: Run Forge fuzz tests
+        shell: bash
+        run: make test-fuzz 2>&1 | tee fuzz-results.txt
+        env:
+          MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}
+
+      - name: Summarize Fuzz Tests
+        if: always()
         run: |
           echo "## Forge Fuzz Test Results" >> $GITHUB_STEP_SUMMARY
-          forge test --match-path "test/fuzz/*.sol" -vv --fuzz-runs 1000 2>&1 | tee fuzz-results.txt || true
-
-          # Extract summary
+          echo '```' >> $GITHUB_STEP_SUMMARY
           tail -30 fuzz-results.txt >> $GITHUB_STEP_SUMMARY
-        env:
-          FOUNDRY_FUZZ_RUNS: 1000
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Upload Fuzz Results
         uses: actions/upload-artifact@v4
@@ -342,11 +365,52 @@ jobs:
           path: fuzz-results.txt
 
   # ═══════════════════════════════════════════════════════════════════════════
+  # HALMOS - Symbolic Execution
+  # ═══════════════════════════════════════════════════════════════════════════
+  halmos:
+    name: Halmos Symbolic Execution
+    runs-on: lux-build-amd64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      # make halmos installs halmos into .venv and scopes the run to the four
+      # Halmos* contracts. A property that neither proves nor finds a
+      # counterexample inside the solver budget counts as failed, by design.
+      - name: Run Halmos
+        shell: bash
+        run: make halmos 2>&1 | tee halmos-results.txt
+
+      - name: Summarize Halmos
+        if: always()
+        run: |
+          echo "## Halmos Symbolic Execution Results" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tail -30 halmos-results.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload Halmos Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: halmos-results
+          path: halmos-results.txt
+
+  # ═══════════════════════════════════════════════════════════════════════════
   # SECURITY SUMMARY
   # ═══════════════════════════════════════════════════════════════════════════
   security-summary:
     name: Security Summary
-    needs: [slither, echidna, medusa, semgrep, codeql, aderyn, forge-fuzz]
+    needs: [slither, echidna, medusa, semgrep, codeql, aderyn, forge-fuzz, halmos]
     runs-on: lux-build-amd64
     if: always()
     steps:
@@ -368,6 +432,7 @@ jobs:
           echo "| CodeQL | ${{ needs.codeql.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Aderyn | ${{ needs.aderyn.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Forge Fuzz | ${{ needs.forge-fuzz.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Halmos | ${{ needs.halmos.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "See individual job logs and artifacts for detailed results." >> $GITHUB_STEP_SUMMARY
 
