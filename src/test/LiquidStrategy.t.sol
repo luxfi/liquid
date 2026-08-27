@@ -111,7 +111,7 @@ contract LiquidStrategyTest is Test {
             collateralizationLowerBound: 110e18,
             globalMinimumCollateralization: 150e18,
             tokenAdapter: address(yieldToken),
-            maxPriceDeviation: 10_000,
+            maxPriceDeviation: 1e18,
             transmuter: address(transmuter),
             protocolFee: 50,
             protocolFeeReceiver: admin,

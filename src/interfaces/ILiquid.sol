@@ -24,9 +24,12 @@ struct LiquidInitializationParams {
     // Token adapter used to get price for yield tokens. Must report the market's
     // own yieldToken and underlyingToken; the engine checks and binds to it.
     address tokenAdapter;
-    // How far, in BPS per block, the adapter's price may move the engine's
-    // stored price. Bounds how fast a compromised or thin adapter can shift
-    // borrowing power. 0 freezes the price entirely.
+    // How far the adapter's price may move the engine's stored price in one
+    // block, as a fraction of it in 1e18. Bounds how fast a compromised or thin
+    // adapter can shift borrowing power. Set it from the rate the collateral
+    // actually earns: a yield index quoted at 20% a year is
+    // 0.2e18 / blocksPerYear here, and anything looser is room an attacker
+    // works in for free. 0 freezes the price entirely.
     uint256 maxPriceDeviation;
     // The initial transmuter or transmuter buffer.
     address transmuter;
@@ -86,6 +89,11 @@ interface ILiquidActions {
     function approveMint(uint256 tokenId, address spender, uint256 amount) external;
 
     /// @notice Synchronizes the state of the account owned by `owner`.
+    ///
+    /// @dev Settles one account against earmarks and redemptions that have
+    ///      already happened. It moves no value and does not restate the price,
+    ///      so anyone may call it for anyone and nothing about the market
+    ///      depends on who did.
     ///
     /// @param tokenId   The tokenId of account
     function poke(uint256 tokenId) external;
@@ -345,11 +353,11 @@ interface ILiquidAdminActions {
     /// @param value The address of token adapter.
     function setTokenAdapter(address value) external;
 
-    /// @notice Sets the per-block cap, in BPS, on how far the adapter may move the stored price.
+    /// @notice Sets the per-block cap on how far the adapter may move the stored price.
     ///
-    /// @notice Reverts if the caller is not the admin.
+    /// @notice Reverts if the caller is not the admin, or if the cap exceeds one whole price per block.
     ///
-    /// @param value The new cap in BPS per block.
+    /// @param value The new cap, as a fraction of the anchor per block in 1e18.
     function setMaxPriceDeviation(uint256 value) external;
 
     /// @notice Set the minimum collateralization ratio.
@@ -679,12 +687,16 @@ interface ILiquidState {
     /// @return adapter The token adapter address.
     function tokenAdapter() external returns (address adapter);
 
-    /// @notice Gets the per-block cap, in BPS, on adapter price movement.
+    /// @notice Gets the per-block cap on adapter price movement.
     ///
-    /// @return value The cap in BPS per block.
+    /// @return value The cap, as a fraction of the anchor per block in 1e18.
     function maxPriceDeviation() external view returns (uint256 value);
 
     /// @notice Gets the last price the engine committed as its rate-limit anchor.
+    ///
+    /// @dev Only a report the cap admitted whole becomes the anchor, so the
+    ///      allowance for the next move is measured from a price the adapter
+    ///      earned rather than from one it was clamped to.
     ///
     /// @return price The anchor price.
     function lastPrice() external view returns (uint256 price);
@@ -821,12 +833,25 @@ interface ILiquidState {
     /// @return TVL   Total value locked.
     function getTotalUnderlyingValue() external view returns (uint256 TVL);
 
-    /// @notice Whether the protocol currently owes more debt than the collateral
-    ///         backing it is worth.
+    /// @notice What stands behind the synthetic in circulation, in debt units.
+    ///
+    /// @dev Collateral still held in the CDPs plus what borrowers have already
+    ///      handed the transmuter in repayment. Both back the same claims, so
+    ///      both are counted. This is the protocol's one statement of solvency:
+    ///      the engine refuses new debt against it and the transmuter cuts
+    ///      claims against it, and a second copy of the arithmetic anywhere is
+    ///      a second statement free to disagree with this one.
+    ///
+    /// @return value The backing, denominated in debt tokens.
+    function backing() external view returns (uint256 value);
+
+    /// @notice Whether the synthetic in circulation is worth more than what
+    ///         stands behind it.
     ///
     /// @dev While true the engine refuses new deposits and new debt, so the
     ///      shortfall is not passed on to anyone arriving next. Repayment,
-    ///      burning and liquidation stay open, which is how it is closed.
+    ///      burning, liquidation and redemption claims stay open, which is how
+    ///      it is closed.
     ///
     /// @return short True when the protocol is short.
     function inBadDebt() external view returns (bool short);

@@ -55,10 +55,12 @@ contract DeployBrandL1 is Script {
     uint256 constant LIQUIDATOR_FEE = 500; // 5% in BPS
     uint256 constant REPAYMENT_FEE = 100; // 1% in BPS
 
-    // How far the adapter may move the engine's price, in BPS per block
-    // elapsed. Bounds how fast a compromised adapter can shift borrowing
-    // power, and freezes it entirely within a single block.
-    uint256 constant MAX_PRICE_DEVIATION = 1;
+    // How far the adapter may move the engine's price in one block, as a
+    // fraction of it in 1e18. Set from what the collateral actually earns, so
+    // that a compromised adapter is held to the rate an honest one moves at.
+    // Written as the division so the calibration can be checked against the
+    // collateral rather than against a block count.
+    uint256 constant MAX_PRICE_DEVIATION = 0.2e18 / BLOCKS_PER_YEAR;
     uint256 constant TIME_TO_TRANSMUTE = 45 days; // ~90 days at 2s
     uint256 constant TRANSMUTATION_FEE = 50; // 0.5% in BPS
     uint256 constant EXIT_FEE = 200; // 2% in BPS

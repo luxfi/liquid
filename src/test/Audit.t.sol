@@ -102,7 +102,7 @@ contract AuditCanonicalToken is Test {
             collateralizationLowerBound: 1.05e18,
             globalMinimumCollateralization: 1.0526e18,
             tokenAdapter: address(yield_),
-            maxPriceDeviation: 10_000,
+            maxPriceDeviation: 1e18,
             transmuter: address(transmuter),
             protocolFee: 0,
             protocolFeeReceiver: address(0xFEE),
@@ -332,7 +332,7 @@ contract AuditLiquid is Test {
             collateralizationLowerBound: LOWER_BOUND,
             globalMinimumCollateralization: globalMin,
             tokenAdapter: address(yield_),
-            maxPriceDeviation: 10_000,
+            maxPriceDeviation: 1e18,
             transmuter: address(transmuter),
             protocolFee: 0,
             protocolFeeReceiver: feeReceiver,
@@ -504,7 +504,7 @@ contract AuditLiquid is Test {
     /// power faster than a guardian can pause the market.
     function test_price_moves_are_rate_limited_across_blocks() external {
         vm.prank(admin);
-        liquid.setMaxPriceDeviation(100); // 1% per block
+        liquid.setMaxPriceDeviation(0.01e18); // one percent a block
 
         uint256 anchor = liquid.price();
         yield_.updateMockTokenSupply(yield_.totalSupply() / 100); // adapter reports 100x
@@ -624,6 +624,56 @@ contract AuditLiquid is Test {
         liquid.deposit(1e18, user, tokenId);
         vm.stopPrank();
     }
+
+    /// The shortfall a guard reading borrower debt cannot see.
+    ///
+    /// A borrower who repays in collateral leaves no debt behind, but the
+    /// synthetic they already sold is still in circulation and the only thing
+    /// standing behind it is what the transmuter was handed. Measured against
+    /// borrower debt the protocol reads perfectly healthy at exactly the moment
+    /// the people holding its synthetic are the ones exposed -- and the
+    /// transmuter is meanwhile cutting their payouts against the other measure.
+    ///
+    /// Bob is the injured party and he never borrowed anything.
+    function test_a_shortfall_is_seen_when_the_borrower_has_already_repaid() external {
+        address bob = address(0xB0BB);
+
+        uint256 tokenId = _openMaxedPosition();
+        (, uint256 borrowed,) = liquid.getCDP(tokenId);
+
+        // Alice sells the synthetic on and settles her loan in collateral.
+        vm.prank(user);
+        IERC20(address(debt)).transfer(bob, borrowed);
+
+        vm.roll(vm.getBlockNumber() + 1);
+        vm.startPrank(user);
+        liquid.repay(liquid.convertDebtTokensToYield(borrowed), tokenId);
+        (uint256 left,,) = liquid.getCDP(tokenId);
+        liquid.withdraw(left, user, tokenId);
+        vm.stopPrank();
+
+        assertEq(liquid.totalDebt(), 0, "no borrower owes anything");
+        assertEq(liquid.totalSyntheticsIssued(), borrowed, "and the synthetic is still out there");
+
+        // Bob queues his claim. It is fully backed at this point.
+        vm.startPrank(bob);
+        IERC20(address(debt)).approve(address(transmuter), type(uint256).max);
+        transmuter.createRedemption(borrowed);
+        vm.stopPrank();
+        assertFalse(liquid.inBadDebt(), "a fully backed protocol reads short");
+
+        // The collateral behind Bob's claim loses a fifth of its value.
+        _dropPrice(80);
+
+        assertLt(liquid.backing(), liquid.totalSyntheticsIssued(), "Bob's claim is no longer covered");
+        assertTrue(liquid.inBadDebt(), "the protocol does not see a shortfall it is about to charge Bob for");
+
+        // And this is why the old invariant could not have caught it. Locked
+        // stake against synthetic issued is an inductive consequence of the two
+        // requires that produce those numbers, so it holds at the moment of
+        // maximum haircut, at exactly 1.0, having proven nothing.
+        assertLe(transmuter.totalLocked(), liquid.totalSyntheticsIssued(), "the statement that held throughout");
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -687,7 +737,7 @@ contract AuditBitcoinMarket is Test {
                     collateralizationLowerBound: 1.05e18,
                     globalMinimumCollateralization: 1.0526e18,
                     tokenAdapter: address(yield_),
-                    maxPriceDeviation: 10_000,
+                    maxPriceDeviation: 1e18,
                     transmuter: address(transmuter),
                     protocolFee: 0,
                     protocolFeeReceiver: feeReceiver,
@@ -816,5 +866,491 @@ contract AuditBitcoinMarket is Test {
 
         // No haircut on a fully-backed market: the claim is worth what it staked.
         assertApproxEqRel(paid, liquid.convertDebtTokensToYield(borrow), 0.001e18, "matured claim paid in full, in 8dp");
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The price limit. A limit that can be cranked is not a limit.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// The collateral in these markets is a yield index: it opens at parity and
+/// rises only as the collateral earns. The limit exists to hold a compromised or
+/// thin adapter to something near that rate, and everything below is a statement
+/// about how much room the limit really leaves.
+///
+/// One percent a block is looser than any index moves and is chosen only so a
+/// hundred blocks is a legible schedule. The properties are scale-free: whatever
+/// the rate, touching the market must not buy price the adapter has not earned.
+contract AuditPriceLimit is Test {
+    Liquid liquid;
+    LiquidTransmuter transmuter;
+    LiquidPosition positionNFT;
+    LiquidMintableToken debt;
+    TestERC20 underlying;
+    TestYieldToken yield_;
+
+    address admin = address(0xA11CE);
+    address user = address(0xB0B);
+    address stranger = address(0xdead);
+
+    uint256 constant PER_BLOCK = 0.01e18;
+    uint256 constant WINDOW = 100; // blocks, so the whole allowance is one anchor
+    uint256 tokenId;
+
+    function setUp() external {
+        vm.startPrank(admin);
+        underlying = new TestERC20(0, 18);
+        yield_ = new TestYieldToken(address(underlying));
+        debt = new LiquidMintableToken("d", "d", 0);
+
+        transmuter = new LiquidTransmuter(
+            ILiquidTransmuter.TransmuterInitializationParams({
+                syntheticToken: address(debt),
+                feeReceiver: address(0xFEE),
+                timeToTransmute: 5_256_000,
+                transmutationFee: 0,
+                exitFee: 0,
+                graphSize: 52_560_000
+            })
+        );
+
+        Liquid logic = new Liquid();
+        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
+            address(logic),
+            address(0xDEAD),
+            abi.encodeWithSelector(
+                Liquid.initialize.selector,
+                LiquidInitializationParams({
+                    admin: admin,
+                    debtToken: address(debt),
+                    underlyingToken: address(underlying),
+                    yieldToken: address(yield_),
+                    blocksPerYear: 2_600_000,
+                    depositCap: type(uint256).max,
+                    minimumCollateralization: 1.1111e18,
+                    collateralizationLowerBound: 1.05e18,
+                    globalMinimumCollateralization: 1.0526e18,
+                    tokenAdapter: address(yield_),
+                    maxPriceDeviation: PER_BLOCK,
+                    transmuter: address(transmuter),
+                    protocolFee: 0,
+                    protocolFeeReceiver: address(0xFEE),
+                    liquidatorFee: 500,
+                    repaymentFee: 100
+                })
+            )
+        );
+        liquid = Liquid(address(proxy));
+        debt.setWhitelist(address(proxy), true);
+        transmuter.setLiquid(address(liquid));
+        transmuter.setDepositCap(uint256(type(int256).max));
+        positionNFT = new LiquidPosition(address(liquid));
+        liquid.setLiquidPositionNFT(address(positionNFT));
+        vm.stopPrank();
+
+        deal(address(underlying), user, 1_000_000e18);
+        vm.startPrank(user);
+        IERC20(address(underlying)).approve(address(yield_), type(uint256).max);
+        yield_.mint(1_000_000e18, user);
+        IERC20(address(yield_)).approve(address(liquid), type(uint256).max);
+        liquid.deposit(1000e18, user, 0);
+        tokenId = positionNFT.tokenOfOwnerByIndex(user, 0);
+        vm.stopPrank();
+    }
+
+    /// The adapter goes bad and reports the largest number it can.
+    function _runaway() internal {
+        yield_.updateMockTokenSupply(1);
+    }
+
+    /// The cheapest transaction that moves value, and so the cheapest way to
+    /// make the engine restate the price.
+    function _touch() internal {
+        vm.prank(user);
+        liquid.deposit(1, user, tokenId);
+    }
+
+    /// What the adapter has earned after `blocks`: the declared rate, taken over
+    /// the time that passed, and nothing else.
+    function _earned(uint256 anchor, uint256 blocks) internal pure returns (uint256) {
+        return anchor + anchor * PER_BLOCK * blocks / 1e18;
+    }
+
+    /// Touching the market must not buy price the adapter has not earned.
+    ///
+    /// The limit is an allowance that accrues with time. Committing a clamped
+    /// report as the new anchor spends that allowance and opens a fresh one from
+    /// the clamped price, so a caller who touches often compounds where a caller
+    /// who waits only accrues. Over one window the two must land in the same
+    /// place.
+    function test_touching_the_market_does_not_compound_the_limit() external {
+        uint256 anchor = liquid.lastPrice();
+        _runaway();
+
+        for (uint256 i; i < WINDOW; ++i) {
+            vm.roll(vm.getBlockNumber() + 1);
+            _touch();
+        }
+
+        assertEq(liquid.price(), _earned(anchor, WINDOW), "cranking the limit bought price the adapter never earned");
+    }
+
+    /// The same window, untouched. This is the schedule the one above must match.
+    function test_an_untouched_market_admits_exactly_what_time_bought() external {
+        uint256 anchor = liquid.lastPrice();
+        _runaway();
+
+        vm.roll(vm.getBlockNumber() + WINDOW);
+
+        assertEq(liquid.price(), _earned(anchor, WINDOW), "a dormant market admits the declared rate over the elapsed time");
+    }
+
+    /// Settling somebody else's account is not a reason to restate the price.
+    ///
+    /// `poke` takes any live position, from any caller, with no approval. While
+    /// it committed the price it was the cheapest way to drive another account's
+    /// market, and a stranger could do it.
+    function test_a_stranger_cannot_move_the_anchor_by_poking() external {
+        uint256 anchor = liquid.lastPrice();
+        uint256 anchorBlock = liquid.lastPriceBlock();
+        _runaway();
+
+        vm.roll(vm.getBlockNumber() + WINDOW);
+        vm.prank(stranger);
+        liquid.poke(tokenId);
+
+        assertEq(liquid.lastPrice(), anchor, "a stranger moved the anchor");
+        assertEq(liquid.lastPriceBlock(), anchorBlock, "a stranger moved the anchor's clock");
+    }
+
+    /// A report inside the allowance is the market working, and it does move the
+    /// anchor. Freezing the anchor while a report is clamped must not freeze it
+    /// when the report is honest.
+    function test_an_honest_report_still_moves_the_anchor() external {
+        uint256 anchor = liquid.lastPrice();
+
+        // Half a percent over a block, well inside the one percent allowance.
+        yield_.updateMockTokenSupply(yield_.totalSupply() * 1000 / 1005);
+        vm.roll(vm.getBlockNumber() + 1);
+        _touch();
+
+        assertGt(liquid.lastPrice(), anchor, "an admissible report did not become the anchor");
+        assertEq(liquid.lastPrice(), liquid.price(), "and the anchor is the price");
+        assertEq(liquid.lastPriceBlock(), vm.getBlockNumber(), "the anchor's clock advanced with it");
+    }
+
+    /// The limit must be able to name the rate it bounds.
+    ///
+    /// A twenty percent index against fifteen million blocks a year moves
+    /// 0.00013 BPS a block. Expressed in BPS per block the tightest limit the
+    /// parameter could hold was 1, nearly eight thousand times that, and all of
+    /// the difference was room a compromised adapter worked in for free.
+    function test_the_limit_can_name_the_rate_it_bounds() external {
+        uint256 blocksPerYear = 15_768_000;
+        uint256 twentyPercentAYear = uint256(0.2e18) / blocksPerYear;
+
+        vm.prank(admin);
+        liquid.setMaxPriceDeviation(twentyPercentAYear);
+
+        uint256 anchor = liquid.lastPrice();
+        _runaway();
+        vm.roll(vm.getBlockNumber() + blocksPerYear);
+
+        // A whole year of a compromised adapter buys a whole year of the index.
+        assertApproxEqRel(liquid.price(), anchor * 12 / 10, 0.0001e18, "a year of a bad adapter bought more than a year of yield");
+    }
+
+    /// Twelve hours is the window that mattered: at 1 BPS a block a compromised
+    /// adapter reached 10x inside it, and 10x turns 100 units of collateral into
+    /// 900 units of debt.
+    function test_half_a_day_of_a_bad_adapter_barely_moves_the_price() external {
+        vm.prank(admin);
+        liquid.setMaxPriceDeviation(uint256(0.2e18) / 15_768_000);
+
+        uint256 anchor = liquid.lastPrice();
+        _runaway();
+        vm.roll(vm.getBlockNumber() + 23_028); // the blocks that used to buy 10x
+
+        assertLt(liquid.price(), anchor * 1001 / 1000, "half a day of a bad adapter moved the price more than a tenth of a percent");
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The liquidation engine, checked against what it is for.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Every assertion below is a condition on the state a liquidation leaves
+/// behind. None of them calls {Liquid.calculateLiquidation}.
+///
+/// Calling it with the arguments the engine passes it and comparing the two
+/// establishes that a `pure` function is deterministic. An inverted fee, a
+/// dropped decimals scalar, a bound read from the wrong side: each moves both
+/// sides of that comparison together and nothing fails. What none of them can
+/// do is leave the position at the right ratio afterwards, so that is what is
+/// asserted here.
+///
+/// The market is deliberately not like-kind. A market whose collateral is
+/// denominated in its own synthetic cannot reach this code at all, which is the
+/// reason it went unexercised: the ratio only rises, and every fee a
+/// force-repayment takes frees more lock than it costs. Reaching the branch
+/// takes collateral whose price can fall.
+contract AuditLiquidation is Test {
+    Liquid liquid;
+    LiquidTransmuter transmuter;
+    LiquidPosition positionNFT;
+    LiquidTokenVault feeVault;
+    LiquidMintableToken debt;
+    TestERC20 underlying;
+    TestYieldToken yield_;
+
+    address admin = address(0xA11CE);
+    address user = address(0xB0B);
+    address liquidator = address(0x11D);
+    address feeReceiver = address(0xFEE);
+
+    uint256 constant MIN_COLL = 1.1111e18; // 90% LTV
+    uint256 constant LOWER_BOUND = 1.05e18;
+    uint256 constant GLOBAL_MIN = 1.0526e18;
+    uint256 constant LIQUIDATOR_FEE = 500; // 5% of surplus, BPS
+    uint256 constant ONE = 1e18;
+
+    function setUp() external {
+        vm.startPrank(admin);
+        underlying = new TestERC20(0, 18);
+        yield_ = new TestYieldToken(address(underlying));
+        debt = new LiquidMintableToken("d", "d", 0);
+
+        transmuter = new LiquidTransmuter(
+            ILiquidTransmuter.TransmuterInitializationParams({
+                syntheticToken: address(debt),
+                feeReceiver: feeReceiver,
+                timeToTransmute: 5_256_000,
+                transmutationFee: 0,
+                exitFee: 0,
+                graphSize: 52_560_000
+            })
+        );
+
+        Liquid logic = new Liquid();
+        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
+            address(logic),
+            address(0xDEAD),
+            abi.encodeWithSelector(
+                Liquid.initialize.selector,
+                LiquidInitializationParams({
+                    admin: admin,
+                    debtToken: address(debt),
+                    underlyingToken: address(underlying),
+                    yieldToken: address(yield_),
+                    blocksPerYear: 2_600_000,
+                    depositCap: type(uint256).max,
+                    minimumCollateralization: MIN_COLL,
+                    collateralizationLowerBound: LOWER_BOUND,
+                    globalMinimumCollateralization: GLOBAL_MIN,
+                    tokenAdapter: address(yield_),
+                    maxPriceDeviation: 1e18,
+                    transmuter: address(transmuter),
+                    protocolFee: 0,
+                    protocolFeeReceiver: feeReceiver,
+                    liquidatorFee: LIQUIDATOR_FEE,
+                    repaymentFee: 100
+                })
+            )
+        );
+        liquid = Liquid(address(proxy));
+        debt.setWhitelist(address(proxy), true);
+        transmuter.setLiquid(address(liquid));
+        transmuter.setDepositCap(uint256(type(int256).max));
+        positionNFT = new LiquidPosition(address(liquid));
+        liquid.setLiquidPositionNFT(address(positionNFT));
+
+        // The bonus a liquidation pays when the position cannot fund one. It is
+        // held in the underlying, which is what setLiquidFeeVault checks.
+        feeVault = new LiquidTokenVault(address(underlying), address(liquid), admin);
+        liquid.setLiquidFeeVault(address(feeVault));
+        vm.stopPrank();
+
+        deal(address(underlying), user, 1_000_000e18);
+        vm.startPrank(user);
+        IERC20(address(underlying)).approve(address(yield_), type(uint256).max);
+        yield_.mint(900_000e18, user);
+        IERC20(address(yield_)).approve(address(liquid), type(uint256).max);
+        vm.stopPrank();
+
+        deal(address(underlying), admin, 100_000e18);
+        vm.startPrank(admin);
+        IERC20(address(underlying)).approve(address(feeVault), type(uint256).max);
+        feeVault.deposit(50_000e18);
+        vm.stopPrank();
+    }
+
+    /// Collateral loses value: the adapter reports `pctOfPar` percent of par.
+    function _dropPrice(uint256 pctOfPar) internal {
+        yield_.updateMockTokenSupply(yield_.totalSupply() * 100 / pctOfPar);
+        vm.roll(vm.getBlockNumber() + 1);
+    }
+
+    function _openMaxedPosition(uint256 collateral) internal returns (uint256 tokenId) {
+        vm.startPrank(user);
+        liquid.deposit(collateral, user, 0);
+        tokenId = positionNFT.tokenOfOwnerByIndex(user, 0);
+        liquid.mint(tokenId, liquid.getMaxBorrowable(tokenId), user);
+        vm.stopPrank();
+    }
+
+    /// A large position carrying no debt, opened so the protocol as a whole
+    /// stays solvent while one borrower falls under the bound.
+    ///
+    /// Without it there is nothing else on the book, the protocol-wide ratio is
+    /// the borrower's own ratio, and any drop that makes a maxed position
+    /// liquidatable declares the protocol insolvent in the same move. Every
+    /// liquidation then takes the full-seizure branch and the margin-restore
+    /// arithmetic is never reached. That is not a hypothetical: it is what these
+    /// tests did on the first run.
+    function _ballast() internal {
+        address other = address(0xBA11);
+        deal(address(underlying), other, 200_000e18);
+        vm.startPrank(other);
+        IERC20(address(underlying)).approve(address(yield_), type(uint256).max);
+        yield_.mint(200_000e18, other);
+        IERC20(address(yield_)).approve(address(liquid), type(uint256).max);
+        liquid.deposit(200_000e18, other, 0);
+        vm.stopPrank();
+    }
+
+    /// The position's collateral valued against its debt, in 1e18.
+    function _ratio(uint256 tokenId) internal view returns (uint256) {
+        (uint256 collateral, uint256 owed,) = liquid.getCDP(tokenId);
+        if (owed == 0) return type(uint256).max;
+        return liquid.convertYieldTokensToDebt(collateral) * ONE / owed;
+    }
+
+    /// The protocol's collateral valued against all the debt it has issued.
+    function _protocolRatio() internal view returns (uint256) {
+        return liquid.normalizeUnderlyingTokensToDebt(liquid.getTotalUnderlyingValue()) * ONE / liquid.totalDebt();
+    }
+
+    /// A liquidation restores margin to the mint bar, and stops there.
+    ///
+    /// This is the whole of what the calculation is for: find the y that solves
+    /// (collateral - fee - y) / (debt - y) = minimumCollateralization. Seizing
+    /// less leaves the position liquidatable and the protocol short; seizing
+    /// more is collateral taken from a borrower who did not owe it.
+    function test_a_liquidation_restores_margin_to_the_mint_bar() external {
+        _ballast();
+        uint256 tokenId = _openMaxedPosition(1000e18);
+        _dropPrice(93);
+
+        // Which branch this is. Stated rather than assumed, because a test that
+        // silently drifts into the full-seizure branch still passes while
+        // asserting nothing about the arithmetic it was written for.
+        assertLt(_ratio(tokenId), LOWER_BOUND, "the position is under the bound");
+        assertGt(_ratio(tokenId), ONE, "and its collateral still covers its debt");
+        assertGt(_protocolRatio(), GLOBAL_MIN, "while the protocol as a whole is solvent");
+
+        vm.prank(liquidator);
+        liquid.liquidate(tokenId);
+
+        assertApproxEqRel(_ratio(tokenId), MIN_COLL, 0.0001e18, "the position was not left at the mint bar");
+    }
+
+    /// And a hair above the bound, nothing is taken.
+    function test_a_position_above_the_bound_is_not_liquidatable() external {
+        uint256 tokenId = _openMaxedPosition(1000e18);
+        _dropPrice(97); // 1.1111 * 0.97 = 1.0778, above the 1.05 bound
+
+        assertGt(_ratio(tokenId), LOWER_BOUND, "the position is above the bound");
+
+        vm.prank(liquidator);
+        vm.expectRevert(ILiquidErrors.LiquidationError.selector);
+        liquid.liquidate(tokenId);
+    }
+
+    /// The liquidator is paid a share of the surplus, not of the position.
+    ///
+    /// A fee taken from the position rather than from what the position is worth
+    /// over its debt pays the liquidator out of the debt's own backing, and the
+    /// difference only shows up as a number, never as a revert.
+    function test_the_liquidator_is_paid_a_share_of_the_surplus() external {
+        _ballast();
+        uint256 tokenId = _openMaxedPosition(1000e18);
+        _dropPrice(93);
+        assertGt(_protocolRatio(), GLOBAL_MIN, "a short protocol pays no base fee at all");
+
+        (uint256 collateral, uint256 owed,) = liquid.getCDP(tokenId);
+        uint256 surplus = liquid.convertYieldTokensToDebt(collateral) - owed;
+        uint256 expected = liquid.convertDebtTokensToYield(surplus * LIQUIDATOR_FEE / 10_000);
+
+        vm.prank(liquidator);
+        (, uint256 feeInYield,) = liquid.liquidate(tokenId);
+
+        assertApproxEqRel(feeInYield, expected, 0.0001e18, "the fee is not five percent of the surplus");
+    }
+
+    /// Debt past collateral takes the position whole, and the bonus comes from
+    /// the vault because there is no surplus left to pay one from.
+    function test_a_position_past_its_collateral_is_seized_whole() external {
+        uint256 tokenId = _openMaxedPosition(1000e18);
+        (uint256 collateralBefore, uint256 owedBefore,) = liquid.getCDP(tokenId);
+
+        _dropPrice(70); // debt now exceeds what the collateral is worth
+        assertLt(liquid.totalValue(tokenId), owedBefore, "the position is under water");
+
+        uint256 heldByLiquidator = IERC20(address(underlying)).balanceOf(liquidator);
+
+        vm.prank(liquidator);
+        (uint256 seized,, uint256 bonus) = liquid.liquidate(tokenId);
+
+        (uint256 collateralAfter, uint256 owedAfter,) = liquid.getCDP(tokenId);
+        assertEq(owedAfter, 0, "debt survived a full seizure");
+        assertEq(collateralAfter, 0, "collateral survived a full seizure");
+        assertApproxEqRel(seized, collateralBefore, 0.0001e18, "the whole position was not taken");
+
+        // The bonus is the liquidator fee against the debt written off, capped
+        // at what the vault holds.
+        uint256 expected = liquid.normalizeDebtTokensToUnderlying(owedBefore * LIQUIDATOR_FEE / 10_000);
+        assertApproxEqRel(bonus, expected, 0.0001e18, "the vault bonus is not the fee on the debt written off");
+        assertEq(IERC20(address(underlying)).balanceOf(liquidator) - heldByLiquidator, bonus, "the bonus never reached the liquidator");
+    }
+
+    /// A liquidation on a protocol that is short overall takes the position in
+    /// full rather than restoring its margin. Leaving a margin behind while the
+    /// protocol is short hands the shortfall to whoever is liquidated last.
+    function test_an_insolvent_protocol_seizes_in_full() external {
+        uint256 tokenId = _openMaxedPosition(1000e18);
+        _dropPrice(93);
+
+        // The position on its own would only need its margin restored: its
+        // collateral still covers its debt. It is the protocol-wide shortfall
+        // that takes it whole, which is the branch being exercised.
+        assertGt(_ratio(tokenId), ONE, "the position's collateral still covers its debt");
+        assertLt(_protocolRatio(), GLOBAL_MIN, "the protocol is short overall");
+
+        (, uint256 owedBefore,) = liquid.getCDP(tokenId);
+        assertGt(owedBefore, 0, "the position carried debt to begin with");
+
+        vm.prank(liquidator);
+        liquid.liquidate(tokenId);
+
+        (, uint256 owedAfter,) = liquid.getCDP(tokenId);
+        assertEq(owedAfter, 0, "an insolvent protocol left a margin standing");
+    }
+
+    /// The bonus is a courtesy, not a precondition. An empty vault must not
+    /// strand the positions the branch exists for.
+    function test_an_empty_vault_does_not_strand_a_deep_liquidation() external {
+        uint256 held = feeVault.totalDeposits();
+        vm.prank(admin);
+        feeVault.withdraw(admin, held);
+        assertEq(feeVault.totalDeposits(), 0, "the vault still holds a bonus");
+
+        uint256 tokenId = _openMaxedPosition(1000e18);
+        _dropPrice(70);
+
+        vm.prank(liquidator);
+        (uint256 seized,, uint256 bonus) = liquid.liquidate(tokenId);
+
+        assertGt(seized, 0, "an empty vault stranded the liquidation");
+        assertEq(bonus, 0, "an empty vault paid a bonus");
     }
 }

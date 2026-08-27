@@ -160,7 +160,7 @@ contract IntegrationTest is Test {
             collateralizationLowerBound: 1_052_631_578_950_000_000, // 1.05 collateralization
             globalMinimumCollateralization: 1_111_111_111_111_111_111, // 1.1
             tokenAdapter: address(vaultAdapter),
-            maxPriceDeviation: 10_000,
+            maxPriceDeviation: 1e18,
             transmuter: address(transmuterLogic),
             protocolFee: 100,
             protocolFeeReceiver: receiver,

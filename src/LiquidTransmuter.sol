@@ -222,20 +222,20 @@ contract LiquidTransmuter is ILiquidTransmuter, ERC721, ReentrancyGuard {
         // Burn position NFT
         _burn(id);
 
-        // Synthetics issued against the underlying value backing them. Above 1.0
-        // the protocol owes more than it holds, and the shortfall is shared by
+        // Synthetics issued against the value backing them. Above 1.0 the
+        // protocol owes more than it holds, and the shortfall is shared by
         // scaling back what each claim is worth.
         //
-        // Both sides must be in the same units for the 1.0 comparison to mean
-        // anything: the collateral total is denominated in underlying tokens,
-        // the synthetics in debt tokens, and for a market like bridged BTC (8dp)
-        // against LBTC (18dp) those differ by ten orders of magnitude. Normalize
-        // the collateral into debt units first, then take the ratio in 1e18.
+        // The engine states what backs the synthetic, and this reads that
+        // statement rather than restating it. A second copy here would be a
+        // second definition of solvency, free to drift from the one the engine
+        // refuses new debt against, and the drift only shows up as claimants
+        // being cut by a market that believes it is healthy.
         //
         // Rounded up, so a rounding remainder registers as bad debt rather than
         // disappearing -- the haircut may be a hair too deep, never too shallow.
         uint256 yieldTokenBalance = TokenUtils.safeBalanceOf(liquid.yieldToken(), address(this));
-        uint256 backing = liquid.normalizeUnderlyingTokensToDebt(liquid.getTotalUnderlyingValue() + liquid.convertYieldTokensToUnderlying(yieldTokenBalance));
+        uint256 backing = liquid.backing();
         // Avoid divide by 0
         if (backing == 0) backing = 1;
         uint256 issued = liquid.totalSyntheticsIssued();
