@@ -259,7 +259,7 @@ const config = {
           href: "https://lux.finance",
           width: 160,
         },
-        copyright: `Copyright \u00a9 2020 \u2013 ${new Date().getFullYear()} Lux Partners.
+        copyright: `Copyright \u00a9 2020 \u2013 ${new Date().getFullYear()} Lux Industries Inc.
         <br>
         <span style="font-size: 0.6em; opacity: 0.8;">
         All rights reserved, no guarantees given. DeFi tools are not toys. Use at your own risk.
