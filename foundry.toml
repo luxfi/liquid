@@ -65,20 +65,20 @@ mainnet = "${MAINNET_API_KEY}"
 sepolia = "${SEPOLIA_API_KEY}"
 
 # Lux Network Endpoints
-lux_mainnet = "http://127.0.0.1:9630/v1/bc/C/rpc"
-lux_testnet = "http://127.0.0.1:9640/v1/bc/C/rpc"
-lux_mainnet_public = "https://api.lux.network/v1/bc/C/rpc"
-lux_testnet_public = "https://api.testnet.lux.network/v1/bc/C/rpc"
+lux_mainnet = "http://127.0.0.1:9630/v1/chain/C/rpc"
+lux_testnet = "http://127.0.0.1:9640/v1/chain/C/rpc"
+lux_mainnet_public = "https://api.lux.network/v1/chain/C/rpc"
+lux_testnet_public = "https://api.testnet.lux.network/v1/chain/C/rpc"
 
 # Zoo Network Endpoints
-zoo_mainnet = "http://127.0.0.1:9630/v1/bc/Zoo/rpc"
-zoo_testnet = "http://127.0.0.1:9640/v1/bc/Zoo/rpc"
-zoo_mainnet_public = "https://api.zoo.network/v1/bc/Zoo/rpc"
+zoo_mainnet = "http://127.0.0.1:9630/v1/chain/Zoo/rpc"
+zoo_testnet = "http://127.0.0.1:9640/v1/chain/Zoo/rpc"
+zoo_mainnet_public = "https://api.zoo.network/v1/chain/Zoo/rpc"
 
 # Hanzo Network Endpoints
-hanzo_mainnet = "http://127.0.0.1:9630/v1/bc/Hanzo/rpc"
-hanzo_testnet = "http://127.0.0.1:9640/v1/bc/Hanzo/rpc"
-hanzo_mainnet_public = "https://api.hanzo.network/v1/bc/Hanzo/rpc"
+hanzo_mainnet = "http://127.0.0.1:9630/v1/chain/Hanzo/rpc"
+hanzo_testnet = "http://127.0.0.1:9640/v1/chain/Hanzo/rpc"
+hanzo_mainnet_public = "https://api.hanzo.network/v1/chain/Hanzo/rpc"
 
 [etherscan]
 mainnet = { key = "${ETHERSCAN_API_KEY}" }
