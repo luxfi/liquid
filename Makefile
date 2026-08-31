@@ -140,17 +140,17 @@ halmos: venv
 # and TOKEN_ADAPTER_ADDRESS for the market being brought up.
 deploy-devnet:
 	LIQUID_ENV=devnet $(FORGE) script script/DeployBrandL1.s.sol \
-		--rpc-url https://api.lux-dev.network/v1/bc/C/rpc \
+		--rpc-url https://api.lux-dev.network/v1/chain/C/rpc \
 		--mnemonics "$$LUX_MNEMONIC" --broadcast -vvv
 
 deploy-testnet:
 	LIQUID_ENV=testnet $(FORGE) script script/DeployBrandL1.s.sol \
-		--rpc-url https://api.lux-test.network/v1/bc/C/rpc \
+		--rpc-url https://api.lux-test.network/v1/chain/C/rpc \
 		--mnemonics "$$LUX_MNEMONIC" --broadcast -vvv
 
 deploy-mainnet:
 	$(FORGE) script script/DeployMainnet.s.sol \
-		--rpc-url https://api.lux.network/v1/bc/C/rpc \
+		--rpc-url https://api.lux.network/v1/chain/C/rpc \
 		--mnemonics "$$LUX_MNEMONIC" --broadcast -vvv
 
 deploy-all: deploy-devnet deploy-testnet deploy-mainnet

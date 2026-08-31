@@ -18,7 +18,7 @@ set -euo pipefail
 export PATH="$HOME/.foundry/bin:$PATH"
 export FOUNDRY_DISABLE_NIGHTLY_WARNING=1
 
-RPC=http://127.0.0.1:9650/v1/bc/C/rpc
+RPC=http://127.0.0.1:9650/v1/chain/C/rpc
 GAS_PRICE=${GAS_PRICE:-500000000000}  # 500 gwei (overcome stuck pending txs)
 M=$(security find-generic-password -a LUX_MNEMONIC -w)
 PRIVATE_KEY=$(cast wallet derive-private-key "$M" 0 | tail -1 | awk '{print $NF}')
