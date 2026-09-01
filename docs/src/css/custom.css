@@ -4,12 +4,12 @@
  * work well for content-centric websites.
  */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Fira+Code:wght@400;500;600&display=swap');
+@import url('');
 
 /* ─── Base typography ────────────────────────────────── */
 :root {
-  --ifm-font-family-base: 'Inter', system-ui, -apple-system, sans-serif;
-  --ifm-font-family-monospace: 'Fira Code', ui-monospace, 'SFMono-Regular', monospace;
+  --ifm-font-family-base: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --ifm-font-family-monospace: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 }
 
 /* ─── Light theme ─────────────────────────────────────── */
@@ -22,7 +22,7 @@
   --ifm-color-primary-lighter: #3f3f46;
   --ifm-color-primary-lightest: #52525b;
 
-  --ifm-code-font-size: 95%;
+  --ifm-code-font-size: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --ifm-border-radius: 8px;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
 }
@@ -132,7 +132,7 @@
 
 /* ─── Search input bar ───────────────────────────────── */
 .navbar__search-input {
-  font-family: 'Inter', sans-serif !important;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   background-color: #111111 !important;
   color: #fff !important;
   border: 1px solid #222222 !important;
