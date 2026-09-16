@@ -23,7 +23,7 @@ jobs:
   # ═══════════════════════════════════════════════════════════════════════════
   forge-lint:
     name: Forge Lint
-    runs-on: lux-build-amd64
+    runs-on: linux-amd64
     steps:
       - uses: actions/checkout@v4
         with:
@@ -61,7 +61,7 @@ jobs:
   # ═══════════════════════════════════════════════════════════════════════════
   coverage:
     name: Code Coverage
-    runs-on: lux-build-amd64
+    runs-on: linux-amd64
     steps:
       - uses: actions/checkout@v4
         with:
@@ -104,7 +104,7 @@ jobs:
   # ═══════════════════════════════════════════════════════════════════════════
   custom-checks:
     name: Custom Security Checks
-    runs-on: lux-build-amd64
+    runs-on: linux-amd64
     steps:
       - uses: actions/checkout@v4
         with:
@@ -358,7 +358,7 @@ jobs:
   # ═══════════════════════════════════════════════════════════════════════════
   gas-analysis:
     name: Gas Analysis
-    runs-on: lux-build-amd64
+    runs-on: linux-amd64
     steps:
       - uses: actions/checkout@v4
         with:
@@ -392,7 +392,7 @@ jobs:
   # ═══════════════════════════════════════════════════════════════════════════
   contract-size:
     name: Contract Size Check
-    runs-on: lux-build-amd64
+    runs-on: linux-amd64
     steps:
       - uses: actions/checkout@v4
         with:
@@ -432,7 +432,7 @@ jobs:
   # ═══════════════════════════════════════════════════════════════════════════
   storage-layout:
     name: Storage Layout Check
-    runs-on: lux-build-amd64
+    runs-on: linux-amd64
     steps:
       - uses: actions/checkout@v4
         with:
@@ -473,7 +473,7 @@ jobs:
   # ═══════════════════════════════════════════════════════════════════════════
   invariant-tests:
     name: Invariant Tests
-    runs-on: lux-build-amd64
+    runs-on: linux-amd64
     steps:
       - uses: actions/checkout@v4
         with:
@@ -513,7 +513,7 @@ jobs:
   # ═══════════════════════════════════════════════════════════════════════════
   full-tests:
     name: Full Test Suite
-    runs-on: lux-build-amd64
+    runs-on: linux-amd64
     # The fork tests in IntegrationTest and strategies/ read this and skip
     # themselves when it is empty. Pull requests from forks get no secret and
     # will keep skipping; that is GitHub, not the wiring.
@@ -563,7 +563,7 @@ jobs:
   audit-summary:
     name: Audit Summary
     needs: [forge-lint, coverage, custom-checks, gas-analysis, contract-size, storage-layout, invariant-tests, full-tests]
-    runs-on: lux-build-amd64
+    runs-on: linux-amd64
     if: always()
     steps:
       - name: Download all artifacts

@@ -12,7 +12,7 @@ env:
 jobs:
   check:
     name: Foundry project
-    runs-on: lux-build-amd64
+    runs-on: linux-amd64
     steps:
       - uses: actions/checkout@v3
         with:
@@ -35,7 +35,7 @@ jobs:
         id: test
 
   forge_coverage:
-    runs-on: lux-build-amd64
+    runs-on: linux-amd64
     steps:
       - uses: actions/checkout@v3
         with:
@@ -54,7 +54,7 @@ jobs:
         run: forge b; forge coverage
 
   slither:
-    runs-on: lux-build-amd64
+    runs-on: linux-amd64
     steps:
       - uses: actions/checkout@v3
       - name: Get node.js
